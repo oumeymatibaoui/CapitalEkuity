@@ -1,0 +1,65 @@
+# =========================
+# GLOBAL
+# =========================
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+*.bak
+*.swp
+
+# =========================
+# IntelliJ / JetBrains
+# =========================
+.idea/
+*.iml
+out/
+
+# =========================
+# VS Code
+# =========================
+.vscode/
+
+# =========================
+# Angular / Node
+# =========================
+frontend-el-emar/node_modules/
+frontend-el-emar/dist/
+frontend-el-emar/.angular/
+frontend-el-emar/.cache/
+frontend-el-emar/npm-debug.log*
+frontend-el-emar/yarn-debug.log*
+frontend-el-emar/yarn-error.log*
+
+# =========================
+# Spring Boot / Maven
+# =========================
+backend-el-emar/target/
+backend-el-emar/.mvn/wrapper/maven-wrapper.jar
+backend-el-emar/HELP.md
+
+# =========================
+# Environment / secrets
+# =========================
+backend-el-emar/src/main/resources/application-local.properties
+backend-el-emar/src/main/resources/application-dev.properties
+backend-el-emar/src/main/resources/application-prod.properties
+backend-el-emar/src/main/resources/.env
+frontend-el-emar/.env
+
+# If your application.properties contains password, ignore it
+backend-el-emar/src/main/resources/application.properties
+
+# =========================
+# Uploaded files / storage
+# =========================
+backend-el-emar/uploads/
+backend-el-emar/files/
+backend-el-emar/storage/
+
+# =========================
+# Database dumps
+# =========================
+*.dump
+*.backup
+*.sql.bak
