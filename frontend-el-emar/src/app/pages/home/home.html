@@ -1,0 +1,143 @@
+<div class="home-page">
+
+    <!-- Navbar -->
+    <header class="navbar">
+        <div class="brand">
+            <div class="brand-logo">
+                <i class="ti ti-building" aria-hidden="true"></i>
+            </div>
+            <div class="brand-text">
+                <h1>El Emar</h1>
+                <span>Plateforme de qualification</span>
+            </div>
+        </div>
+
+        <nav class="nav-actions">
+            <button class="btn-nav-outline" (click)="openElEmarLogin()">Connexion El Emar</button>
+            <button class="btn-nav-gold">Espace candidat</button>
+        </nav>
+    </header>
+
+    <!-- Hero -->
+    <section class="hero">
+        <div class="hero-inner">
+            <div class="hero-badge">
+                <i class="ti ti-star" aria-hidden="true"></i> Plateforme officielle de qualification — El Emar
+            </div>
+
+            <h2 class="hero-title">
+                Qualifiez votre structure
+                <span class="hero-title-accent">en toute simplicité</span>
+            </h2>
+
+            <p class="hero-description">
+                Accédez à l’appel à candidature qui vous a été affecté par El Emar, complétez votre dossier et suivez son avancement directement sur la plateforme.
+            </p>
+
+            <div class="hero-actions">
+                <button class="btn-gold-pill">
+          Accéder à mon espace
+          <i class="ti ti-arrow-right" aria-hidden="true"></i>
+        </button>
+                <button class="btn-outline-pill" (click)="openElEmarLogin()">Connexion El Emar</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Steps Section -->
+    <section class="steps-section" id="procedure">
+        <div class="section-header">
+            <h3>Comment compléter votre candidature ?</h3>
+            <p>
+                Suivez ces 9 étapes simples pour compléter votre dossier de qualification auprès d'El Emar.
+            </p>
+        </div>
+
+        <div class="steps-grid">
+            <div class="step-card" *ngFor="let step of steps">
+                <div class="step-icon" [class.gold]="step.number === '06'">
+                    <i class="ti" [ngClass]="getStepIcon(step.number)" aria-hidden="true"></i>
+                </div>
+
+                <div class="step-body">
+                    <div class="step-label">ÉTAPE {{ step.number }}</div>
+                    <h4 class="step-title">{{ step.title }}</h4>
+                    <p class="step-desc">{{ step.description }}</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="cta-section">
+        <div class="cta-inner">
+            <div class="cta-check-icon">
+                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="12" cy="12" r="10"/>
+          <polyline points="9 12 11 14 15 10"/>
+        </svg>
+            </div>
+
+            <h2 class="cta-title">Prêt à compléter votre dossier ?</h2>
+
+            <p class="cta-desc">
+                Connectez-vous avec les identifiants fournis par El Emar et accédez directement à l’appel qui vous a été affecté.
+            </p>
+
+            <div class="cta-actions">
+                <button class="btn-gold-pill">Accéder à mon espace candidat</button>
+                <button class="btn-outline-dark-pill" (click)="openElEmarLogin()">Interface El Emar</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-brand">
+            <div class="footer-logo">
+                <i class="ti ti-building" aria-hidden="true"></i>
+            </div>
+            <span><strong>El Emar</strong> — Plateforme de qualification des structures partenaires</span> </div>
+        <p class="footer-copy">© 2026 El Emar. Tous droits réservés.</p>
+    </footer>
+
+</div>
+<!-- El Emar Login Modal -->
+<div class="login-overlay" *ngIf="showElEmarLogin" (click)="closeElEmarLogin()">
+    <div class="login-card" (click)="$event.stopPropagation()">
+
+        <button class="login-close" type="button" (click)="closeElEmarLogin()">
+      <i class="ti ti-x"></i>
+    </button>
+
+        <div class="login-icon">
+            <i class="ti ti-building"></i>
+        </div>
+
+        <h3>Connexion El Emar</h3>
+        <p class="login-subtitle">Accès réservé au personnel El Emar</p>
+
+        <form class="login-form" (submit)="ElEmarLogin($event)">
+            <div class="form-group">
+                <label>Adresse e-mail</label>
+                <input type="email" name="email" [(ngModel)]="elEmarLogin.email" placeholder="admin@elemar.tn" autocomplete="off" />
+            </div>
+
+            <div class="form-group">
+                <label>Mot de passe</label>
+                <input type="password" name="motDePasse" [(ngModel)]="elEmarLogin.motDePasse" placeholder="••••••••" autocomplete="off" />
+            </div>
+
+            <p class="login-error" *ngIf="loginError">
+                {{ loginError }}
+            </p>
+
+            <button class="login-submit" type="submit">
+        Se connecter en tant qu'El Emar
+      </button>
+        </form>
+
+
+
+    </div>
+</div>

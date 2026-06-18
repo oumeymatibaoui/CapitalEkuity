@@ -1,0 +1,639 @@
+:host {
+    display: block;
+    width: 100%;
+}
+
+
+/* ═══════════════════════════════
+   PAGE ZONES — CHARTE EL EMAR
+═══════════════════════════════ */
+
+.admin-page {
+    display: grid;
+    gap: 24px;
+    color: #0f172a;
+}
+
+
+/* Header page */
+
+.page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    h2 {
+        margin: 0;
+        color: #0f172a;
+        font-size: 28px;
+        font-weight: 800;
+        letter-spacing: -0.03em;
+    }
+    p {
+        margin: 6px 0 0;
+        color: #64748b;
+        font-size: 15px;
+        font-weight: 500;
+    }
+}
+
+
+/* Buttons */
+
+.primary-btn {
+    height: 46px;
+    padding: 0 22px;
+    border: none;
+    border-radius: 15px;
+    background: #1b2b5e;
+    color: #ffffff;
+    font-size: 15px;
+    font-weight: 750;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    box-shadow: 0 10px 22px rgba(27, 43, 94, 0.22);
+    transition: 0.2s ease;
+    i {
+        font-size: 19px;
+    }
+    &:hover {
+        background: #13214c;
+        transform: translateY(-1px);
+    }
+}
+
+.secondary-btn {
+    height: 46px;
+    padding: 0 22px;
+    border-radius: 15px;
+    background: #ffffff;
+    color: #1b2b5e;
+    border: 1px solid #dfe4ee;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: 0.2s ease;
+    &:hover {
+        background: #f8fafc;
+        border-color: #c9a84c;
+    }
+}
+
+
+/* Table card */
+
+.table-card {
+    background: #ffffff;
+    border: 1px solid #e2e6f0;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+thead {
+    background: #f8fafc;
+}
+
+th {
+    text-align: left;
+    padding: 18px 22px;
+    color: #667085;
+    font-size: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    border-bottom: 1px solid #e2e6f0;
+}
+
+td {
+    padding: 18px 22px;
+    border-bottom: 1px solid #e2e6f0;
+    color: #0f172a;
+    font-size: 15px;
+    vertical-align: middle;
+}
+
+tbody tr {
+    transition: 0.18s ease;
+    &:hover {
+        background: #fafbff;
+    }
+    &:last-child td {
+        border-bottom: none;
+    }
+}
+
+td strong {
+    color: #0f172a;
+    font-weight: 800;
+}
+
+td p {
+    margin: 5px 0 0;
+    color: #64748b;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.address-cell {
+    max-width: 430px;
+    color: #475569;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.text-right {
+    text-align: right;
+}
+
+.actions {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.icon-btn {
+    width: 36px;
+    height: 36px;
+    border: none;
+    border-radius: 12px;
+    background: transparent;
+    cursor: pointer;
+    font-size: 19px;
+    margin-left: 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: 0.2s ease;
+    &.view {
+        color: #1b2b5e;
+        &:hover {
+            background: rgba(27, 43, 94, 0.08);
+        }
+    }
+    &.edit {
+        color: #64748b;
+        &:hover {
+            background: #f1f5f9;
+            color: #1b2b5e;
+        }
+    }
+    &.delete {
+        color: #ef4444;
+        &:hover {
+            background: rgba(239, 68, 68, 0.1);
+        }
+    }
+}
+
+.empty {
+    text-align: center;
+    color: #64748b;
+    padding: 44px;
+    font-size: 15px;
+}
+
+
+/* ═══════════════════════════════
+   MODAL
+═══════════════════════════════ */
+
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(8, 16, 42, 0.72);
+    backdrop-filter: blur(5px);
+    z-index: 3000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+
+.modal-card {
+    width: 620px;
+    max-width: 100%;
+    max-height: 92vh;
+    overflow-y: auto;
+    background: #ffffff;
+    border-radius: 22px;
+    box-shadow: 0 30px 90px rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(226, 230, 240, 0.9);
+}
+
+.large-modal {
+    width: 780px;
+}
+
+
+/* Modal scrollbar */
+
+.modal-card::-webkit-scrollbar {
+    width: 8px;
+}
+
+.modal-card::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.modal-card::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 999px;
+}
+
+
+/* Modal header */
+
+.modal-header {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: #ffffff;
+    padding: 26px 28px 20px;
+    border-bottom: 1px solid #e2e6f0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    h3 {
+        margin: 0;
+        color: #0f172a;
+        font-size: 22px;
+        font-weight: 850;
+        letter-spacing: -0.03em;
+    }
+    button {
+        width: 38px;
+        height: 38px;
+        border: none;
+        border-radius: 50%;
+        background: #f8fafc;
+        cursor: pointer;
+        color: #64748b;
+        font-size: 20px;
+        transition: 0.2s ease;
+        &:hover {
+            background: #eef2f8;
+            color: #1b2b5e;
+        }
+    }
+}
+
+
+/* Modal body spacing */
+
+.modal-card>.form-grid,
+.modal-card>.map-wrapper,
+.modal-card>.coords-grid,
+.modal-card>.form-group {
+    margin-left: 28px;
+    margin-right: 28px;
+}
+
+.form-grid {
+    margin-top: 24px;
+    display: grid;
+    grid-template-columns: 1fr 1.45fr;
+    gap: 18px;
+}
+
+.coords-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+}
+
+
+/* Forms */
+
+.form-group {
+    display: grid;
+    gap: 8px;
+    margin-bottom: 18px;
+    label {
+        color: #0f172a;
+        font-size: 14px;
+        font-weight: 750;
+    }
+    input,
+    textarea,
+    select {
+        width: 100%;
+        border: 1px solid #dfe4ee;
+        border-radius: 14px;
+        padding: 13px 16px;
+        outline: none;
+        font-size: 15px;
+        font-family: inherit;
+        color: #0f172a;
+        background: #f8fafc;
+        transition: 0.2s ease;
+        &::placeholder {
+            color: #94a3b8;
+        }
+        &:focus {
+            border-color: #c9a84c;
+            background: #ffffff;
+            box-shadow: 0 0 0 4px rgba(201, 168, 76, 0.14);
+        }
+        &:read-only {
+            color: #475569;
+            background: #f1f5f9;
+            cursor: default;
+        }
+    }
+    textarea {
+        min-height: 96px;
+        resize: vertical;
+        line-height: 1.5;
+    }
+}
+
+.address-row {
+    display: flex;
+    gap: 10px;
+    input {
+        flex: 1;
+    }
+}
+
+.search-btn {
+    width: 48px;
+    min-width: 48px;
+    height: 48px;
+    border: none;
+    border-radius: 14px;
+    background: #1b2b5e;
+    color: #ffffff;
+    cursor: pointer;
+    font-size: 19px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 8px 18px rgba(27, 43, 94, 0.18);
+    transition: 0.2s ease;
+    &:hover {
+        background: #13214c;
+        transform: translateY(-1px);
+    }
+}
+
+
+/* Map */
+
+
+/* MAP */
+
+.map-wrapper {
+    margin: 18px 28px 14px;
+    height: 320px;
+    border-radius: 18px;
+    overflow: hidden;
+    border: 1px solid #dfe4ee;
+    background: #f8fafc;
+    position: relative;
+    display: block;
+}
+
+.zone-map {
+    width: 100%;
+    height: 100%;
+    min-height: 320px;
+    display: block;
+    z-index: 1;
+}
+
+.map-hint {
+    margin: 0 28px 20px;
+    color: #64748b;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.4;
+}
+
+
+/* Leaflet visual integration */
+
+:host ::ng-deep .leaflet-container {
+    font-family: Inter, Arial, sans-serif;
+}
+
+:host ::ng-deep .leaflet-control-zoom a {
+    color: #1b2b5e;
+    border-color: #e2e6f0;
+}
+
+:host ::ng-deep .leaflet-control-attribution {
+    font-size: 10px;
+    color: #64748b;
+}
+
+
+/* Modal footer */
+
+.modal-actions {
+    position: sticky;
+    bottom: 0;
+    background: #ffffff;
+    padding: 18px 28px 24px;
+    border-top: 1px solid #e2e6f0;
+    display: flex;
+    justify-content: flex-end;
+    gap: 14px;
+}
+
+
+/* Responsive */
+
+@media (max-width: 900px) {
+    .page-header {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+    .form-grid,
+    .coords-grid {
+        grid-template-columns: 1fr;
+    }
+    .large-modal {
+        width: 95vw;
+    }
+    #zoneMap {
+        height: 260px;
+    }
+}
+
+@media (max-width: 640px) {
+    .table-card {
+        overflow-x: auto;
+    }
+    table {
+        min-width: 900px;
+    }
+    .modal-card>.form-grid,
+    .modal-card>.map-wrapper,
+    .modal-card>.coords-grid,
+    .modal-card>.form-group {
+        margin-left: 20px;
+        margin-right: 20px;
+    }
+    .modal-header,
+    .modal-actions {
+        padding-left: 20px;
+        padding-right: 20px;
+    }
+}
+
+
+/* ═══════════════════════════════
+   DELETE CONFIRMATION CARD
+═══════════════════════════════ */
+
+.delete-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(8, 16, 42, 0.72);
+    backdrop-filter: blur(5px);
+    z-index: 4000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+
+.delete-card {
+    width: 430px;
+    max-width: 100%;
+    background: #ffffff;
+    border-radius: 22px;
+    padding: 34px;
+    box-shadow: 0 30px 90px rgba(0, 0, 0, 0.35);
+    text-align: center;
+    border: 1px solid rgba(226, 230, 240, 0.9);
+    animation: deleteCardUp 0.22s ease;
+}
+
+.delete-icon {
+    width: 62px;
+    height: 62px;
+    margin: 0 auto 18px;
+    border-radius: 18px;
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+}
+
+.delete-card h3 {
+    margin: 0;
+    color: #0f172a;
+    font-size: 22px;
+    font-weight: 850;
+    letter-spacing: -0.03em;
+}
+
+.delete-card p {
+    margin: 12px 0 0;
+    color: #64748b;
+    font-size: 15px;
+    line-height: 1.6;
+}
+
+.delete-card p strong {
+    color: #1b2b5e;
+    font-weight: 850;
+}
+
+.delete-info {
+    margin-top: 18px;
+    padding: 14px 16px;
+    border-radius: 16px;
+    background: #f8fafc;
+    border: 1px solid #e2e6f0;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    text-align: left;
+    color: #475569;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.delete-info i {
+    color: #c9a84c;
+    font-size: 18px;
+    margin-top: 2px;
+}
+
+.delete-actions {
+    margin-top: 28px;
+    display: flex;
+    justify-content: center;
+    gap: 14px;
+}
+
+.danger-btn {
+    height: 46px;
+    padding: 0 24px;
+    border: none;
+    border-radius: 15px;
+    background: #ef4444;
+    color: #ffffff;
+    font-size: 15px;
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow: 0 10px 22px rgba(239, 68, 68, 0.22);
+    transition: 0.2s ease;
+}
+
+.danger-btn:hover {
+    background: #dc2626;
+    transform: translateY(-1px);
+}
+
+@keyframes deleteCardUp {
+    from {
+        opacity: 0;
+        transform: translateY(18px) scale(0.96);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.form-error {
+    margin: 0 28px 20px;
+    padding: 14px 16px;
+    border-radius: 14px;
+    background: rgba(239, 68, 68, 0.08);
+    border: 1px solid rgba(239, 68, 68, 0.18);
+    color: #dc2626;
+    font-size: 14px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    i {
+        font-size: 20px;
+    }
+}
+
+.field-error {
+    color: #dc2626;
+    font-size: 13px;
+    font-weight: 650;
+    margin-top: 4px;
+}
+
+.input-error {
+    border-color: #ef4444 !important;
+    background: #fff7f7 !important;
+}

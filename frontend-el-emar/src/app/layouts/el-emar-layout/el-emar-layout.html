@@ -1,0 +1,71 @@
+<div class="admin-layout">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+
+        <div class="sidebar-header">
+            <div class="sidebar-logo">
+                <i class="ti ti-building"></i>
+            </div>
+
+            <div class="sidebar-brand">
+                <h2>El Emar</h2>
+                <span>Administration</span>
+            </div>
+
+            <button class="sidebar-close">
+        <i class="ti ti-x"></i>
+      </button>
+        </div>
+
+        <nav class="sidebar-nav">
+            <a *ngFor="let item of menuItems" [routerLink]="item.route" routerLinkActive="active" class="sidebar-link">
+                <i class="ti" [ngClass]="item.icon"></i>
+                <span>{{ item.label }}</span>
+                <i class="ti ti-chevron-right arrow"></i>
+            </a>
+        </nav>
+
+        <div class="sidebar-footer">
+            <a routerLink="/" class="logout-link" (click)="logout()">
+                <i class="ti ti-logout"></i>
+                <span>Déconnexion</span>
+            </a>
+        </div>
+
+    </aside>
+
+    <!-- Main -->
+    <main class="main-content">
+
+        <!-- AppBar -->
+        <header class="appbar">
+            <div>
+                <h1>Tableau de bord</h1>
+                <p>El Emar — Gestion des appels à candidature</p>
+            </div>
+
+            <div class="appbar-actions">
+                <button class="notification-btn">
+          <i class="ti ti-bell"></i>
+          <span></span>
+        </button>
+
+                <div class="admin-profile">
+                    <div class="avatar">A</div>
+                    <div>
+                        <strong>Admin El Emar</strong>
+                        <span>Administrateur</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Page content -->
+        <section class="page-content">
+            <router-outlet></router-outlet>
+        </section>
+
+    </main>
+
+</div>

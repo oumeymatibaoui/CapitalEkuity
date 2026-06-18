@@ -1,0 +1,579 @@
+:host {
+    display: block;
+    width: 100%;
+}
+
+
+/* PAGE */
+
+.admin-page {
+    display: grid;
+    gap: 26px;
+    color: #0f172a;
+}
+
+
+/* HEADER */
+
+.page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    h2 {
+        margin: 0;
+        color: #0f172a;
+        font-size: 28px;
+        font-weight: 850;
+        letter-spacing: -0.03em;
+    }
+    p {
+        margin: 6px 0 0;
+        color: #64748b;
+        font-size: 15px;
+        font-weight: 500;
+    }
+}
+
+
+/* BUTTONS */
+
+.primary-btn {
+    height: 48px;
+    padding: 0 24px;
+    border: none;
+    border-radius: 16px;
+    background: #1b2b5e;
+    color: #ffffff;
+    font-size: 15px;
+    font-weight: 800;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    box-shadow: 0 12px 24px rgba(27, 43, 94, 0.22);
+    transition: 0.2s ease;
+    i {
+        font-size: 20px;
+    }
+    &:hover {
+        background: #13214c;
+        transform: translateY(-1px);
+    }
+}
+
+.secondary-btn {
+    height: 48px;
+    padding: 0 24px;
+    border-radius: 16px;
+    background: #ffffff;
+    color: #64748b;
+    border: 1px solid #dfe4ee;
+    font-size: 15px;
+    font-weight: 750;
+    cursor: pointer;
+    transition: 0.2s ease;
+    &:hover {
+        background: #f8fafc;
+        color: #1b2b5e;
+        border-color: #c9a84c;
+    }
+}
+
+
+/* LOT CARDS */
+
+.lots-list {
+    display: grid;
+    gap: 20px;
+}
+
+.lot-card {
+    min-height: 145px;
+    background: #ffffff;
+    border: 1px solid #e2e6f0;
+    border-radius: 20px;
+    padding: 26px 30px;
+    display: flex;
+    align-items: center;
+    gap: 22px;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+    transition: 0.2s ease;
+    &:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+    }
+}
+
+.lot-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 18px;
+    background: #f1f5f9;
+    color: #1b2b5e;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 30px;
+    flex-shrink: 0;
+    &.archi {
+        background: #eef2ff;
+        color: #1b2b5e;
+    }
+    &.structure {
+        background: #eff6ff;
+        color: #3b82f6;
+    }
+    &.fluides {
+        background: #ecfeff;
+        color: #0891b2;
+    }
+    &.electricite {
+        background: #fff7ed;
+        color: #ea580c;
+    }
+    &.opc {
+        background: #f5f3ff;
+        color: #7c3aed;
+    }
+    &.default {
+        background: #f1f5f9;
+        color: #1b2b5e;
+    }
+}
+
+.lot-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.lot-title-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+    h3 {
+        margin: 0;
+        color: #0f172a;
+        font-size: 24px;
+        font-weight: 850;
+        letter-spacing: -0.03em;
+    }
+}
+
+.lot-code {
+    display: inline-flex;
+    align-items: center;
+    height: 28px;
+    padding: 0 12px;
+    border-radius: 7px;
+    background: #eef2f8;
+    color: #1b2b5e;
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+}
+
+.status-pill {
+    display: inline-flex;
+    align-items: center;
+    height: 28px;
+    padding: 0 12px;
+    border-radius: 999px;
+    background: #dcfce7;
+    color: #047857;
+    font-size: 13px;
+    font-weight: 800;
+    &.inactive {
+        background: #e5e7eb;
+        color: #64748b;
+    }
+}
+
+.lot-description {
+    margin: 0;
+    color: #64748b;
+    font-size: 17px;
+    font-weight: 500;
+    line-height: 1.5;
+}
+
+.lot-meta {
+    margin: 10px 0 0;
+    color: #b0821d;
+    font-size: 14px;
+    font-weight: 650;
+}
+
+
+/* ACTIONS */
+
+.lot-actions {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-shrink: 0;
+}
+
+.icon-btn {
+    width: 38px;
+    height: 38px;
+    border: none;
+    border-radius: 12px;
+    background: transparent;
+    cursor: pointer;
+    font-size: 21px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: 0.2s ease;
+    &.edit {
+        color: #64748b;
+        &:hover {
+            background: #f1f5f9;
+            color: #1b2b5e;
+        }
+    }
+    &.delete {
+        color: #ef4444;
+        &:hover {
+            background: rgba(239, 68, 68, 0.1);
+        }
+    }
+}
+
+.icon-btn.status-btn.active-status {
+    color: #16a34a !important;
+    &:hover {
+        background: rgba(22, 163, 74, 0.1);
+    }
+}
+
+.icon-btn.status-btn.inactive-status {
+    color: #94a3b8 !important;
+    &:hover {
+        background: rgba(148, 163, 184, 0.14);
+        color: #64748b !important;
+    }
+}
+
+.empty-card {
+    background: #ffffff;
+    border: 1px solid #e2e6f0;
+    border-radius: 20px;
+    padding: 44px;
+    text-align: center;
+    color: #64748b;
+    font-size: 15px;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+}
+
+
+/* MODAL */
+
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(8, 16, 42, 0.72);
+    backdrop-filter: blur(5px);
+    z-index: 4000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+
+.modal-card {
+    width: 560px;
+    max-width: 100%;
+    background: #ffffff;
+    border-radius: 22px;
+    box-shadow: 0 30px 90px rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(226, 230, 240, 0.9);
+    overflow: hidden;
+}
+
+.modal-header {
+    padding: 26px 30px 22px;
+    border-bottom: 1px solid #e2e6f0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    h3 {
+        margin: 0;
+        color: #0f172a;
+        font-size: 24px;
+        font-weight: 850;
+        letter-spacing: -0.03em;
+    }
+    button {
+        width: 38px;
+        height: 38px;
+        border: none;
+        border-radius: 50%;
+        background: transparent;
+        cursor: pointer;
+        color: #64748b;
+        font-size: 22px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: 0.2s ease;
+        &:hover {
+            background: #f1f5f9;
+            color: #1b2b5e;
+        }
+    }
+}
+
+.form-grid {
+    padding: 26px 30px 0;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.form-group {
+    display: grid;
+    gap: 8px;
+    margin: 0 30px 22px;
+    label {
+        color: #0f172a;
+        font-size: 15px;
+        font-weight: 800;
+    }
+    input,
+    textarea {
+        width: 100%;
+        border: 1px solid #dfe4ee;
+        border-radius: 14px;
+        padding: 14px 16px;
+        outline: none;
+        font-size: 15px;
+        font-family: inherit;
+        color: #0f172a;
+        background: #ffffff;
+        transition: 0.2s ease;
+        &::placeholder {
+            color: #9ca3af;
+        }
+        &:focus {
+            border-color: #c9a84c;
+            background: #ffffff;
+            box-shadow: 0 0 0 4px rgba(201, 168, 76, 0.14);
+        }
+    }
+    textarea {
+        min-height: 96px;
+        resize: vertical;
+        line-height: 1.5;
+    }
+}
+
+.checkbox-row {
+    margin: 0 30px 26px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: #0f172a;
+    font-size: 16px;
+    font-weight: 750;
+    cursor: pointer;
+    input {
+        width: 16px;
+        height: 16px;
+        accent-color: #1b2b5e;
+        cursor: pointer;
+    }
+}
+
+.modal-actions {
+    padding: 20px 30px;
+    border-top: 1px solid #e2e6f0;
+    display: flex;
+    justify-content: flex-end;
+    gap: 14px;
+    background: #ffffff;
+}
+
+
+/* DELETE CARD */
+
+.delete-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(8, 16, 42, 0.72);
+    backdrop-filter: blur(5px);
+    z-index: 5000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+
+.delete-card {
+    width: 430px;
+    max-width: 100%;
+    background: #ffffff;
+    border-radius: 22px;
+    padding: 34px;
+    box-shadow: 0 30px 90px rgba(0, 0, 0, 0.35);
+    text-align: center;
+    border: 1px solid rgba(226, 230, 240, 0.9);
+}
+
+.delete-icon {
+    width: 62px;
+    height: 62px;
+    margin: 0 auto 18px;
+    border-radius: 18px;
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+}
+
+.delete-card h3 {
+    margin: 0;
+    color: #0f172a;
+    font-size: 22px;
+    font-weight: 850;
+}
+
+.delete-card p {
+    margin: 12px 0 0;
+    color: #64748b;
+    font-size: 15px;
+    line-height: 1.6;
+}
+
+.delete-card p strong {
+    color: #1b2b5e;
+    font-weight: 850;
+}
+
+.delete-info {
+    margin-top: 18px;
+    padding: 14px 16px;
+    border-radius: 16px;
+    background: #f8fafc;
+    border: 1px solid #e2e6f0;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    text-align: left;
+    color: #475569;
+    font-size: 13px;
+}
+
+.delete-info i {
+    color: #c9a84c;
+    font-size: 18px;
+}
+
+.delete-actions {
+    margin-top: 28px;
+    display: flex;
+    justify-content: center;
+    gap: 14px;
+}
+
+.danger-btn {
+    height: 48px;
+    padding: 0 24px;
+    border: none;
+    border-radius: 16px;
+    background: #ef4444;
+    color: #ffffff;
+    font-size: 15px;
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow: 0 10px 22px rgba(239, 68, 68, 0.22);
+    transition: 0.2s ease;
+    &:hover {
+        background: #dc2626;
+        transform: translateY(-1px);
+    }
+}
+
+
+/* RESPONSIVE */
+
+@media (max-width: 900px) {
+    .page-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .lot-card {
+        align-items: flex-start;
+    }
+    .lot-actions {
+        margin-left: auto;
+    }
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.form-error {
+    margin: 0 30px 20px;
+    padding: 14px 16px;
+    border-radius: 14px;
+    background: rgba(239, 68, 68, 0.08);
+    border: 1px solid rgba(239, 68, 68, 0.18);
+    color: #dc2626;
+    font-size: 14px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    i {
+        font-size: 20px;
+    }
+}
+
+@media (max-width: 640px) {
+    .lot-card {
+        flex-direction: column;
+    }
+    .lot-actions {
+        width: 100%;
+        justify-content: flex-end;
+    }
+    .modal-card {
+        width: 95vw;
+    }
+}
+
+.form-error {
+    margin: 0 30px 20px;
+    padding: 14px 16px;
+    border-radius: 14px;
+    background: rgba(239, 68, 68, 0.08);
+    border: 1px solid rgba(239, 68, 68, 0.18);
+    color: #dc2626;
+    font-size: 14px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    i {
+        font-size: 20px;
+    }
+}
+
+.field-error {
+    color: #dc2626;
+    font-size: 13px;
+    font-weight: 650;
+    margin-top: 4px;
+    display: block;
+}
+
+.input-error {
+    border-color: #ef4444 !important;
+    background: #fff7f7 !important;
+}

@@ -1,0 +1,306 @@
+<div class="admin-page">
+
+    <!-- Header -->
+    <div class="page-header">
+        <div>
+            <h2>Appels à candidature</h2>
+            <p>{{ appels.length }} appels à candidature au total</p>
+        </div>
+
+        <button class="primary-btn" type="button" (click)="openCreateModal()">
+      <i class="ti ti-plus"></i>
+      Nouvel appel à candidature
+    </button>
+    </div>
+
+    <!-- Filters -->
+    <div class="filters-row">
+        <div class="search-box">
+            <i class="ti ti-search"></i>
+
+            <input type="text" placeholder="Rechercher..." [(ngModel)]="searchTerm" (ngModelChange)="applyFilters()" />
+        </div>
+
+        <button class="filter-btn" [class.active]="statutFilter === 'TOUS'" type="button" (click)="setStatutFilter('TOUS')">
+      Tous
+    </button>
+
+        <button class="filter-btn" [class.active]="statutFilter === 'BROUILLON'" type="button" (click)="setStatutFilter('BROUILLON')">
+      Brouillon
+    </button>
+
+        <button class="filter-btn" [class.active]="statutFilter === 'PUBLIE'" type="button" (click)="setStatutFilter('PUBLIE')">
+      Publié
+    </button>
+
+        <button class="filter-btn" [class.active]="statutFilter === 'CLOTURE'" type="button" (click)="setStatutFilter('CLOTURE')">
+      Clôturé
+    </button>
+    </div>
+
+    <!-- Table -->
+    <div class="table-card">
+        <table>
+            <thead>
+                <tr>
+                    <th>Référence</th>
+                    <th>Titre</th>
+                    <th>Zones</th>
+                    <th>Lots</th>
+                    <th>Date limite</th>
+                    <th>Seuil</th>
+                    <th>Candidatures</th>
+                    <th>Statut</th>
+                    <th class="text-right">Actions</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                <tr *ngFor="let appel of filteredAppels">
+                    <td class="reference-cell">
+                        {{ appel.reference }}
+                    </td>
+
+                    <td>
+                        <strong>{{ appel.titre }}</strong>
+                        <p>{{ appel.description || '-' }}</p>
+                    </td>
+
+                    <td>
+                        <span class="tag" *ngFor="let zone of appel.zoneNames || []">
+              {{ zone }}
+            </span>
+                    </td>
+
+                    <td>
+                        <span class="tag" *ngFor="let lot of appel.lotNames || []">
+              {{ lot }}
+            </span>
+                    </td>
+
+                    <td>
+                        {{ appel.dateLimite | date:'yyyy-MM-dd' }}
+                    </td>
+
+                    <td>
+                        {{ appel.seuilAdmission }}/100
+                    </td>
+
+                    <td>
+                        {{ appel.candidaturesCount || 0 }}
+                    </td>
+
+                    <td>
+                        <span class="status-pill" [ngClass]="getStatutClass(appel.statut)">
+              {{ getStatutLabel(appel.statut) }}
+            </span>
+                    </td>
+
+                    <td class="actions">
+                        <button class="icon-btn edit" type="button" title="Modifier" (click)="openEditModal(appel)">
+              <i class="ti ti-pencil"></i>
+            </button>
+
+                        <button class="icon-btn delete" type="button" title="Supprimer" (click)="openDeleteModal(appel)">
+              <i class="ti ti-trash"></i>
+            </button>
+                    </td>
+                </tr>
+
+                <tr *ngIf="filteredAppels.length === 0">
+                    <td colspan="9" class="empty">
+                        Aucun appel trouvé.
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+</div>
+
+<!-- Modal ajout / modification -->
+<div class="modal-overlay" *ngIf="showModal">
+    <div class="modal-card large-modal">
+
+        <div class="modal-header">
+            <h3>
+                {{ isEditMode ? 'Modifier l’appel' : 'Créer un appel à candidature' }}
+            </h3>
+
+            <button type="button" (click)="closeModal()">
+        <i class="ti ti-x"></i>
+      </button>
+        </div>
+
+        <!-- Message général backend -->
+        <div class="form-error modal-error" *ngIf="formError">
+            <i class="ti ti-alert-circle"></i>
+            <span>{{ formError }}</span>
+        </div>
+
+        <!-- Titre -->
+        <div class="form-group">
+            <label>Titre de l'appel *</label>
+
+            <input type="text" [(ngModel)]="form.titre" placeholder="Ex : Qualification bureaux d'études — Projet XYZ" [class.input-error]="fieldErrors['titre']" />
+
+            <small class="field-error" *ngIf="fieldErrors['titre']">
+        {{ fieldErrors['titre'] }}
+      </small>
+        </div>
+
+        <!-- Description -->
+        <div class="form-group">
+            <label>Description *</label>
+
+            <textarea [(ngModel)]="form.description" placeholder="Description de l'appel à candidature..." [class.input-error]="fieldErrors['description']"></textarea>
+
+            <small class="field-error" *ngIf="fieldErrors['description']">
+        {{ fieldErrors['description'] }}
+      </small>
+        </div>
+
+        <!-- Dates -->
+        <div class="form-grid">
+
+            <div class="form-group">
+                <label>Date de début *</label>
+
+                <input type="date" [(ngModel)]="form.dateDebut" [class.input-error]="fieldErrors['dateDebut']" />
+
+                <small class="field-error" *ngIf="fieldErrors['dateDebut']">
+          {{ fieldErrors['dateDebut'] }}
+        </small>
+            </div>
+
+            <div class="form-group">
+                <label>Date limite *</label>
+
+                <input type="date" [(ngModel)]="form.dateLimite" [class.input-error]="fieldErrors['dateLimite']" />
+
+                <small class="field-error" *ngIf="fieldErrors['dateLimite']">
+          {{ fieldErrors['dateLimite'] }}
+        </small>
+            </div>
+
+        </div>
+
+        <!-- Seuil -->
+        <div class="form-group">
+            <label>Seuil d'admission : {{ form.seuilAdmission }}/100 *</label>
+
+            <input type="range" min="0" max="100" [(ngModel)]="form.seuilAdmission" />
+
+            <small class="field-error" *ngIf="fieldErrors['seuilAdmission']">
+        {{ fieldErrors['seuilAdmission'] }}
+      </small>
+        </div>
+
+        <!-- Zones -->
+        <div class="form-group">
+            <label>Zones concernées *</label>
+
+            <div class="chips-row" [class.input-error]="fieldErrors['zoneIds']">
+                <button type="button" class="choice-chip" *ngFor="let zone of zones" [class.selected]="isZoneSelected(zone.id)" (click)="toggleZone(zone.id)">
+          {{ zone.nomZone }}
+        </button>
+            </div>
+
+            <small class="field-error" *ngIf="fieldErrors['zoneIds']">
+        {{ fieldErrors['zoneIds'] }}
+      </small>
+        </div>
+
+        <!-- Lots -->
+        <div class="form-group">
+            <label>Lots concernés *</label>
+
+            <div class="chips-row" [class.input-error]="fieldErrors['lotIds']">
+                <button type="button" class="choice-chip" *ngFor="let lot of lots" [class.selected]="isLotSelected(lot.id)" (click)="toggleLot(lot.id)">
+          {{ lot.nomLot }}
+        </button>
+            </div>
+
+            <small class="field-error" *ngIf="fieldErrors['lotIds']">
+        {{ fieldErrors['lotIds'] }}
+      </small>
+        </div>
+
+        <!-- Objectif -->
+        <div class="form-group">
+            <label>Objectif *</label>
+
+            <textarea [(ngModel)]="form.objectif" placeholder="Objectif principal de l'appel..." [class.input-error]="fieldErrors['objectif']"></textarea>
+
+            <small class="field-error" *ngIf="fieldErrors['objectif']">
+        {{ fieldErrors['objectif'] }}
+      </small>
+        </div>
+
+        <!-- Email -->
+        <div class="form-group">
+            <label>Email dépôt *</label>
+
+            <input type="email" [(ngModel)]="form.emailDepot" placeholder="contact@elemar.tn" [class.input-error]="fieldErrors['emailDepot']" />
+
+            <small class="field-error" *ngIf="fieldErrors['emailDepot']">
+        {{ fieldErrors['emailDepot'] }}
+      </small>
+        </div>
+
+        <!-- Statut -->
+        <div class="form-group">
+            <label>Statut *</label>
+
+            <select [(ngModel)]="form.statut" [class.input-error]="fieldErrors['statut']">
+        <option value="BROUILLON">Brouillon</option>
+        <option value="PUBLIE">Publié</option>
+        <option value="CLOTURE">Clôturé</option>
+      </select>
+
+            <small class="field-error" *ngIf="fieldErrors['statut']">
+        {{ fieldErrors['statut'] }}
+      </small>
+        </div>
+
+        <!-- Actions -->
+        <div class="modal-actions">
+            <button class="secondary-btn" type="button" (click)="closeModal()">
+        Annuler
+      </button>
+
+            <button class="primary-btn" type="button" (click)="saveAppel()">
+        {{ isEditMode ? 'Modifier l’appel' : 'Créer l’appel à candidature' }}
+      </button>
+        </div>
+
+    </div>
+</div>
+
+<!-- Delete Confirmation -->
+<div class="delete-overlay" *ngIf="showDeleteModal" (click)="closeDeleteModal()">
+    <div class="delete-card" (click)="$event.stopPropagation()">
+
+        <div class="delete-icon">
+            <i class="ti ti-trash"></i>
+        </div>
+
+        <h3>Supprimer l’appel ?</h3>
+
+        <p>
+            Cette action supprimera définitivement l’appel
+            <strong>{{ appelToDelete?.titre }}</strong>.
+        </p>
+
+        <div class="delete-actions">
+            <button class="secondary-btn" type="button" (click)="closeDeleteModal()">
+        Annuler
+      </button>
+
+            <button class="danger-btn" type="button" (click)="confirmDeleteAppel()">
+        Supprimer
+      </button>
+        </div>
+
+    </div>
+</div>

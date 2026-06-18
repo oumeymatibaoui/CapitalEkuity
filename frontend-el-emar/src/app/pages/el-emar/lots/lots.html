@@ -1,0 +1,178 @@
+<div class="admin-page">
+
+    <!-- Header -->
+    <div class="page-header">
+        <div>
+            <h2>Gestion des lots</h2>
+            <p>{{ activeLotsCount }} lots actifs</p>
+        </div>
+
+        <button class="primary-btn" type="button" (click)="openCreateModal()">
+      <i class="ti ti-plus"></i>
+      Ajouter un lot
+    </button>
+    </div>
+
+    <!-- Liste des lots -->
+    <div class="lots-list">
+
+        <div class="lot-card" *ngFor="let lot of lots">
+
+            <div class="lot-icon" [ngClass]="getLotTheme(lot.codeLot)">
+                <i class="ti ti-layers-subtract"></i>
+            </div>
+
+            <div class="lot-content">
+
+                <div class="lot-title-row">
+                    <span class="lot-code">{{ lot.codeLot }}</span>
+
+                    <h3>{{ lot.nomLot }}</h3>
+
+                    <span class="status-pill" [class.inactive]="!isLotActive(lot)">
+            {{ isLotActive(lot) ? 'Actif' : 'Inactif' }}
+          </span>
+                </div>
+
+                <p class="lot-description">
+                    {{ lot.description || 'Aucune description.' }}
+                </p>
+
+                <p class="lot-meta">
+                    0 candidature déposée
+                </p>
+
+            </div>
+
+            <div class="lot-actions">
+
+                <button class="icon-btn status-btn" [ngClass]="isLotActive(lot) ? 'active-status' : 'inactive-status'" type="button" title="Activer / désactiver" (click)="toggleLotStatus(lot)">
+          <i
+            class="ti"
+            [ngClass]="isLotActive(lot) ? 'ti-toggle-right' : 'ti-toggle-left'"
+          ></i>
+        </button>
+
+                <button class="icon-btn edit" type="button" title="Modifier" (click)="openEditModal(lot)">
+          <i class="ti ti-pencil"></i>
+        </button>
+
+                <button class="icon-btn delete" type="button" title="Supprimer" (click)="openDeleteModal(lot)">
+          <i class="ti ti-trash"></i>
+        </button>
+
+            </div>
+
+        </div>
+
+        <div class="empty-card" *ngIf="lots.length === 0">
+            Aucun lot trouvé.
+        </div>
+
+    </div>
+
+</div>
+
+<!-- Modal création / modification -->
+<div class="modal-overlay" *ngIf="showModal">
+    <div class="modal-card">
+
+        <div class="modal-header">
+            <h3>
+                {{ isEditMode ? 'Modifier le lot' : 'Ajouter un lot' }}
+            </h3>
+
+            <button type="button" (click)="closeModal()">
+        <i class="ti ti-x"></i>
+      </button>
+        </div>
+
+        <!-- Message général d'erreur backend -->
+        <div class="form-error modal-error" *ngIf="formError">
+            <i class="ti ti-alert-circle"></i>
+            <span>{{ formError }}</span>
+        </div>
+
+        <div class="form-grid">
+
+            <!-- Code lot -->
+            <div class="form-group">
+                <label>Code lot *</label>
+
+                <input type="text" [(ngModel)]="form.codeLot" placeholder="LOT-XXX" [class.input-error]="fieldErrors['codeLot']" />
+
+                <small class="field-error" *ngIf="fieldErrors['codeLot']">
+          {{ fieldErrors['codeLot'] }}
+        </small>
+            </div>
+
+            <!-- Nom lot -->
+            <div class="form-group">
+                <label>Nom *</label>
+
+                <input type="text" [(ngModel)]="form.nomLot" placeholder="Ex : Acoustique" [class.input-error]="fieldErrors['nomLot']" />
+
+                <small class="field-error" *ngIf="fieldErrors['nomLot']">
+          {{ fieldErrors['nomLot'] }}
+        </small>
+            </div>
+
+        </div>
+
+        <!-- Description -->
+        <div class="form-group">
+            <label>Description *</label>
+
+            <textarea [(ngModel)]="form.description" placeholder="Description du lot..." [class.input-error]="fieldErrors['description']"></textarea>
+
+            <small class="field-error" *ngIf="fieldErrors['description']">
+    {{ fieldErrors['description'] }}
+  </small>
+        </div>
+        <!-- Statut actif -->
+        <label class="checkbox-row">
+      <input type="checkbox" [(ngModel)]="form.actif" />
+      <span>Lot actif</span>
+    </label>
+
+        <!-- Actions -->
+        <div class="modal-actions">
+            <button class="secondary-btn" type="button" (click)="closeModal()">
+        Annuler
+      </button>
+
+            <button class="primary-btn" type="button" (click)="saveLot()">
+        {{ isEditMode ? 'Modifier le lot' : 'Ajouter' }}
+      </button>
+        </div>
+
+    </div>
+</div>
+
+<!-- Delete Confirmation -->
+<div class="delete-overlay" *ngIf="showDeleteModal" (click)="closeDeleteModal()">
+    <div class="delete-card" (click)="$event.stopPropagation()">
+
+        <div class="delete-icon">
+            <i class="ti ti-trash"></i>
+        </div>
+
+        <h3>Supprimer le lot ?</h3>
+
+        <p>
+            Cette action supprimera définitivement le lot
+            <strong>{{ lotToDelete?.nomLot }}</strong>.
+        </p>
+
+        <div class="delete-actions">
+            <button class="secondary-btn" type="button" (click)="closeDeleteModal()">
+        Annuler
+      </button>
+
+            <button class="danger-btn" type="button" (click)="confirmDeleteLot()">
+        Supprimer
+      </button>
+        </div>
+
+    </div>
+</div>
