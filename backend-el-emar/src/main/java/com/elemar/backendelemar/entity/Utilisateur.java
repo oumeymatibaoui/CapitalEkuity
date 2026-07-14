@@ -39,7 +39,8 @@ public class Utilisateur {
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     @Column(name = "statut_compte", nullable = false, columnDefinition = "statut_compte")
-    private StatutCompte statutCompte;
+    @Builder.Default
+    private StatutCompte statutCompte = StatutCompte.ACTIF;
 
     @Column(name = "premiere_connexion")
     private Boolean premiereConnexion;
@@ -49,4 +50,19 @@ public class Utilisateur {
 
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "candidature_id")
+    private Candidature candidature;
+
+    @Column(name = "fonction", length = 120)
+    private String fonction;
+
+    @Column(name = "telephone", length = 50)
+    private String telephone;
+
+    @Column(name = "must_change_password")
+    private Boolean mustChangePassword;
+
+    @Column(name = "actif")
+    private Boolean actif;
 }

@@ -1,0 +1,414 @@
+:host {
+    display: block;
+    height: 100vh;
+}
+
+
+/* =========================
+   SIDEBAR
+========================= */
+
+.sidebar {
+    width: 320px;
+    height: 100vh;
+    background: linear-gradient(180deg, #1d2d68 0%, #162452 100%);
+    color: #ffffff;
+    display: flex;
+    flex-direction: column;
+    position: sticky;
+    top: 0;
+    overflow: hidden;
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 10px 0 30px rgba(15, 23, 42, 0.08);
+}
+
+
+/* =========================
+   BRAND
+========================= */
+
+.sidebar-brand {
+    padding: 20px 18px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.brand-main {
+    display: flex;
+    align-items: center;
+    gap: 13px;
+}
+
+.brand-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 16px;
+    background: linear-gradient(135deg, #d9b947, #f2d66b);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #1d2d68;
+    font-size: 24px;
+    flex-shrink: 0;
+    box-shadow: 0 10px 22px rgba(217, 185, 71, 0.24);
+}
+
+.brand-text {
+    min-width: 0;
+}
+
+.brand-text h2 {
+    margin: 0;
+    font-size: 21px;
+    line-height: 1.1;
+    font-weight: 900;
+    color: #ffffff;
+    letter-spacing: -0.02em;
+}
+
+.brand-text span {
+    display: block;
+    margin-top: 4px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #cfd7ef;
+}
+
+
+/* =========================
+   ACCOUNT BUTTON
+========================= */
+
+.account-button {
+    width: 100%;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.07);
+    border-radius: 18px;
+    padding: 11px 12px;
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    color: #ffffff;
+    cursor: pointer;
+    transition: 0.18s ease;
+    overflow: hidden;
+    text-align: left;
+}
+
+.account-button:hover,
+.account-button.active {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(217, 185, 71, 0.7);
+    transform: translateY(-1px);
+}
+
+.account-avatar {
+    width: 38px;
+    height: 38px;
+    border-radius: 13px;
+    background: linear-gradient(135deg, #d9b947, #f2d66b);
+    color: #1d2d68;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 950;
+    flex-shrink: 0;
+    box-shadow: 0 8px 16px rgba(217, 185, 71, 0.20);
+}
+
+.account-info {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    flex: 1;
+}
+
+.account-info strong {
+    max-width: 205px;
+    font-size: 13px;
+    color: #ffffff;
+    font-weight: 850;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.account-info small {
+    margin-top: 2px;
+    font-size: 11px;
+    color: #cfd7ef;
+    font-weight: 650;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.account-arrow {
+    font-size: 18px;
+    color: #d9b947;
+    flex-shrink: 0;
+}
+
+
+/* =========================
+   NAVIGATION
+========================= */
+
+.sidebar-nav {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 18px 12px;
+}
+
+.nav-group {
+    margin-bottom: 8px;
+}
+
+
+/* =========================
+   GROUP HEADER
+========================= */
+
+.nav-group-toggle {
+    width: 100%;
+    min-height: 48px;
+    border: 1px solid transparent;
+    border-radius: 15px;
+    background: transparent;
+    color: #d6ddf2;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 13px;
+    cursor: pointer;
+    transition: 0.18s ease;
+    text-align: left;
+}
+
+.nav-group-toggle:hover {
+    background: rgba(255, 255, 255, 0.07);
+    color: #ffffff;
+}
+
+.nav-group-toggle.active {
+    background: rgba(255, 255, 255, 0.10);
+    border-color: rgba(217, 185, 71, 0.25);
+    color: #ffffff;
+}
+
+.nav-group-toggle.open {
+    background: rgba(255, 255, 255, 0.09);
+}
+
+.group-left {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    min-width: 0;
+}
+
+.group-left span {
+    font-size: 14.5px;
+    font-weight: 800;
+    color: inherit;
+    line-height: 1.25;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.group-chevron {
+    width: 20px;
+    font-size: 17px;
+    color: #d9b947;
+    flex-shrink: 0;
+}
+
+.group-count {
+    min-width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.09);
+    color: #d6ddf2;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 850;
+    flex-shrink: 0;
+}
+
+
+/* =========================
+   ITEMS
+========================= */
+
+.nav-items {
+    margin: 7px 0 10px 13px;
+    padding: 6px 0 6px 12px;
+    border-left: 1px solid rgba(255, 255, 255, 0.14);
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.nav-link {
+    width: 100%;
+    min-height: 43px;
+    border: 1px solid transparent;
+    border-radius: 14px;
+    background: transparent;
+    color: #cfd7ef;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 12px;
+    cursor: pointer;
+    transition: 0.18s ease;
+    text-align: left;
+    font-size: 14px;
+    font-weight: 650;
+    font-family: inherit;
+    line-height: 1;
+}
+
+.nav-link i {
+    width: 21px;
+    font-size: 19px;
+    color: #cfd7ef;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    opacity: 0.92;
+}
+
+.nav-link span {
+    min-width: 0;
+    flex: 1;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.nav-link:hover {
+    background: rgba(255, 255, 255, 0.075);
+    color: #ffffff;
+    transform: translateX(2px);
+}
+
+.nav-link:hover i {
+    color: #ffffff;
+    opacity: 1;
+}
+
+.nav-link.active {
+    background: rgba(217, 185, 71, 0.18);
+    border-color: rgba(217, 185, 71, 0.35);
+    color: #ffffff;
+    font-weight: 850;
+    box-shadow: inset 3px 0 0 #d9b947;
+}
+
+.nav-link.active i {
+    color: #d9b947;
+    opacity: 1;
+}
+
+.nav-link.active::after {
+    content: '›';
+    color: #d9b947;
+    font-size: 22px;
+    line-height: 1;
+    margin-left: auto;
+}
+
+
+/* =========================
+   FOOTER
+========================= */
+
+.sidebar-footer {
+    padding: 14px 12px 16px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.logout-btn {
+    width: 100%;
+    height: 48px;
+    border: 1px solid transparent;
+    border-radius: 16px;
+    background: transparent;
+    color: #cfd7ef;
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    padding: 0 15px;
+    cursor: pointer;
+    font-size: 14.5px;
+    font-weight: 800;
+    transition: 0.18s ease;
+    font-family: inherit;
+}
+
+.logout-btn i {
+    font-size: 21px;
+    color: #cfd7ef;
+    flex-shrink: 0;
+}
+
+.logout-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #ffffff;
+    border-color: rgba(255, 255, 255, 0.10);
+}
+
+.logout-btn:hover i {
+    color: #ffffff;
+}
+
+
+/* =========================
+   SCROLLBAR
+========================= */
+
+.sidebar-nav::-webkit-scrollbar {
+    width: 5px;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.18);
+    border-radius: 20px;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.28);
+}
+
+.sidebar-nav::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+
+/* =========================
+   RESPONSIVE
+========================= */
+
+@media (max-width: 900px) {
+    .sidebar {
+        width: 285px;
+    }
+    .account-info strong {
+        max-width: 165px;
+    }
+    .brand-text h2 {
+        font-size: 19px;
+    }
+    .nav-link {
+        font-size: 13.5px;
+    }
+}

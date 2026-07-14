@@ -1,0 +1,375 @@
+<div class="roles-page">
+
+    <div class="page-header">
+        <div>
+            <h1>
+                <i class="ti ti-shield"></i> Rôles et accès
+            </h1>
+            <p>Gérer les droits d’accès aux modules de la plateforme selon les rôles utilisateurs.</p>
+        </div>
+
+        <button type="button" class="primary-btn" (click)="openCreateModal()">
+      <i class="ti ti-plus"></i>
+      Nouveau rôle
+    </button>
+    </div>
+
+    <div class="alert success" *ngIf="successMessage">
+        {{ successMessage }}
+    </div>
+
+    <div class="alert error" *ngIf="errorMessage">
+        {{ errorMessage }}
+    </div>
+
+    <div class="stats-grid">
+
+        <div class="stat-card">
+            <div class="stat-icon users">
+                <i class="ti ti-users"></i>
+            </div>
+            <div>
+                <strong>{{ roles.length }}</strong>
+                <span>Rôles créés</span>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon modules">
+                <i class="ti ti-layout-grid"></i>
+            </div>
+            <div>
+                <strong>{{ getTotalModules() }}</strong>
+                <span>Modules disponibles</span>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon allowed">
+                <i class="ti ti-lock-open"></i>
+            </div>
+            <div>
+                <strong>{{ getTotalAuthorized() }}</strong>
+                <span>Accès autorisés</span>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon blocked">
+                <i class="ti ti-lock"></i>
+            </div>
+            <div>
+                <strong>{{ getTotalBlocked() }}</strong>
+                <span>Accès bloqués</span>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="content-grid">
+
+        <!-- LEFT : ROLES -->
+        <section class="roles-list-card">
+
+            <h2>Liste des rôles</h2>
+
+            <div class="search-box">
+                <i class="ti ti-search"></i>
+                <input type="text" placeholder="Rechercher un rôle" [(ngModel)]="searchRole" (input)="filterRoles()" />
+            </div>
+
+            <div class="role-card" *ngFor="let role of filteredRoles" [class.selected]="selectedRole?.id === role.id" (click)="selectRole(role)">
+
+                <div class="role-card-header">
+                    <h3>{{ role.nomRole }}</h3>
+                    <span class="active-badge" *ngIf="role.actif">Actif</span>
+                </div>
+
+                <span class="system-badge" *ngIf="role.roleSysteme">
+          <i class="ti ti-shield"></i>
+          Rôle système
+        </span>
+
+                <p>{{ role.description }}</p>
+
+                <div class="role-progress">
+                    <span>
+            <strong>{{ role.modulesAutorises }}</strong>
+            / {{ role.totalModules }} modules autorisés
+          </span>
+                    <i class="ti ti-chevron-right"></i>
+                </div>
+
+            </div>
+
+        </section>
+
+        <!-- CENTER : ACCESS -->
+        <section class="access-card">
+
+            <div class="access-header">
+
+                <!-- Infos du rôle sélectionné -->
+                <div class="selected-role-info">
+
+                    <h2>Accès du rôle sélectionné</h2>
+
+                    <ng-container *ngIf="selectedRole">
+
+                        <div class="selected-role-title-row">
+
+                            <div class="selected-role-main-info">
+                                <h3>{{ selectedRole.nomRole }}</h3>
+                                <p>{{ selectedRole.description }}</p>
+
+                                <span class="system-badge" *ngIf="selectedRole.roleSysteme">
+            <i class="ti ti-shield"></i>
+            Rôle système
+          </span>
+                            </div>
+
+
+
+                        </div>
+
+                    </ng-container>
+
+                </div>
+
+                <!-- Actions des modules -->
+                <div class="access-actions">
+
+                    <button type="button" class="allow-btn" (click)="allowAll()" [disabled]="!selectedRole">
+    <i class="ti ti-lock-open"></i>
+    Tout autoriser
+  </button>
+
+                    <button type="button" class="selected-action-btn edit" title="Modifier le rôle" (click)="openEditSelectedRole()" [disabled]="!selectedRole">
+    <i class="ti ti-pencil"></i>
+    Modifier
+  </button>
+
+                    <button type="button" class="selected-action-btn delete" title="Désactiver le rôle" *ngIf="selectedRole && !selectedRole.roleSysteme" (click)="openDeleteSelectedRole()">
+    <i class="ti ti-trash"></i>
+    Désactiver
+  </button>
+
+                    <button type="button" class="selected-action-btn locked" title="Rôle système protégé" *ngIf="selectedRole && selectedRole.roleSysteme" disabled>
+    <i class="ti ti-lock"></i>
+    Protégé
+  </button>
+
+                    <button type="button" class="block-btn" (click)="blockAll()" [disabled]="!selectedRole">
+    <i class="ti ti-lock"></i>
+    Tout bloquer
+  </button>
+
+                    <button type="button" class="reset-btn" (click)="resetChanges()" [disabled]="!selectedRole">
+    <i class="ti ti-refresh"></i>
+    Réinitialiser
+  </button>
+
+                </div>
+            </div>
+
+            <div class="modules-wrapper">
+
+                <div class="module-group" *ngFor="let group of moduleGroups">
+
+                    <div class="group-header">
+                        <div>
+                            <i class="ti ti-folder"></i>
+                            <strong>{{ group.groupe }}</strong>
+                        </div>
+
+                        <span>
+              {{ group.modulesAutorises }}/{{ group.totalModules }}
+            </span>
+                    </div>
+
+                    <div class="module-row" *ngFor="let module of group.modules">
+
+                        <div class="module-left">
+                            <div class="module-icon">
+                                <i [class]="module.icone"></i>
+                            </div>
+
+                            <div>
+                                <h4>{{ module.libelle }}</h4>
+                                <p>{{ module.description }}</p>
+                            </div>
+                        </div>
+
+                        <div class="module-right">
+                            <span class="status-badge" [class.blocked]="!module.autorise">
+                {{ module.autorise ? 'Autorisé' : 'Bloqué' }}
+              </span>
+
+                            <button type="button" class="toggle" [class.active]="module.autorise" (click)="toggleModule(module)">
+                <span></span>
+              </button>
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+            <div class="save-bar">
+                <button type="button" class="primary-btn" (click)="saveAccess()">
+          Enregistrer les accès
+        </button>
+            </div>
+
+        </section>
+
+        <!-- RIGHT : PREVIEW -->
+        <section class="preview-card">
+
+            <h2>Aperçu de la navbar</h2>
+            <p>Vue utilisateur pour ce rôle</p>
+
+            <div class="navbar-preview">
+
+                <div class="preview-brand">
+                    <div class="brand-icon">
+                        <i class="ti ti-building"></i>
+                    </div>
+                    <div>
+                        <strong>El Emar</strong>
+                        <span>Administration</span>
+                    </div>
+                </div>
+
+                <div class="preview-role">
+                    {{ selectedRole?.nomRole || 'Rôle' }}
+                </div>
+
+                <div class="preview-group" *ngFor="let group of getAuthorizedModulesForPreview()">
+
+                    <h4>{{ group.groupe }}</h4>
+
+                    <div class="preview-link" *ngFor="let module of group.modules">
+                        <i [class]="module.icone"></i>
+                        <span>{{ module.libelle }}</span>
+                    </div>
+
+                </div>
+
+                <div class="preview-logout">
+                    <i class="ti ti-logout"></i> Déconnexion
+                </div>
+
+            </div>
+
+        </section>
+
+    </div>
+
+</div>
+
+<!-- CREATE ROLE MODAL -->
+<div class="modal-overlay" *ngIf="showCreateModal">
+
+    <div class="modal-card">
+
+        <div class="modal-header">
+            <div class="modal-title">
+                <div class="modal-icon">
+                    <i class="ti ti-plus"></i>
+                </div>
+                <h3>Créer un nouveau rôle</h3>
+            </div>
+
+            <button type="button" (click)="closeCreateModal()">
+        <i class="ti ti-x"></i>
+      </button>
+        </div>
+
+        <div class="modal-body">
+
+            <div class="form-group">
+                <label>Nom du rôle *</label>
+                <input type="text" placeholder="ex. Responsable régional" [(ngModel)]="createForm.nomRole" name="nomRole" />
+            </div>
+
+            <div class="form-group">
+                <label>Description</label>
+                <textarea placeholder="Brève description des responsabilités de ce rôle" [(ngModel)]="createForm.description" name="description"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label>Type de rôle</label>
+
+                <div class="role-type-selector">
+
+                    <button type="button" [class.active]="createForm.typeRole === 'INTERNE'" (click)="createForm.typeRole = 'INTERNE'">
+            Interne
+          </button>
+
+                    <button type="button" [class.active]="createForm.typeRole === 'EXTERNE'" (click)="createForm.typeRole = 'EXTERNE'">
+            Externe
+          </button>
+
+                </div>
+
+            </div>
+
+        </div>
+
+        <div class="modal-actions">
+
+            <button type="button" class="secondary-btn" (click)="closeCreateModal()">
+        Annuler
+      </button>
+
+            <button type="button" class="primary-btn" (click)="saveRole()">
+        <i class="ti ti-check"></i>
+        Créer le rôle
+      </button>
+
+        </div>
+
+    </div>
+
+</div>
+<!-- DELETE ROLE MODAL -->
+<div class="delete-overlay" *ngIf="showDeleteRoleModal">
+
+    <div class="delete-card">
+
+        <div class="delete-icon">
+            <i class="ti ti-trash"></i>
+        </div>
+
+        <h3>Désactiver le rôle</h3>
+
+        <p>
+            Voulez-vous vraiment désactiver le rôle
+            <strong>{{ roleToDelete?.nomRole }}</strong> ?
+        </p>
+
+        <div class="delete-info">
+            <i class="ti ti-info-circle"></i>
+            <span>
+        Le rôle ne sera pas supprimé définitivement.
+        Il sera seulement marqué comme inactif.
+      </span>
+        </div>
+
+        <div class="delete-actions">
+
+            <button type="button" class="secondary-btn" (click)="closeDeleteRoleModal()">
+        Annuler
+      </button>
+
+            <button type="button" class="danger-btn" (click)="confirmDeleteRole()">
+        Confirmer
+      </button>
+
+        </div>
+
+    </div>
+
+</div>

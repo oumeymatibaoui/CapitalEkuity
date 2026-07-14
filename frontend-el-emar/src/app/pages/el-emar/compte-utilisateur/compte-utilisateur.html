@@ -1,0 +1,218 @@
+<div class="compte-utilisateur-page">
+
+    <div class="top-header">
+        <div>
+            <h1>{{ getCompteTitle() }}</h1>
+            <p>
+                Consultez vos informations, modifiez votre nom ou fonction, changez votre mot de passe et suivez votre historique.
+            </p>
+        </div>
+
+        <button type="button" class="btn secondary" (click)="loadCompte(); loadHistorique()">
+      Actualiser
+    </button>
+    </div>
+
+    <div *ngIf="pageError" class="alert error">
+        {{ pageError }}
+    </div>
+
+    <div *ngIf="successMessage" class="alert success">
+        {{ successMessage }}
+    </div>
+
+    <div *ngIf="loading" class="loading-card">
+        Chargement du compte...
+    </div>
+
+    <div class="profile-card" *ngIf="!loading && compte">
+
+        <div class="profile-left">
+            <div class="profile-avatar">
+                {{ getProfileInitial() }}
+            </div>
+
+            <div class="profile-info">
+                <h2>{{ compte.nom || 'Utilisateur' }}</h2>
+                <p>{{ compte.email || 'Email non renseigné' }}</p>
+                <small>{{ compte.typeUtilisateur || '-' }}</small>
+            </div>
+        </div>
+
+        <div class="profile-status" [class.active]="compte.actif">
+            {{ compte.actif ? 'Compte actif' : 'Compte inactif' }}
+        </div>
+
+    </div>
+
+    <div class="content-grid" *ngIf="!loading && compte">
+
+        <!-- INFORMATIONS COMPTE -->
+        <div class="card">
+
+            <div class="card-header">
+                <h3>Informations du compte</h3>
+                <p>L’email est affiché en lecture seule.</p>
+            </div>
+
+            <form [formGroup]="compteForm" class="form-grid">
+
+                <div class="field">
+                    <label>Nom</label>
+                    <input type="text" class="form-control" formControlName="nom">
+                </div>
+
+                <div class="field">
+                    <label>Email</label>
+                    <input type="email" class="form-control readonly-input" formControlName="email">
+                </div>
+
+                <div class="field full">
+                    <label>Fonction</label>
+                    <input type="text" class="form-control" formControlName="fonction">
+                </div>
+
+            </form>
+
+            <div class="actions">
+                <button type="button" class="btn primary" (click)="saveCompte()" [disabled]="savingCompte">
+          {{ savingCompte ? 'Sauvegarde...' : 'Sauvegarder les informations' }}
+        </button>
+            </div>
+
+        </div>
+
+        <!-- MOT DE PASSE -->
+        <div class="card">
+
+            <div class="card-header">
+                <h3>Sécurité</h3>
+                <p>Changez votre mot de passe.</p>
+            </div>
+
+            <button type="button" class="btn secondary" (click)="togglePasswordForm()">
+        {{ showPasswordForm ? 'Annuler' : 'Changer le mot de passe' }}
+      </button>
+
+            <div class="password-panel" *ngIf="showPasswordForm">
+
+                <form [formGroup]="passwordForm" class="password-grid">
+
+                    <div class="field full">
+                        <label>Mot de passe actuel</label>
+                        <input type="password" class="form-control" formControlName="oldPassword">
+                    </div>
+
+                    <div class="field full">
+                        <label>Nouveau mot de passe</label>
+                        <input type="password" class="form-control" formControlName="newPassword">
+                    </div>
+
+                    <div class="field full">
+                        <label>Confirmer le nouveau mot de passe</label>
+                        <input type="password" class="form-control" formControlName="confirmPassword">
+                    </div>
+
+                </form>
+
+                <div *ngIf="passwordErrorMessage" class="alert error password-alert">
+                    {{ passwordErrorMessage }}
+                </div>
+
+                <div *ngIf="passwordSuccessMessage" class="alert success password-alert">
+                    {{ passwordSuccessMessage }}
+                </div>
+
+                <div class="actions">
+                    <button type="button" class="btn primary" (click)="changePassword()" [disabled]="changingPassword">
+            {{ changingPassword ? 'Modification...' : 'Enregistrer le mot de passe' }}
+          </button>
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- HISTORIQUE -->
+    <div class="card historique-section">
+
+        <div class="card-header historique-header">
+            <div>
+                <h3>Historique de mes actions</h3>
+                <p>Actions réalisées avec votre compte.</p>
+            </div>
+
+            <button type="button" class="btn secondary" (click)="loadHistorique()">
+        Actualiser historique
+      </button>
+        </div>
+
+        <div *ngIf="historique.length === 0" class="empty-card">
+            Aucune action enregistrée pour le moment.
+        </div>
+
+        <div class="historique-table-wrapper" *ngIf="historique.length > 0">
+
+            <table class="historique-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Action</th>
+                        <th>Description</th>
+                        <th>Candidature</th>
+                        <th>Lot</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    <tr *ngFor="let item of historique">
+
+                        <td>
+                            {{ formatDate(item.dateAction) }}
+                        </td>
+
+                        <td>
+                            <span class="action-badge" [ngClass]="getActionClass(item.action)">
+                {{ getActionLabel(item.action) }}
+              </span>
+                        </td>
+
+                        <td>
+                            <strong>{{ item.description || '-' }}</strong>
+                        </td>
+
+                        <td>
+                            <div class="small-cell">
+                                <strong>{{ item.raisonSociale || '-' }}</strong>
+
+                                <small *ngIf="item.emailCandidature">
+                  {{ item.emailCandidature }}
+                </small>
+
+                                <small *ngIf="item.candidatureId">
+                  Candidature #{{ item.candidatureId }}
+                </small>
+                            </div>
+                        </td>
+
+                        <td>
+                            <div class="small-cell">
+                                <strong>{{ item.lotNom || '-' }}</strong>
+
+                                <small *ngIf="item.applicationCandidatureId">
+                  Application #{{ item.applicationCandidatureId }}
+                </small>
+                            </div>
+                        </td>
+
+                    </tr>
+                </tbody>
+            </table>
+
+        </div>
+
+    </div>
+
+</div>

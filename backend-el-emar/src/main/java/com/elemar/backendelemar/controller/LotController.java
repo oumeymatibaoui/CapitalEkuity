@@ -11,14 +11,16 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/lots")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "http://localhost:4200")
+@CrossOrigin(origins = "*")
 public class LotController {
 
     private final LotService lotService;
 
     @GetMapping
-    public List<LotResponse> getAllLots() {
-        return lotService.getAllLots();
+    public List<LotResponse> getAllLots(
+            @RequestParam(required = false) Long typeIntervenantId
+    ) {
+        return lotService.getAllLots(typeIntervenantId);
     }
 
     @GetMapping("/{id}")

@@ -5,6 +5,7 @@ import { HttpClient } from '@angular/common/http';
 import * as L from 'leaflet';
 
 import { Zone, ZoneService } from '../../../core/services/zone.service';
+import { SafeMapService } from '../../../core/services/safe-map.service'; // <-- AJOUTÉ
 
 @Component({
   selector: 'app-zones',
@@ -17,7 +18,31 @@ export class Zones implements OnInit {
 
   @ViewChild('zoneMapContainer') zoneMapContainer?: ElementRef<HTMLDivElement>;
 
+  showCustomZoneNameInput = false;
   zones: Zone[] = [];
+  predefinedZoneNames: Zone[] = [
+    {
+      nomZone: 'Zone 1',
+      adresse: 'Lac',
+      latitude: null,
+      longitude: null,
+      description: 'Zone 1 : Lac. Classification très haut standing, complexité très élevée. Seuil minimum 80/100.'
+    },
+    {
+      nomZone: 'Zone 2',
+      adresse: 'Ain Zaghouan Nord ; Jardins de Carthage',
+      latitude: null,
+      longitude: null,
+      description: 'Zone 2 : Ain Zaghouan Nord et Jardins de Carthage. Classification haut standing, complexité élevée. Seuil minimum 80/100.'
+    },
+    {
+      nomZone: 'Zone 3',
+      adresse: 'Ain Zaghouan ; Soukra',
+      latitude: null,
+      longitude: null,
+      description: 'Zone 3 : Ain Zaghouan et Soukra. Classification standard, complexité modérée. Seuil minimum 80/100.'
+    }
+  ];
 
   showModal = false;
   isEditMode = false;
@@ -43,7 +68,8 @@ export class Zones implements OnInit {
   constructor(
     private zoneService: ZoneService,
     private http: HttpClient,
-    private cdr: ChangeDetectorRef
+    private cdr: ChangeDetectorRef,
+    private safeMap: SafeMapService // <-- AJOUTÉ
   ) {}
 
   ngOnInit(): void {
@@ -62,30 +88,30 @@ export class Zones implements OnInit {
     this.fieldErrors = {};
   }
 
-handleApiError(err: any): void {
-  console.log('API ERROR ZONE = ', err);
+  handleApiError(err: any): void {
+    console.log('API ERROR ZONE = ', err);
 
-  const message =
-    err?.error?.message ||
-    err?.error?.detail ||
-    err?.error?.error ||
-    'Une erreur est survenue';
+    const message =
+      err?.error?.message ||
+      err?.error?.detail ||
+      err?.error?.error ||
+      'Une erreur est survenue';
 
-  this.formError = message;
-  this.fieldErrors = err?.error?.errors || {};
+    this.formError = message;
+    this.fieldErrors = err?.error?.errors || {};
 
-  const lowerMessage = message.toLowerCase();
+    const lowerMessage = message.toLowerCase();
 
-  if (lowerMessage.includes('localisation')) {
-    this.fieldErrors['localisation'] = message;
+    if (lowerMessage.includes('localisation')) {
+      this.fieldErrors['localisation'] = message;
+    }
+
+    if (lowerMessage.includes('adresse')) {
+      this.fieldErrors['adresse'] = message;
+    }
+
+    this.cdr.detectChanges();
   }
-
-  if (lowerMessage.includes('adresse')) {
-    this.fieldErrors['adresse'] = message;
-  }
-
-  this.cdr.detectChanges();
-}
 
   validateZoneForm(): boolean {
     this.resetErrors();
@@ -127,6 +153,7 @@ handleApiError(err: any): void {
     this.showModal = true;
     this.isEditMode = false;
     this.selectedZoneId = null;
+    this.showCustomZoneNameInput = false;
 
     this.resetErrors();
 
@@ -147,6 +174,14 @@ handleApiError(err: any): void {
     this.selectedZoneId = zone.id ?? null;
 
     this.resetErrors();
+
+    const isPredefinedZone = this.predefinedZoneNames.some(
+      option =>
+        option.nomZone.trim().toLowerCase() ===
+        zone.nomZone.trim().toLowerCase()
+    );
+
+    this.showCustomZoneNameInput = !isPredefinedZone;
 
     this.form = {
       nomZone: zone.nomZone,
@@ -204,7 +239,8 @@ handleApiError(err: any): void {
     const lat = hasCoordinates ? Number(this.form.latitude) : defaultLat;
     const lng = hasCoordinates ? Number(this.form.longitude) : defaultLng;
 
-    this.map = L.map(container).setView(
+    // <-- MODIFIÉ : this.safeMap.createMap(...) au lieu de L.map(...)
+    this.map = this.safeMap.createMap(container).setView(
       [lat, lng],
       hasCoordinates ? 14 : 11
     );
@@ -217,7 +253,8 @@ handleApiError(err: any): void {
       this.setMarker(lat, lng);
     }
 
-    this.map.on('click', (event: L.LeafletMouseEvent) => {
+    // <-- MODIFIÉ : this.safeMap.onMapClick(...) au lieu de this.map.on('click', ...)
+    this.safeMap.onMapClick(this.map, (event) => {
       const clickedLat = event.latlng.lat;
       const clickedLng = event.latlng.lng;
 
@@ -228,7 +265,7 @@ handleApiError(err: any): void {
 
       this.setMarker(clickedLat, clickedLng);
       this.reverseGeocode(clickedLat, clickedLng);
-    });
+    }, this.cdr);
 
     setTimeout(() => {
       this.map?.invalidateSize();
@@ -267,24 +304,27 @@ handleApiError(err: any): void {
 
     this.http.get<any[]>(url).subscribe({
       next: result => {
-        if (!result || result.length === 0) {
-          this.fieldErrors['adresse'] = 'Adresse introuvable';
-          return;
-        }
+        // <-- MODIFIÉ : on force la détection après la réponse HTTP externe
+        this.safeMap.runAndDetect(() => {
+          if (!result || result.length === 0) {
+            this.fieldErrors['adresse'] = 'Adresse introuvable';
+            return;
+          }
 
-        const place = result[0];
+          const place = result[0];
 
-        const lat = Number(place.lat);
-        const lng = Number(place.lon);
+          const lat = Number(place.lat);
+          const lng = Number(place.lon);
 
-        this.form.latitude = Number(lat.toFixed(6));
-        this.form.longitude = Number(lng.toFixed(6));
-        this.form.adresse = place.display_name;
+          this.form.latitude = Number(lat.toFixed(6));
+          this.form.longitude = Number(lng.toFixed(6));
+          this.form.adresse = place.display_name;
 
-        this.fieldErrors['localisation'] = '';
+          this.fieldErrors['localisation'] = '';
 
-        this.map?.setView([lat, lng], 14);
-        this.setMarker(lat, lng);
+          this.map?.setView([lat, lng], 14);
+          this.setMarker(lat, lng);
+        }, this.cdr);
       },
       error: err => console.error(err)
     });
@@ -296,9 +336,12 @@ handleApiError(err: any): void {
 
     this.http.get<any>(url).subscribe({
       next: result => {
-        if (result && result.display_name) {
-          this.form.adresse = result.display_name;
-        }
+        // <-- MODIFIÉ : on force la détection après la réponse HTTP externe
+        this.safeMap.runAndDetect(() => {
+          if (result && result.display_name) {
+            this.form.adresse = result.display_name;
+          }
+        }, this.cdr);
       },
       error: err => console.error(err)
     });
@@ -363,5 +406,84 @@ handleApiError(err: any): void {
       },
       error: err => console.error(err)
     });
+  }
+
+  getZoneNameOptions(): Zone[] {
+    const options: Zone[] = [...this.predefinedZoneNames];
+
+    for (const zone of this.zones || []) {
+      const alreadyExists = options.some(
+        option =>
+          option.nomZone?.trim().toLowerCase() ===
+          zone.nomZone?.trim().toLowerCase()
+      );
+
+      if (!alreadyExists && zone.nomZone) {
+        options.push({
+          nomZone: zone.nomZone,
+          adresse: zone.adresse ?? '',
+          latitude: zone.latitude ?? null,
+          longitude: zone.longitude ?? null,
+          description: zone.description ?? ''
+        });
+      }
+    }
+
+    return options;
+  }
+
+  onZoneNameSelected(nomZone: string): void {
+    this.fieldErrors['nomZone'] = '';
+
+    const selected = this.getZoneNameOptions().find(
+      option => option.nomZone === nomZone
+    );
+
+    if (!selected) {
+      return;
+    }
+
+    this.form.nomZone = selected.nomZone;
+    this.form.adresse = selected.adresse ?? '';
+    this.form.description = selected.description ?? '';
+
+    if (selected.latitude !== null && selected.latitude !== undefined) {
+      this.form.latitude = selected.latitude;
+    }
+
+    if (selected.longitude !== null && selected.longitude !== undefined) {
+      this.form.longitude = selected.longitude;
+    }
+
+    if (
+      this.form.latitude !== null &&
+      this.form.latitude !== undefined &&
+      this.form.longitude !== null &&
+      this.form.longitude !== undefined
+    ) {
+      this.map?.setView(
+        [Number(this.form.latitude), Number(this.form.longitude)],
+        14
+      );
+
+      this.setMarker(
+        Number(this.form.latitude),
+        Number(this.form.longitude)
+      );
+    }
+  }
+
+  enableCustomZoneName(): void {
+    this.showCustomZoneNameInput = true;
+
+    this.form.nomZone = '';
+    this.fieldErrors['nomZone'] = '';
+  }
+
+  disableCustomZoneName(): void {
+    this.showCustomZoneNameInput = false;
+
+    this.form.nomZone = '';
+    this.fieldErrors['nomZone'] = '';
   }
 }

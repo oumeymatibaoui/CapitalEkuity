@@ -1,1 +1,181 @@
-<p>synthese works!</p>
+<div class="synthese-page">
+
+    <div class="page-header">
+        <div>
+            <p class="eyebrow">Synthèse El Emar</p>
+            <h1>Classement des candidats par lot et par zone</h1>
+            <p class="subtitle">
+                Affichage des candidats ayant une note supérieure ou égale au seuil demandé, avec classement décroissant par note.
+            </p>
+        </div>
+
+        <div class="header-actions">
+            <button type="button" class="btn primary" (click)="loadClassement()">
+        Actualiser
+      </button>
+        </div>
+    </div>
+
+    <div class="filters-card">
+        <div class="filter-group">
+            <label>Note minimale</label>
+            <input type="number" min="0" max="100" [value]="minNote" (input)="onMinNoteChange($event)" />
+        </div>
+
+        <label class="checkbox-filter">
+      <input
+        type="checkbox"
+        [checked]="admisOnly"
+        (change)="onAdmisOnlyChange($event)"
+      />
+      <span>Afficher seulement les candidats admis</span>
+    </label>
+
+        <button type="button" class="btn secondary" (click)="loadClassement()">
+      Appliquer
+    </button>
+    </div>
+
+    <div *ngIf="pageError" class="alert error">
+        {{ pageError }}
+    </div>
+
+    <div *ngIf="loading" class="loading-card">
+        Chargement du classement...
+    </div>
+
+    <div *ngIf="!loading && classement.length === 0" class="empty-card">
+        Aucun candidat trouvé pour ce seuil.
+    </div>
+
+    <div *ngIf="!loading && classement.length > 0" class="stats-grid">
+        <div class="stat-card">
+            <span>Candidats / lots</span>
+            <strong>{{ classement.length }}</strong>
+        </div>
+
+        <div class="stat-card">
+            <span>Meilleure note</span>
+            <strong>{{ getBestNote() | number:'1.0-2' }} / 100</strong>
+        </div>
+
+        <div class="stat-card">
+            <span>Note moyenne</span>
+            <strong>{{ getAverageNote() | number:'1.0-2' }} / 100</strong>
+        </div>
+
+        <div class="stat-card">
+            <span>Seuil appliqué</span>
+            <strong>{{ minNote }} / 100</strong>
+        </div>
+    </div>
+
+    <div *ngIf="!loading && classement.length > 0" class="chart-card">
+        <div class="section-header">
+            <div>
+                <h2>Top candidats par note</h2>
+                <p>Classement décroissant des meilleurs candidats par lot et par zone.</p>
+            </div>
+        </div>
+
+        <div class="chart-list">
+            <div class="chart-row" *ngFor="let row of getTopClassement(10); trackBy: trackByApplicationLot">
+                <div class="chart-label">
+                    <strong>{{ row.raisonSociale }}</strong>
+                    <span>{{ row.nomLot }} • {{ row.nomZone || 'Zone non définie' }}</span>
+                </div>
+
+                <div class="bar-track">
+                    <div class="bar-fill" [style.width.%]="getBarWidth(row.noteLot)"></div>
+                </div>
+
+                <div class="bar-value">
+                    {{ row.noteLot | number:'1.0-2' }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div *ngIf="!loading && classement.length > 0" class="table-card">
+        <div class="section-header">
+            <div>
+                <h2>Liste détaillée</h2>
+                <p>Une ligne représente un candidat pour un lot précis.</p>
+            </div>
+        </div>
+
+        <div class="table-wrapper">
+            <table class="ranking-table">
+                <thead>
+                    <tr>
+                        <th>Rang</th>
+                        <th>Candidat</th>
+                        <th>Type</th>
+                        <th>Lot</th>
+                        <th>Zone</th>
+                        <th>Note</th>
+                        <th>Décision</th>
+                        <th>Statut</th>
+                        <th>Date soumission</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    <tr *ngFor="let row of classement; trackBy: trackByApplicationLot">
+                        <td>
+                            <span class="rank-badge">
+                {{ row.rangGlobal || '-' }}
+              </span>
+                        </td>
+
+                        <td>
+                            <div class="candidate-cell">
+                                <strong>{{ row.raisonSociale }}</strong>
+                                <span>{{ row.emailPrincipal || '-' }}</span>
+                                <small>{{ row.telephone || '-' }}</small>
+                            </div>
+                        </td>
+
+                        <td>
+                            <span class="type-badge">
+                {{ row.typeCandidat || '-' }}
+              </span>
+                        </td>
+
+                        <td>
+                            <div class="lot-cell">
+                                <strong>{{ row.nomLot }}</strong>
+                                <span>Rang lot : {{ row.rangParLot || '-' }}</span>
+                            </div>
+                        </td>
+
+                        <td>
+                            <span class="zone-badge">
+                {{ row.nomZone || '-' }}
+              </span>
+                        </td>
+
+                        <td>
+                            <span class="score-badge" [class.high]="row.noteLot >= 90" [class.good]="row.noteLot >= 80 && row.noteLot < 90">
+                {{ row.noteLot | number:'1.0-2' }} / 100
+              </span>
+                        </td>
+
+                        <td>
+                            <span class="decision-badge" [class.admis]="row.decisionFinale === 'ADMIS'" [class.eligible]="!row.decisionFinale" [class.rejete]="row.decisionFinale === 'REJETE'">
+                {{ getDecisionLabel(row.decisionFinale) }}
+              </span>
+                        </td>
+
+                        <td>{{ row.statut || '-' }}</td>
+
+                        <td>
+                            {{ row.dateSoumission ? (row.dateSoumission | date:'dd/MM/yyyy HH:mm') : '-' }}
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>

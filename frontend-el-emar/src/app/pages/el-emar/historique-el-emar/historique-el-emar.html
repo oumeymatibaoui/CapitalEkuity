@@ -1,0 +1,94 @@
+<div class="historique-el-emar-page">
+
+    <div class="top-header">
+        <div>
+            <h1>Historique El Emar</h1>
+            <p>
+                Suivi des actions réalisées par votre compte El Emar : évaluation, notifications, décisions finales et classements par zone.
+            </p>
+        </div>
+
+        <button type="button" class="btn secondary" (click)="loadHistorique()">
+      Actualiser
+    </button>
+    </div>
+
+    <div *ngIf="pageError" class="alert error">
+        {{ pageError }}
+    </div>
+
+    <div *ngIf="loading" class="loading-card">
+        Chargement de l’historique El Emar...
+    </div>
+
+    <div *ngIf="!loading && historique.length === 0" class="empty-card">
+        Aucune action El Emar enregistrée pour le moment.
+    </div>
+
+    <div class="historique-card" *ngIf="!loading && historique.length > 0">
+
+        <table class="historique-table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Action</th>
+                    <th>Description</th>
+                    <th>Candidature</th>
+                    <th>Lot</th>
+                    <th>Utilisateur</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                <tr *ngFor="let item of historique">
+
+                    <td>
+                        {{ formatDate(item.dateAction) }}
+                    </td>
+
+                    <td>
+                        <span class="action-badge" [ngClass]="getActionClass(item.action)">
+              {{ getActionLabel(item.action) }}
+            </span>
+                    </td>
+
+                    <td>
+                        <strong>{{ item.description || '-' }}</strong>
+                    </td>
+
+                    <td>
+                        <div class="candidature-cell">
+                            <strong>{{ item.raisonSociale || '-' }}</strong>
+                            <small *ngIf="item.emailCandidature">
+                {{ item.emailCandidature }}
+              </small>
+                            <small *ngIf="item.candidatureId">
+                Candidature #{{ item.candidatureId }}
+              </small>
+                        </div>
+                    </td>
+
+                    <td>
+                        <div class="lot-cell">
+                            <strong>{{ item.lotNom || '-' }}</strong>
+                            <small *ngIf="item.applicationCandidatureId">
+                Application #{{ item.applicationCandidatureId }}
+              </small>
+                        </div>
+                    </td>
+
+                    <td>
+                        <div class="user-cell">
+                            <strong>{{ item.utilisateurNom || '-' }}</strong>
+                            <small>{{ item.utilisateurEmail || '-' }}</small>
+                            <small>{{ item.typeUtilisateur || '-' }}</small>
+                        </div>
+                    </td>
+
+                </tr>
+            </tbody>
+        </table>
+
+    </div>
+
+</div>

@@ -1,20 +1,42 @@
 <div class="admin-page">
 
-    <!-- Header -->
     <div class="page-header">
         <div>
-            <h2>Gestion des lots</h2>
-            <p>{{ activeLotsCount }} lots actifs</p>
+            <h2>Domaines d’intervention par métier</h2>
+            <p>{{ activeLotsCount }} domaine(s) actif(s)</p>
         </div>
 
         <button class="primary-btn" type="button" (click)="openCreateModal()">
       <i class="ti ti-plus"></i>
-      Ajouter un lot
+      Ajouter un domaine
     </button>
     </div>
 
-    <!-- Liste des lots -->
-    <div class="lots-list">
+    <div class="filter-card">
+        <label>Filtrer par type d’intervenant</label>
+
+        <select [(ngModel)]="selectedTypeFilter" (ngModelChange)="onTypeFilterChange()">
+      <option [ngValue]="null">Tous les types</option>
+
+      <option
+        *ngFor="let type of types"
+        [ngValue]="type.id"
+      >
+        {{ type.libelle }}
+      </option>
+    </select>
+    </div>
+
+    <div class="form-error modal-error" *ngIf="formError">
+        <i class="ti ti-alert-circle"></i>
+        <span>{{ formError }}</span>
+    </div>
+
+    <div class="loading-card" *ngIf="loading">
+        Chargement des domaines...
+    </div>
+
+    <div class="lots-list" *ngIf="!loading">
 
         <div class="lot-card" *ngFor="let lot of lots">
 
@@ -34,12 +56,16 @@
           </span>
                 </div>
 
+                <p class="lot-type">
+                    Type : {{ lot.typeIntervenantLibelle || getTypeLabel(lot.typeIntervenantId) }}
+                </p>
+
                 <p class="lot-description">
                     {{ lot.description || 'Aucune description.' }}
                 </p>
 
                 <p class="lot-meta">
-                    0 candidature déposée
+                    Domaine utilisé pour la configuration des grilles de notation.
                 </p>
 
             </div>
@@ -66,20 +92,19 @@
         </div>
 
         <div class="empty-card" *ngIf="lots.length === 0">
-            Aucun lot trouvé.
+            Aucun domaine trouvé.
         </div>
 
     </div>
 
 </div>
 
-<!-- Modal création / modification -->
 <div class="modal-overlay" *ngIf="showModal">
     <div class="modal-card">
 
         <div class="modal-header">
             <h3>
-                {{ isEditMode ? 'Modifier le lot' : 'Ajouter un lot' }}
+                {{ isEditMode ? 'Modifier le domaine' : 'Ajouter un domaine' }}
             </h3>
 
             <button type="button" (click)="closeModal()">
@@ -87,30 +112,46 @@
       </button>
         </div>
 
-        <!-- Message général d'erreur backend -->
         <div class="form-error modal-error" *ngIf="formError">
             <i class="ti ti-alert-circle"></i>
             <span>{{ formError }}</span>
         </div>
 
+        <div class="form-group">
+            <label>Type d’intervenant *</label>
+
+            <select [(ngModel)]="form.typeIntervenantId" [class.input-error]="fieldErrors['typeIntervenantId']">
+        <option [ngValue]="null">-- Choisir un type --</option>
+
+        <option
+          *ngFor="let type of types"
+          [ngValue]="type.id"
+        >
+          {{ type.libelle }}
+        </option>
+      </select>
+
+            <small class="field-error" *ngIf="fieldErrors['typeIntervenantId']">
+        {{ fieldErrors['typeIntervenantId'] }}
+      </small>
+        </div>
+
         <div class="form-grid">
 
-            <!-- Code lot -->
             <div class="form-group">
-                <label>Code lot *</label>
+                <label>Code domaine *</label>
 
-                <input type="text" [(ngModel)]="form.codeLot" placeholder="LOT-XXX" [class.input-error]="fieldErrors['codeLot']" />
+                <input type="text" [(ngModel)]="form.codeLot" placeholder="ETU-STRUCT" [class.input-error]="fieldErrors['codeLot']" />
 
                 <small class="field-error" *ngIf="fieldErrors['codeLot']">
           {{ fieldErrors['codeLot'] }}
         </small>
             </div>
 
-            <!-- Nom lot -->
             <div class="form-group">
-                <label>Nom *</label>
+                <label>Nom du domaine *</label>
 
-                <input type="text" [(ngModel)]="form.nomLot" placeholder="Ex : Acoustique" [class.input-error]="fieldErrors['nomLot']" />
+                <input type="text" [(ngModel)]="form.nomLot" placeholder="Ex : Étude structurelle" [class.input-error]="fieldErrors['nomLot']" />
 
                 <small class="field-error" *ngIf="fieldErrors['nomLot']">
           {{ fieldErrors['nomLot'] }}
@@ -119,37 +160,30 @@
 
         </div>
 
-        <!-- Description -->
         <div class="form-group">
-            <label>Description *</label>
+            <label>Description</label>
 
-            <textarea [(ngModel)]="form.description" placeholder="Description du lot..." [class.input-error]="fieldErrors['description']"></textarea>
-
-            <small class="field-error" *ngIf="fieldErrors['description']">
-    {{ fieldErrors['description'] }}
-  </small>
+            <textarea [(ngModel)]="form.description" placeholder="Description du domaine d’intervention..."></textarea>
         </div>
-        <!-- Statut actif -->
+
         <label class="checkbox-row">
       <input type="checkbox" [(ngModel)]="form.actif" />
-      <span>Lot actif</span>
+      <span>Domaine actif</span>
     </label>
 
-        <!-- Actions -->
         <div class="modal-actions">
             <button class="secondary-btn" type="button" (click)="closeModal()">
         Annuler
       </button>
 
             <button class="primary-btn" type="button" (click)="saveLot()">
-        {{ isEditMode ? 'Modifier le lot' : 'Ajouter' }}
+        {{ isEditMode ? 'Modifier le domaine' : 'Ajouter' }}
       </button>
         </div>
 
     </div>
 </div>
 
-<!-- Delete Confirmation -->
 <div class="delete-overlay" *ngIf="showDeleteModal" (click)="closeDeleteModal()">
     <div class="delete-card" (click)="$event.stopPropagation()">
 
@@ -157,10 +191,10 @@
             <i class="ti ti-trash"></i>
         </div>
 
-        <h3>Supprimer le lot ?</h3>
+        <h3>Supprimer le domaine ?</h3>
 
         <p>
-            Cette action supprimera définitivement le lot
+            Cette action supprimera définitivement le domaine
             <strong>{{ lotToDelete?.nomLot }}</strong>.
         </p>
 

@@ -1,0 +1,174 @@
+<div class="admin-page">
+
+    <div class="page-header">
+        <div>
+            <h2>Types d’intervenants</h2>
+            <p>{{ activeTypesCount }} type(s) actif(s)</p>
+        </div>
+
+        <button class="primary-btn" type="button" (click)="openCreateModal()">
+      <i class="ti ti-plus"></i>
+      Ajouter un type
+    </button>
+    </div>
+
+    <div class="form-error modal-error" *ngIf="formError">
+        <i class="ti ti-alert-circle"></i>
+        <span>{{ formError }}</span>
+    </div>
+
+    <div class="lots-list">
+
+        <div class="lot-card" *ngFor="let type of types">
+
+            <div class="lot-icon">
+                <i class="ti ti-category"></i>
+            </div>
+
+            <div class="lot-content">
+
+                <div class="lot-title-row">
+                    <span class="lot-code">{{ type.code }}</span>
+
+                    <h3>{{ type.libelle }}</h3>
+
+                    <span class="status-pill" [class.inactive]="!isTypeActive(type)">
+            {{ isTypeActive(type) ? 'Actif' : 'Inactif' }}
+          </span>
+                </div>
+
+                <p class="lot-description">
+                    {{ type.description || 'Aucune description.' }}
+                </p>
+
+                <p class="lot-meta">
+                    Ordre d’affichage : {{ type.ordreAffichage || 0 }}
+                </p>
+
+            </div>
+
+            <div class="lot-actions">
+
+                <button class="icon-btn status-btn" [ngClass]="isTypeActive(type) ? 'active-status' : 'inactive-status'" type="button" title="Activer / désactiver" (click)="toggleTypeStatus(type)">
+          <i
+            class="ti"
+            [ngClass]="isTypeActive(type) ? 'ti-toggle-right' : 'ti-toggle-left'"
+          ></i>
+        </button>
+
+                <button class="icon-btn edit" type="button" title="Modifier" (click)="openEditModal(type)">
+          <i class="ti ti-pencil"></i>
+        </button>
+
+                <button class="icon-btn delete" type="button" title="Supprimer" (click)="openDeleteModal(type)">
+          <i class="ti ti-trash"></i>
+        </button>
+
+            </div>
+
+        </div>
+
+        <div class="empty-card" *ngIf="types.length === 0">
+            Aucun type trouvé.
+        </div>
+
+    </div>
+
+</div>
+
+<div class="modal-overlay" *ngIf="showModal">
+    <div class="modal-card">
+
+        <div class="modal-header">
+            <h3>{{ isEditMode ? 'Modifier le type' : 'Ajouter un type' }}</h3>
+
+            <button type="button" (click)="closeModal()">
+        <i class="ti ti-x"></i>
+      </button>
+        </div>
+
+        <div class="form-error modal-error" *ngIf="formError">
+            <i class="ti ti-alert-circle"></i>
+            <span>{{ formError }}</span>
+        </div>
+
+        <div class="form-grid">
+
+            <div class="form-group">
+                <label>Code type *</label>
+
+                <input type="text" [(ngModel)]="form.code" placeholder="BUREAU_ETUDES" [class.input-error]="fieldErrors['code']" />
+
+                <small class="field-error" *ngIf="fieldErrors['code']">
+          {{ fieldErrors['code'] }}
+        </small>
+            </div>
+
+            <div class="form-group">
+                <label>Libellé *</label>
+
+                <input type="text" [(ngModel)]="form.libelle" placeholder="Bureau d’études" [class.input-error]="fieldErrors['libelle']" />
+
+                <small class="field-error" *ngIf="fieldErrors['libelle']">
+          {{ fieldErrors['libelle'] }}
+        </small>
+            </div>
+
+            <div class="form-group">
+                <label>Ordre d’affichage</label>
+
+                <input type="number" [(ngModel)]="form.ordreAffichage" placeholder="1" />
+            </div>
+
+        </div>
+
+        <div class="form-group">
+            <label>Description</label>
+
+            <textarea [(ngModel)]="form.description" placeholder="Description du type d’intervenant..."></textarea>
+        </div>
+
+        <label class="checkbox-row">
+      <input type="checkbox" [(ngModel)]="form.actif" />
+      <span>Type actif</span>
+    </label>
+
+        <div class="modal-actions">
+            <button class="secondary-btn" type="button" (click)="closeModal()">
+        Annuler
+      </button>
+
+            <button class="primary-btn" type="button" (click)="saveType()">
+        {{ isEditMode ? 'Modifier le type' : 'Ajouter' }}
+      </button>
+        </div>
+
+    </div>
+</div>
+
+<div class="delete-overlay" *ngIf="showDeleteModal" (click)="closeDeleteModal()">
+    <div class="delete-card" (click)="$event.stopPropagation()">
+
+        <div class="delete-icon">
+            <i class="ti ti-trash"></i>
+        </div>
+
+        <h3>Supprimer le type ?</h3>
+
+        <p>
+            Cette action supprimera définitivement le type
+            <strong>{{ typeToDelete?.libelle }}</strong>.
+        </p>
+
+        <div class="delete-actions">
+            <button class="secondary-btn" type="button" (click)="closeDeleteModal()">
+        Annuler
+      </button>
+
+            <button class="danger-btn" type="button" (click)="confirmDeleteType()">
+        Supprimer
+      </button>
+        </div>
+
+    </div>
+</div>

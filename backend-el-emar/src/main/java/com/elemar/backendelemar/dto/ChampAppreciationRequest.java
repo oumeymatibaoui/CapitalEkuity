@@ -5,6 +5,8 @@ import jakarta.validation.constraints.*;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.util.List;
+
 @Getter
 @Setter
 public class ChampAppreciationRequest {
@@ -51,4 +53,5 @@ public class ChampAppreciationRequest {
 
     @NotNull(message = "Le statut actif est requis")
     private Boolean actif;
+    private List<LiaisonChampPieceRequest> piecesLiees;
 }

@@ -1,0 +1,470 @@
+.admin-page {
+    min-height: 100vh;
+    background: #f6f7fb;
+    padding: 28px;
+    color: #0f172a;
+}
+
+
+/* HEADER */
+
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 18px;
+    margin-bottom: 24px;
+}
+
+.page-header h2 {
+    margin: 0;
+    color: #101d56;
+    font-size: 30px;
+    font-weight: 900;
+}
+
+.page-header p {
+    margin: 6px 0 0;
+    color: #64748b;
+    font-weight: 800;
+}
+
+
+/* BUTTONS */
+
+.primary-btn,
+.secondary-btn,
+.danger-btn {
+    border: none;
+    border-radius: 14px;
+    padding: 12px 18px;
+    font-weight: 900;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: 0.2s ease;
+}
+
+.primary-btn {
+    background: #101d56;
+    color: #ffffff;
+}
+
+.primary-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 12px 26px rgba(16, 29, 86, 0.22);
+}
+
+.secondary-btn {
+    background: #eef2ff;
+    color: #101d56;
+}
+
+.secondary-btn:hover {
+    background: #e0e7ff;
+}
+
+.danger-btn {
+    background: #ef4444;
+    color: #ffffff;
+}
+
+.danger-btn:hover {
+    background: #dc2626;
+}
+
+
+/* LIST */
+
+.lots-list {
+    display: grid;
+    gap: 16px;
+}
+
+.lot-card {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 22px;
+    padding: 18px;
+    display: grid;
+    grid-template-columns: 58px 1fr auto;
+    align-items: center;
+    gap: 18px;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+    transition: 0.2s ease;
+}
+
+.lot-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 16px 38px rgba(15, 23, 42, 0.1);
+}
+
+.lot-icon {
+    width: 58px;
+    height: 58px;
+    border-radius: 18px;
+    background: #101d56;
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+}
+
+.lot-content {
+    min-width: 0;
+}
+
+.lot-title-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.lot-code {
+    background: #eef2ff;
+    color: #101d56;
+    padding: 6px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 900;
+}
+
+.lot-title-row h3 {
+    margin: 0;
+    color: #0f172a;
+    font-size: 19px;
+    font-weight: 900;
+}
+
+.status-pill {
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: #dcfce7;
+    color: #166534;
+    font-size: 12px;
+    font-weight: 900;
+}
+
+.status-pill.inactive {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.lot-description {
+    margin: 0 0 8px;
+    color: #475569;
+    font-weight: 700;
+    line-height: 1.45;
+}
+
+.lot-meta {
+    margin: 0;
+    color: #94a3b8;
+    font-size: 13px;
+    font-weight: 800;
+}
+
+
+/* ACTIONS */
+
+.lot-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.icon-btn {
+    width: 42px;
+    height: 42px;
+    border: none;
+    border-radius: 14px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 19px;
+    transition: 0.2s ease;
+}
+
+.icon-btn:hover {
+    transform: translateY(-1px);
+}
+
+.icon-btn.edit {
+    background: #e0f2fe;
+    color: #0369a1;
+}
+
+.icon-btn.delete {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.status-btn.active-status {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.status-btn.inactive-status {
+    background: #f1f5f9;
+    color: #64748b;
+}
+
+
+/* EMPTY */
+
+.empty-card {
+    background: #ffffff;
+    border: 1px dashed #cbd5e1;
+    border-radius: 20px;
+    padding: 28px;
+    text-align: center;
+    color: #64748b;
+    font-weight: 900;
+}
+
+
+/* ERROR */
+
+.form-error {
+    background: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #fecaca;
+    border-radius: 14px;
+    padding: 12px 14px;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.modal-error {
+    margin-bottom: 16px;
+}
+
+.field-error {
+    color: #dc2626;
+    font-weight: 800;
+    font-size: 12px;
+    margin-top: 6px;
+    display: block;
+}
+
+.input-error {
+    border-color: #ef4444 !important;
+    background: #fff7f7 !important;
+}
+
+
+/* MODAL */
+
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(7, 19, 54, 0.72);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+
+.modal-card {
+    width: min(720px, 96vw);
+    background: #ffffff;
+    border-radius: 24px;
+    padding: 24px;
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.35);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.modal-header h3 {
+    margin: 0;
+    color: #101d56;
+    font-size: 22px;
+    font-weight: 900;
+}
+
+.modal-header button {
+    border: none;
+    background: #f1f5f9;
+    color: #334155;
+    width: 40px;
+    height: 40px;
+    border-radius: 14px;
+    cursor: pointer;
+    font-size: 18px;
+}
+
+
+/* FORM */
+
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.form-group {
+    margin-bottom: 16px;
+}
+
+.form-group label {
+    display: block;
+    color: #101d56;
+    font-weight: 900;
+    margin-bottom: 8px;
+}
+
+.form-group input,
+.form-group textarea,
+.form-group select {
+    width: 100%;
+    border: 1px solid #d1d5db;
+    border-radius: 14px;
+    padding: 12px 14px;
+    background: #ffffff;
+    color: #0f172a;
+    font-weight: 700;
+    outline: none;
+    transition: 0.2s ease;
+}
+
+.form-group input:focus,
+.form-group textarea:focus,
+.form-group select:focus {
+    border-color: #101d56;
+    box-shadow: 0 0 0 3px rgba(16, 29, 86, 0.12);
+}
+
+.form-group textarea {
+    min-height: 110px;
+    resize: vertical;
+}
+
+.checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #0f172a;
+    font-weight: 900;
+    margin: 8px 0 22px;
+}
+
+.checkbox-row input {
+    width: 18px;
+    height: 18px;
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
+
+/* DELETE MODAL */
+
+.delete-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(7, 19, 54, 0.72);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+
+.delete-card {
+    width: min(460px, 96vw);
+    background: #ffffff;
+    border-radius: 24px;
+    padding: 28px;
+    text-align: center;
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.35);
+}
+
+.delete-icon {
+    width: 68px;
+    height: 68px;
+    border-radius: 22px;
+    background: #fee2e2;
+    color: #991b1b;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 30px;
+    margin-bottom: 16px;
+}
+
+.delete-card h3 {
+    margin: 0 0 10px;
+    color: #111827;
+    font-size: 22px;
+    font-weight: 900;
+}
+
+.delete-card p {
+    margin: 0 0 22px;
+    color: #64748b;
+    font-weight: 700;
+    line-height: 1.5;
+}
+
+.delete-card strong {
+    color: #111827;
+}
+
+.delete-actions {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+}
+
+
+/* RESPONSIVE */
+
+@media (max-width: 800px) {
+    .admin-page {
+        padding: 16px;
+    }
+    .page-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .lot-card {
+        grid-template-columns: 1fr;
+    }
+    .lot-icon {
+        width: 52px;
+        height: 52px;
+    }
+    .lot-actions {
+        justify-content: flex-start;
+    }
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
+    .modal-actions,
+    .delete-actions {
+        flex-direction: column;
+    }
+    .primary-btn,
+    .secondary-btn,
+    .danger-btn {
+        width: 100%;
+        justify-content: center;
+    }
+}

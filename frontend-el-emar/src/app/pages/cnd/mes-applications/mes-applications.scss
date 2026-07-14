@@ -1,0 +1,143 @@
+.mes-applications-page {
+    padding: 24px;
+}
+
+.top-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    align-items: flex-start;
+    margin-bottom: 20px;
+}
+
+.top-header h1 {
+    margin: 0;
+    font-size: 28px;
+    font-weight: 800;
+}
+
+.top-header p {
+    margin: 6px 0 0;
+    color: #64748b;
+}
+
+.alert {
+    padding: 12px 14px;
+    border-radius: 12px;
+    margin-bottom: 16px;
+    font-weight: 600;
+}
+
+.alert.error {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.loading-card,
+.empty-card {
+    padding: 20px;
+    border-radius: 16px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    color: #64748b;
+    font-weight: 600;
+}
+
+.historique-card {
+    background: white;
+    border-radius: 18px;
+    border: 1px solid #e2e8f0;
+    overflow: hidden;
+    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+}
+
+.historique-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.historique-table th {
+    text-align: left;
+    background: #f8fafc;
+    color: #475569;
+    font-size: 13px;
+    padding: 14px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.historique-table td {
+    padding: 14px;
+    border-bottom: 1px solid #f1f5f9;
+    vertical-align: top;
+}
+
+.historique-table tr:hover {
+    background: #f8fafc;
+}
+
+.action-badge {
+    display: inline-flex;
+    padding: 6px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.action-default {
+    background: #e2e8f0;
+    color: #334155;
+}
+
+.action-upload {
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+
+.action-edit {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.action-submit {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.action-notification {
+    background: #ffedd5;
+    color: #c2410c;
+}
+
+.action-decision {
+    background: #ede9fe;
+    color: #6d28d9;
+}
+
+td strong {
+    display: block;
+    color: #0f172a;
+}
+
+td small {
+    display: block;
+    margin-top: 4px;
+    color: #64748b;
+}
+
+.user-cell strong {
+    font-weight: 800;
+}
+
+.btn {
+    border: none;
+    border-radius: 10px;
+    padding: 10px 14px;
+    cursor: pointer;
+    font-weight: 700;
+}
+
+.btn.secondary {
+    background: #e2e8f0;
+    color: #0f172a;
+}

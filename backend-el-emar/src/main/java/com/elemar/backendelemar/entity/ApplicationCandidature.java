@@ -20,8 +20,8 @@ import java.time.LocalDateTime;
         name = "application_candidature",
         uniqueConstraints = {
                 @UniqueConstraint(
-                        name = "uq_application_candidature_lot",
-                        columnNames = {"candidature_id", "appel_lot_id"}
+                        name = "uq_application_candidature_direct_lot",
+                        columnNames = {"candidature_id", "lot_id"}
                 )
         }
 )
@@ -31,20 +31,25 @@ public class ApplicationCandidature {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // Candidature globale : bureau + appel
+    // Candidature globale
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "candidature_id", nullable = false)
     private Candidature candidature;
 
-    // Mini-candidature par lot
+    // Nouveau modèle : application directe par lot
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "appel_lot_id", nullable = false)
+    @JoinColumn(name = "lot_id", nullable = false)
+    private Lot lot;
+
+    // Ancien modèle conservé pour le futur module Appel/Campagne
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "appel_lot_id")
     private AppelLot appelLot;
 
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     @Column(name = "statut", nullable = false, columnDefinition = "statut_application")
-    private StatutApplication statut;
+    private StatutApplication statut = StatutApplication.BROUILLON;
 
     @Column(name = "date_creation")
     private LocalDateTime dateCreation;
@@ -53,10 +58,10 @@ public class ApplicationCandidature {
     private LocalDateTime dateSoumission;
 
     @Column(name = "taux_completion")
-    private BigDecimal tauxCompletion;
+    private BigDecimal tauxCompletion = BigDecimal.ZERO;
 
     @Column(name = "phase1_validee")
-    private Boolean phase1Validee;
+    private Boolean phase1Validee = false;
 
     @Column(name = "note_finale")
     private BigDecimal noteFinale;
@@ -71,4 +76,12 @@ public class ApplicationCandidature {
 
     @Column(name = "date_decision")
     private LocalDateTime dateDecision;
+
+
+
+
+
+
+    @Column(name = "evaluateur_decision_id")
+    private Long evaluateurDecisionId;
 }

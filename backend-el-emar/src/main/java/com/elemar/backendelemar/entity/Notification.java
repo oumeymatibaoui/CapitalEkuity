@@ -5,25 +5,27 @@ import lombok.*;
 
 import java.time.LocalDateTime;
 
+@Entity
+@Table(name = "notification")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@Entity
-@Table(name = "notification")
 public class Notification {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // Utilisateur qui envoie la notification
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "expediteur_id")
     private Utilisateur expediteur;
+    @Column(name = "traitee")
+    private Boolean traitee = false;
 
-    // Utilisateur qui reçoit la notification
+    @Column(name = "date_traitement")
+    private LocalDateTime dateTraitement;
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "destinataire_id")
     private Utilisateur destinataire;
@@ -36,14 +38,40 @@ public class Notification {
     @JoinColumn(name = "application_candidature_id")
     private ApplicationCandidature applicationCandidature;
 
-    @Column(nullable = false, columnDefinition = "text")
+    @Column(name = "reponse_critere_id")
+    private Long reponseCritereId;
+
+    @Column(name = "critere_evaluation_id")
+    private Long critereEvaluationId;
+
+    @Column(name = "code_critere")
+    private String codeCritere;
+
+    @Column(name = "libelle_critere")
+    private String libelleCritere;
+
+    @Column(name = "message", columnDefinition = "TEXT", nullable = false)
     private String message;
 
-    @Column(name = "type_notification")
+    @Column(name = "type_notification", length = 50, nullable = false)
     private String typeNotification;
 
-    private Boolean lu;
+    @Builder.Default
+    @Column(name = "lu", nullable = false)
+    private Boolean lu = false;
 
-    @Column(name = "date_creation")
-    private LocalDateTime dateCreation;
+    @Builder.Default
+    @Column(name = "date_creation", nullable = false)
+    private LocalDateTime dateCreation = LocalDateTime.now();
+
+    @PrePersist
+    public void prePersist() {
+        if (lu == null) {
+            lu = false;
+        }
+
+        if (dateCreation == null) {
+            dateCreation = LocalDateTime.now();
+        }
+    }
 }

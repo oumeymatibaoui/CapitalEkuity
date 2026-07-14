@@ -1,0 +1,534 @@
+<div class="evaluation-detail-page">
+
+    <div class="top-header">
+        <div>
+            <button type="button" class="back-link" (click)="goBack()">
+                ← Retour aux candidatures
+            </button>
+            <h1>Évaluation du dossier</h1>
+            <p>Consultation des réponses, pièces PDF et notation automatique.</p>
+        </div>
+
+        <div class="header-actions" *ngIf="detail">
+            <div class="global-score" [ngClass]="getNoteClass(getDisplayedGlobalNote())">
+                <span>Note globale</span>
+                <strong>{{ getDisplayedGlobalNote() | number:'1.0-2' }} %</strong>
+            </div>
+        </div>
+    </div>
+
+    <div *ngIf="pageError" class="alert error">{{ pageError }}</div>
+    <div *ngIf="successMessage" class="alert success">{{ successMessage }}</div>
+    <div *ngIf="debugMessage" class="alert warning">{{ debugMessage }}</div>
+
+    <div *ngIf="loading" class="loading-card">
+        <div class="spinner"></div>
+        <span>Chargement du dossier candidat...</span>
+    </div>
+
+    <div *ngIf="loadFinished && !loading && !detail && !pageError" class="empty-card">
+        Aucun détail trouvé pour cette candidature.
+    </div>
+
+    <ng-container *ngIf="!loading && detail">
+
+        <!-- DONNÉES GÉNÉRALES -->
+        <div class="section-card">
+            <div class="section-header">
+                <div class="section-left">
+                    <span class="section-icon">◆</span>
+                    <div>
+                        <h2>Données générales de la société</h2>
+                        <small>Informations soumises par le candidat.</small>
+                    </div>
+                </div>
+                <span class="status-badge">{{ detail.statut || 'SOUMIS' }}</span>
+            </div>
+
+            <div class="info-grid">
+                <div class="info-item">
+                    <label>Raison sociale</label>
+                    <strong>{{ detail.raisonSociale || '-' }}</strong>
+                </div>
+
+                <div class="info-item">
+                    <label>Forme juridique</label>
+                    <strong>{{ detail.formeJuridique || '-' }}</strong>
+                </div>
+
+                <div class="info-item">
+                    <label>RNE / Matricule fiscal</label>
+                    <strong>{{ detail.rneMatriculeFiscal || '-' }}</strong>
+                </div>
+
+                <div class="info-item">
+                    <label>Date création</label>
+                    <strong>{{ formatDate(detail.dateCreationBureau) }}</strong>
+                </div>
+
+                <div class="info-item full">
+                    <label>Adresse siège</label>
+                    <strong>{{ detail.adresseSiege || '-' }}</strong>
+                </div>
+
+                <div class="info-item">
+                    <label>Téléphone</label>
+                    <strong>{{ detail.telephone || '-' }}</strong>
+                </div>
+
+                <div class="info-item">
+                    <label>Email</label>
+                    <strong>{{ detail.emailPrincipal || '-' }}</strong>
+                </div>
+
+                <div class="info-item">
+                    <label>Ville</label>
+                    <strong>{{ detail.ville || '-' }}</strong>
+                </div>
+
+                <div class="info-item">
+                    <label>Site internet</label>
+                    <strong>{{ detail.siteInternet || '-' }}</strong>
+                </div>
+
+                <div class="info-item">
+                    <label>Représentant légal</label>
+                    <strong>{{ detail.representantLegal || '-' }}</strong>
+                </div>
+
+                <div class="info-item">
+                    <label>Fonction représentant</label>
+                    <strong>{{ detail.fonctionRepresentant || '-' }}</strong>
+                </div>
+
+                <div class="info-item">
+                    <label>Banque principale</label>
+                    <strong>{{ detail.banquePrincipale || '-' }}</strong>
+                </div>
+
+                <div class="info-item full">
+                    <label>Spécialités</label>
+                    <strong>{{ detail.specialites || '-' }}</strong>
+                </div>
+
+                <div class="info-item full">
+                    <label>Agréments / Certifications</label>
+                    <strong>{{ detail.agrementsCertifications || '-' }}</strong>
+                </div>
+            </div>
+        </div>
+
+        <!-- PIÈCES GÉNÉRALES -->
+        <div class="section-card">
+            <div class="section-header">
+                <div class="section-left">
+                    <span class="section-icon">☆</span>
+                    <div>
+                        <h2>Pièces générales</h2>
+                        <small>Documents administratifs déposés par le candidat.</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="document-evaluation-grid">
+
+                <div class="document-evaluation-card">
+                    <button type="button" class="document-card" [disabled]="!detail.rnePdfUrl" (click)="openPdfModal(detail.rnePdfUrl, 'Registre National des Entreprises / RNE')">
+                        <span class="doc-icon">PDF</span>
+                        <span>
+                            <strong>Registre National des Entreprises / RNE</strong>
+                            <small>{{ detail.rneNomFichier || 'Non déposé' }}</small>
+                        </span>
+                    </button>
+
+                    <select class="form-control status-select" [ngModel]="detail.rneStatut || 'A_VERIFIER'" [ngClass]="getStatusClass(detail.rneStatut || 'A_VERIFIER')" (ngModelChange)="onDocumentGeneralStatutChange('RNE', $event)">
+                        <option value="A_VERIFIER">À vérifier</option>
+                        <option value="CONFORME">Conforme</option>
+                        <option value="NON_CONFORME">Non conforme</option>
+                    </select>
+                </div>
+
+                <div class="document-evaluation-card">
+                    <button type="button" class="document-card" [disabled]="!detail.cnssPdfUrl" (click)="openPdfModal(detail.cnssPdfUrl, 'Attestation CNSS')">
+                        <span class="doc-icon">PDF</span>
+                        <span>
+                            <strong>Attestation CNSS</strong>
+                            <small>{{ detail.cnssNomFichier || 'Non déposé' }}</small>
+                        </span>
+                    </button>
+
+                    <select class="form-control status-select" [ngModel]="detail.cnssStatut || 'A_VERIFIER'" [ngClass]="getStatusClass(detail.cnssStatut || 'A_VERIFIER')" (ngModelChange)="onDocumentGeneralStatutChange('CNSS', $event)">
+                        <option value="A_VERIFIER">À vérifier</option>
+                        <option value="CONFORME">Conforme</option>
+                        <option value="NON_CONFORME">Non conforme</option>
+                    </select>
+                </div>
+
+            </div>
+
+            <div class="blocking-alert" *ngIf="isDossierNonRecevable()">
+                Dossier non recevable : RNE ou CNSS non conforme. La note globale est automatiquement égale à 0.
+            </div>
+        </div>
+
+        <!-- LOTS -->
+        <div class="section-card">
+            <div class="section-header">
+                <div class="section-left">
+                    <span class="section-icon">●</span>
+                    <div>
+                        <h2>Lots remplis par le candidat</h2>
+                        <small>Seuls les lots choisis et remplis sont affichés.</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="empty-card" *ngIf="!detail.lots || detail.lots.length === 0">
+                Aucun lot rempli pour cette candidature.
+            </div>
+
+            <div class="lot-tabs" *ngIf="detail.lots && detail.lots.length > 0">
+                <button type="button" *ngFor="let lot of detail.lots" [class.active]="selectedLot?.applicationCandidatureId === lot.applicationCandidatureId" (click)="selectLot(lot)">
+                    <span>{{ lot.nomLot }}</span>
+                    <strong>{{ getDisplayedLotNote(lot) | number:'1.0-2' }} %</strong>
+                </button>
+            </div>
+
+            <ng-container *ngIf="selectedLot">
+
+                <div class="lot-summary">
+                    <div>
+                        <label>Lot sélectionné</label>
+                        <strong>{{ selectedLot.nomLot }}</strong>
+                    </div>
+
+                    <div>
+                        <label>Statut</label>
+                        <strong>{{ selectedLot.statut || '-' }}</strong>
+                    </div>
+
+                    <div>
+                        <label>Note lot</label>
+                        <strong [ngClass]="getNoteClass(getDisplayedLotNote(selectedLot))">
+                            {{ getDisplayedLotNote(selectedLot) | number:'1.0-2' }} %
+                        </strong>
+                    </div>
+
+                    <div *ngIf="getClassementForLot(selectedLot) as classement">
+                        <label>Classement zone</label>
+                        <strong [ngClass]="getCategorieClass(classement.categorie)">
+                            Catégorie {{ classement.categorie }}
+                        </strong>
+                    </div>
+                </div>
+
+                <!-- FORMULAIRE ÉVALUATION -->
+                <div class="form-evaluation-block">
+                    <div class="block-title">
+                        <h3>Formulaire rempli par le candidat</h3>
+                        <span *ngIf="saving">Sauvegarde...</span>
+                    </div>
+
+                    <ng-container *ngFor="let section of getSections(selectedLot)">
+                        <div class="subsection-title">{{ section }}</div>
+
+                        <table class="evaluation-table">
+                            <thead>
+                                <tr>
+                                    <th>Champ demandé</th>
+                                    <th>Réponse candidat</th>
+                                    <th>Pièces</th>
+                                    <th>Évaluation El Emar</th>
+                                    <th>Note</th>
+                                    <th>Commentaire critère</th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                <tr *ngFor="let critere of getCriteresBySection(selectedLot, section)">
+
+                                    <td class="critere-cell">
+                                        <strong>{{ critere.libelle }}</strong>
+                                        <small *ngIf="critere.aideCandidat">{{ critere.aideCandidat }}</small>
+                                        <span class="critere-code" *ngIf="critere.codeCritere">
+                                            {{ critere.codeCritere }}
+                                        </span>
+                                    </td>
+
+                                    <td class="reponse-cell">
+                                        {{ critere.reponse || '-' }}
+                                    </td>
+
+                                    <td class="pieces-cell">
+                                        <div *ngIf="!critere.pieces || critere.pieces.length === 0" class="no-piece">
+                                            Aucune pièce
+                                        </div>
+
+                                        <button type="button" class="piece-btn" *ngFor="let piece of critere.pieces" [disabled]="!piece.deposee" (click)="openPdfModal(piece.pdfUrl, piece.nomPiece)">
+                                            <span>{{ piece.deposee ? 'Voir PDF' : 'Non déposé' }}</span>
+                                            <small>{{ piece.nomPiece }}</small>
+                                        </button>
+                                    </td>
+
+                                    <td class="evaluation-cell">
+                                        <select [(ngModel)]="critere.statutEvaluation" class="form-control status-select" [ngClass]="getStatusClass(critere.statutEvaluation)" [disabled]="isDossierNonRecevable()" (ngModelChange)="onStatutEvaluationChange(selectedLot, critere)">
+                                            <option value="A_VERIFIER">À vérifier</option>
+                                            <option value="CONFORME">Conforme</option>
+                                            <option value="NON_CONFORME">Non conforme</option>
+                                        </select>
+                                    </td>
+
+                                    <td>
+                                        <span class="note-mini" [ngClass]="getNoteClass(getDisplayedCritereNote(critere))">
+                                            {{ getDisplayedCritereNote(critere) | number:'1.0-2' }}
+                                            /
+                                            {{ (critere.noteMax || 0) | number:'1.0-2' }}
+                                        </span>
+                                    </td>
+
+                                    <td>
+                                        <div class="field">
+                                            <!-- <label>Commentaire spécifique à ce critère</label> -->
+
+                                            <textarea rows="3" class="form-control decision-textarea" [ngModel]="getCritereCommentaire(selectedLot, critere)" (ngModelChange)="setCritereCommentaire(selectedLot, critere, $event)" placeholder="Exemple : cette réponse est incomplète, merci de corriger ce point précis...">
+        </textarea>
+                                        </div>
+
+                                        <button type="button" class="btn primary" [disabled]="saving || !hasCritereCommentaire(selectedLot, critere)" (click)="envoyerCommentaireCritereAuCandidat(selectedLot, critere)">
+        Notifier le candidat
+    </button>
+                                    </td>
+
+                                </tr>
+                            </tbody>
+                        </table>
+                    </ng-container>
+                </div>
+
+                <!-- RÉFÉRENCES PROJETS -->
+                <div class="references-block" *ngIf="selectedLot.references && selectedLot.references.length > 0">
+
+                    <div class="block-title">
+                        <h3>Projets de référence</h3>
+                        <span>{{ selectedLot.references.length }} référence(s)</span>
+                    </div>
+
+                    <div class="references-grid">
+                        <div class="reference-card" *ngFor="let ref of selectedLot.references">
+
+                            <div class="reference-header">
+                                <strong>{{ ref.nomProjet || 'Projet de référence' }}</strong>
+                                <span>{{ ref.anneeLivraison || '-' }}</span>
+                            </div>
+
+                            <div class="reference-zone-box">
+                                <label>Zone El Emar</label>
+
+                                <select class="form-control zone-select" [ngModel]="referenceZoneSelection[ref.id]" (ngModelChange)="onReferenceZoneChangeLocal(ref, $event)">
+                                    <option value="">-- Choisir une zone El Emar --</option>
+
+                                    <option *ngFor="let zone of  zonesUniques" [value]="zone.id">
+                                        {{ zone.nomZone }}
+                                    </option>
+                                </select>
+
+                                <textarea rows="2" class="form-control comment-box" [(ngModel)]="referenceZoneCommentaire[ref.id]" placeholder="Commentaire El Emar sur la zone ou la référence...">
+                                </textarea>
+
+                                <small *ngIf="getReferenceZoneLabel(ref) !== '-'">
+                                    Zone sélectionnée : {{ getReferenceZoneLabel(ref) }}
+                                    <span *ngIf="getReferenceZoneAdresse(ref)">
+                                        — {{ getReferenceZoneAdresse(ref) }}
+                                    </span>
+                                </small>
+
+                                <small *ngIf="getReferenceZoneLabel(ref) === '-'">
+                                    Aucune zone sélectionnée pour cette référence.
+                                </small>
+
+                                <button type="button" class="btn small primary" [disabled]="saving || !referenceZoneSelection[ref.id]" (click)="validerZoneReference(selectedLot, ref)">
+                                    Enregistrer cette zone
+                                </button>
+
+                                <small class="success-text" *ngIf="ref.zoneValidee">
+                                    Zone enregistrée en base
+                                </small>
+                            </div>
+
+                            <div class="reference-info">
+                                <p>
+                                    <label>Maître d'ouvrage</label>
+                                    <span>{{ ref.maitreOuvrage || '-' }}</span>
+                                </p>
+
+                                <p>
+                                    <label>Adresse référence</label>
+                                    <span>{{ ref.adresseProjet || ref.ville || '-' }}</span>
+                                </p>
+
+                                <p>
+                                    <label>Type projet</label>
+                                    <span>{{ ref.typeProjet || '-' }}</span>
+                                </p>
+
+                                <p>
+                                    <label>Surface</label>
+                                    <span>{{ ref.surfaceM2 || '-' }} m²</span>
+                                </p>
+
+                                <p>
+                                    <label>Niveaux R+</label>
+                                    <span>{{ ref.niveauxRPlus || '-' }}</span>
+                                </p>
+
+                                <p>
+                                    <label>Sous-sols</label>
+                                    <span>{{ ref.nombreSousSols || '-' }}</span>
+                                </p>
+
+                                <p>
+                                    <label>BIM</label>
+                                    <span>{{ formatBoolean(ref.bimOuiNon) }}</span>
+                                </p>
+
+                                <p>
+                                    <label>Seuil OK</label>
+                                    <span>{{ formatBoolean(ref.seuilOk) }}</span>
+                                </p>
+
+                                <p class="full">
+                                    <label>Mission réalisée</label>
+                                    <span>{{ ref.missionRealisee || '-' }}</span>
+                                </p>
+                            </div>
+
+                            <div class="reference-files">
+                                <button type="button" class="piece-btn" [disabled]="!ref.fichierP11Url" (click)="openPdfModal(ref.fichierP11Url, getReferenceP11Title())">
+                                    <span>Voir PDF</span>
+                                    <small>{{ getReferenceP11Title() }}</small>
+                                </button>
+
+                                <button type="button" class="piece-btn" [disabled]="!ref.fichierP12Url" (click)="openPdfModal(ref.fichierP12Url, getReferenceP12Title())">
+                                    <span>Voir PDF</span>
+                                    <small>{{ getReferenceP12Title() }}</small>
+                                </button>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+
+                <!-- DÉCISION FINALE PAR LOT -->
+                <div class="decision-final-card">
+
+                    <div class="decision-header">
+                        <div>
+                            <h3>Décision finale du lot</h3>
+                            <p>
+                                Décision spécifique au lot
+                                <strong>{{ selectedLot.nomLot }}</strong>. Le classement par zone sera enregistré uniquement pour ce lot.
+                            </p>
+                        </div>
+
+                        <span class="lot-decision-badge">
+                            {{ selectedLot.statut || 'EN ÉVALUATION' }}
+                        </span>
+                    </div>
+
+                    <div class="decision-score">
+                        <span>Score du lot</span>
+
+                        <strong [ngClass]="getNoteClass(getFinalScoreForLot(selectedLot))">
+                            {{ getFinalScoreForLot(selectedLot) | number:'1.0-2' }} / 100
+                        </strong>
+
+                        <small *ngIf="getFinalScoreForLot(selectedLot) < 80">
+                            Le seuil minimum d'admission pour ce lot est fixé à 80/100.
+                        </small>
+                    </div>
+
+                    <div class="decision-actions-grid">
+
+                        <button type="button" class="decision-choice admit" [ngClass]="getDecisionButtonClassForLot(selectedLot, 'ADMIS')" (click)="selectDecisionForLot(selectedLot, 'ADMIS')" [disabled]="!canAdmettreLot(selectedLot) || isLotValidating(selectedLot)">
+                            ✓ Admettre ce lot
+                        </button>
+
+                        <button type="button" class="decision-choice reject" [ngClass]="getDecisionButtonClassForLot(selectedLot, 'REJETE')" (click)="selectDecisionForLot(selectedLot, 'REJETE')" [disabled]="isLotValidating(selectedLot)">
+                            ✕ Rejeter ce lot
+                        </button>
+
+                    </div>
+
+                    <div class="decision-warning" *ngIf="
+                            decisionFinaleByLot[selectedLot.applicationCandidatureId] === 'ADMIS'
+                            && !hasAtLeastOneZoneSelectedForLot(selectedLot)
+                        ">
+                        Pour admettre ce lot, vous devez sélectionner au moins une zone El Emar dans les projets de référence de ce lot.
+                    </div>
+
+                    <div class="field">
+                        <label>Observations / Commentaires du lot</label>
+
+                        <textarea rows="4" class="form-control decision-textarea" [(ngModel)]="observationFinaleByLot[selectedLot.applicationCandidatureId]" placeholder="Motivez votre décision finale pour ce lot...">
+                        </textarea>
+                    </div>
+
+                    <div class="decision-submit-line">
+
+                        <button type="button" class="btn primary decision-submit-btn" (click)="validerDecisionFinaleLot(selectedLot)" [disabled]="
+                                isLotValidating(selectedLot)
+                                || !decisionFinaleByLot[selectedLot.applicationCandidatureId]
+                            ">
+                            {{
+                                isLotValidating(selectedLot)
+                                    ? 'Validation...'
+                                    : 'Notifier le bureau et valider la décision du lot'
+                            }}
+                        </button>
+
+                        <span class="decision-saved" *ngIf="isLotDecisionValidated(selectedLot)">
+                            Décision du lot enregistrée
+                        </span>
+
+                    </div>
+
+                </div>
+
+            </ng-container>
+        </div>
+
+    </ng-container>
+
+    <!-- MODAL PDF -->
+    <div class="pdf-modal-backdrop" *ngIf="pdfModalOpen" (click)="closePdfModal()">
+
+        <div class="pdf-modal" (click)="$event.stopPropagation()">
+
+            <div class="pdf-modal-header">
+                <h3>{{ selectedPdfTitle }}</h3>
+
+                <button type="button" class="btn small danger" (click)="closePdfModal()">
+                    Fermer
+                </button>
+            </div>
+
+            <div class="pdf-loading" *ngIf="pdfLoading">
+                <div class="spinner"></div>
+                <span>Chargement du PDF...</span>
+            </div>
+
+            <div class="pdf-error" *ngIf="!pdfLoading && pdfError">
+                {{ pdfError }}
+
+                <a *ngIf="selectedPdfRawUrl" class="btn primary" [href]="selectedPdfRawUrl" target="_blank" rel="noopener">
+                    Ouvrir le PDF dans un nouvel onglet
+                </a>
+            </div>
+
+            <iframe *ngIf="!pdfLoading && !pdfError && selectedPdfUrl" [src]="selectedPdfUrl" class="pdf-frame">
+            </iframe>
+
+        </div>
+    </div>
+
+</div>

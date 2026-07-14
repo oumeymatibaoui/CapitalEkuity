@@ -3,6 +3,8 @@ package com.elemar.backendelemar.dto;
 import com.elemar.backendelemar.enums.ModeleReponse;
 import lombok.*;
 
+import java.util.List;
+
 @Getter
 @Setter
 @NoArgsConstructor
@@ -29,4 +31,5 @@ public class ChampAppreciationResponse {
     private Boolean obligatoire;
     private Integer ordreAffichage;
     private Boolean actif;
+    private List<LiaisonChampPieceResponse> piecesLiees;
 }

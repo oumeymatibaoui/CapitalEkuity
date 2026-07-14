@@ -1,1 +1,341 @@
-<p>candidatures works!</p>
+<div class="candidatures-page">
+
+    <!-- HEADER -->
+    <div class="page-header">
+        <div>
+            <h1>Gestion des candidatures</h1>
+            <p>Créer les accès des sociétés candidates, affecter les lots et générer les comptes CND.</p>
+        </div>
+
+        <button type="button" class="primary-btn" (click)="openCreateModal()">
+      + Nouvelle candidature
+    </button>
+    </div>
+
+    <!-- ALERTS -->
+    <div *ngIf="errorMessage" class="alert error">
+        {{ errorMessage }}
+    </div>
+
+    <div *ngIf="successMessage" class="alert success">
+        {{ successMessage }}
+    </div>
+
+    <!-- FILTER -->
+    <div class="filter-card">
+        <div>
+            <label>Filtrer par type d’intervenant</label>
+
+            <select [(ngModel)]="selectedTypeFilterId">
+        <option [ngValue]="null">Tous les types</option>
+
+        <option
+          *ngFor="let type of types"
+          [ngValue]="type.id"
+        >
+          {{ type.libelle }}
+        </option>
+      </select>
+        </div>
+
+        <div class="filter-stats">
+            <span>Total candidatures</span>
+            <strong>{{ getFilteredCandidatures().length }}</strong>
+        </div>
+    </div>
+
+    <!-- LOADING -->
+    <div *ngIf="loading" class="loading-card">
+        Chargement des candidatures...
+    </div>
+
+    <!-- EMPTY -->
+    <div *ngIf="!loading && getFilteredCandidatures().length === 0" class="empty-card">
+        Aucune candidature trouvée.
+    </div>
+
+    <!-- LIST -->
+    <div class="cards-grid" *ngIf="!loading">
+
+        <div class="candidature-card" *ngFor="let candidature of getFilteredCandidatures(); trackBy: trackByCandidatureId">
+
+            <div class="card-header">
+
+                <div class="card-title-area">
+                    <h3>{{ candidature.nomEntreprise }}</h3>
+                    <p>{{ candidature.typeIntervenantLibelle || getTypeName(candidature.typeIntervenantId) }}</p>
+                </div>
+
+                <div class="card-header-actions">
+
+                    <span class="status-chip" [class.complete]="candidature.profilComplete" [class.incomplete]="!candidature.profilComplete">
+      {{ candidature.profilComplete ? 'Profil complété' : 'À compléter' }}
+    </span>
+
+                    <button type="button" class="delete-candidature-btn" title="Supprimer cette candidature" (click)="deleteCandidature(candidature)" [disabled]="deletingCandidatureId === candidature.candidatureId">
+
+      <i class="ti ti-trash"></i>
+
+      <span>
+        {{ deletingCandidatureId === candidature.candidatureId ? 'Suppression...' : 'Supprimer' }}
+      </span>
+
+    </button>
+
+                </div>
+
+            </div>
+
+            <div class="info-line">
+                <span>Statut</span>
+                <strong>{{ candidature.statut || 'BROUILLON' }}</strong>
+            </div>
+
+            <div class="section-mini">
+                <strong>Lots autorisés</strong>
+
+                <div class="chips-line">
+                    <span class="lot-chip" *ngFor="let lot of candidature.lots">
+            {{ lot.nomLot }}
+          </span>
+
+                    <span *ngIf="!candidature.lots || candidature.lots.length === 0">
+            Aucun lot
+          </span>
+                </div>
+            </div>
+
+            <div class="section-mini">
+                <strong>Utilisateurs CND</strong>
+
+                <div class="user-line" *ngFor="let user of candidature.utilisateurs">
+                    <div>
+                        <span>{{ user.nomComplet }}</span>
+                        <small>{{ user.email }}</small>
+                        <small *ngIf="user.fonction">{{ user.fonction }}</small>
+                    </div>
+
+                    <div class="user-actions">
+                        <button type="button" class="small-btn" (click)="resetPassword(user)">
+              Reset MDP
+            </button>
+
+                        <button type="button" class="small-btn danger" (click)="deactivateUser(user)" [disabled]="user.actif === false">
+              Désactiver
+            </button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- MODAL CREATE -->
+    <div class="modal-backdrop" *ngIf="modalOpen">
+        <div class="modal-card">
+
+            <div class="modal-header">
+                <div>
+                    <h2>Nouvelle candidature / société</h2>
+                    <p>Créer l’accès candidat, affecter les lots et générer les mots de passe.</p>
+                </div>
+
+                <button type="button" class="close-btn" (click)="closeModal()">
+          ×
+        </button>
+            </div>
+
+            <div class="modal-body">
+
+                <!-- STEP 1 -->
+                <div class="form-block">
+                    <div class="block-title">
+                        <span>1</span>
+                        <div>
+                            <h3>Informations société</h3>
+                            <p>El Emar crée l’accès initial. Le candidat complètera ensuite le dossier.</p>
+                        </div>
+                    </div>
+
+                    <div class="form-grid two">
+                        <label>
+              Nom société *
+              <input
+                [(ngModel)]="form.nomEntreprise"
+                placeholder="Ex: Bureau Atlas Engineering"
+              >
+            </label>
+                        <!-- 
+                        <label>
+              Email principal société *
+              <input
+                [(ngModel)]="form.emailPrincipal"
+                placeholder="Ex: contact@societe.com"
+              >
+            </label> -->
+                    </div>
+
+                    <label>
+            Type d’intervenant *
+            <select
+              [(ngModel)]="form.typeIntervenantId"
+              (ngModelChange)="onTypeChange()"
+            >
+              <option [ngValue]="null">-- Choisir un type --</option>
+
+              <option
+                *ngFor="let type of types"
+                [ngValue]="type.id"
+              >
+                {{ type.libelle }}
+              </option>
+            </select>
+          </label>
+                </div>
+
+                <!-- STEP 2 -->
+                <div class="form-block">
+                    <div class="block-title">
+                        <span>2</span>
+                        <div>
+                            <h3>Lots autorisés</h3>
+                            <p>Le candidat verra uniquement ces lots dans son interface.</p>
+                        </div>
+                    </div>
+
+                    <div *ngIf="loadingLots" class="loading-mini">
+                        Chargement des lots...
+                    </div>
+
+                    <div *ngIf="!loadingLots && form.typeIntervenantId && lots.length === 0" class="empty-mini">
+                        Aucun lot actif trouvé pour ce type.
+                    </div>
+
+                    <div class="lots-grid" *ngIf="lots.length > 0">
+                        <button type="button" class="lot-option" *ngFor="let lot of lots; trackBy: trackByLotId" [class.selected]="isLotSelected(lot.id)" (click)="toggleLot(lot.id)">
+              <span>{{ lot.nomLot }}</span>
+              <small>{{ lot.codeLot || 'LOT' }}</small>
+            </button>
+                    </div>
+                </div>
+
+                <!-- STEP 3 -->
+                <div class="form-block">
+                    <div class="block-title">
+                        <span>3</span>
+                        <div>
+                            <h3>Utilisateurs CND</h3>
+                            <p>Ajouter les personnes qui pourront se connecter pour cette société.</p>
+                        </div>
+                    </div>
+
+                    <div class="users-title-line">
+                        <strong>Comptes utilisateurs</strong>
+
+                        <button type="button" class="secondary-btn" (click)="addUserRow()">
+              + Ajouter utilisateur
+            </button>
+                    </div>
+
+                    <div class="user-form-card" *ngFor="let user of form.users; let i = index; trackBy: trackByUserIndex">
+                        <div class="user-form-header">
+                            <strong>Utilisateur {{ i + 1 }}</strong>
+
+                            <button type="button" class="remove-btn" (click)="removeUserRow(i)">
+                Supprimer
+              </button>
+                        </div>
+
+                        <div class="form-grid two">
+                            <label>
+                Nom complet
+                <input
+                  [(ngModel)]="user.nomComplet"
+                  placeholder="Ex: Ahmed Ben Ali"
+                >
+              </label>
+
+                            <label>
+                Email utilisateur *
+                <input
+                  [(ngModel)]="user.email"
+                  placeholder="Ex: ahmed@societe.com"
+                >
+              </label>
+                        </div>
+
+                        <div class="form-grid two">
+                            <label>
+                Téléphone
+                <input
+                  [(ngModel)]="user.telephone"
+                  placeholder="+216 ..."
+                >
+              </label>
+
+                            <label>
+                Fonction
+                <input
+                  [(ngModel)]="user.fonction"
+                  placeholder="Responsable technique"
+                >
+              </label>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="cancel-btn" (click)="closeModal()">
+          Annuler
+        </button>
+
+                <button type="button" class="save-btn" (click)="save()" [disabled]="saving">
+          {{ saving ? 'Création...' : 'Créer et générer mots de passe' }}
+        </button>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- MODAL PASSWORDS -->
+    <div class="modal-backdrop" *ngIf="generatedAccountsModalOpen">
+        <div class="password-modal">
+
+            <div class="modal-header">
+                <div>
+                    <h2>Comptes générés</h2>
+                    <p>Copie ces mots de passe. Ils ne seront affichés qu’une seule fois.</p>
+                </div>
+
+                <button type="button" class="close-btn" (click)="closeGeneratedAccountsModal()">
+          ×
+        </button>
+            </div>
+
+            <div class="password-list">
+                <div class="password-card" *ngFor="let account of generatedAccounts">
+                    <div>
+                        <strong>{{ account.nomComplet }}</strong>
+                        <span>{{ account.email }}</span>
+                    </div>
+
+                    <code>{{ account.motDePasseTemporaire }}</code>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="secondary-btn" (click)="copyAccounts()">
+          Copier les comptes
+        </button>
+
+                <button type="button" class="save-btn" (click)="closeGeneratedAccountsModal()">
+          Terminer
+        </button>
+            </div>
+
+        </div>
+    </div>
+
+</div>

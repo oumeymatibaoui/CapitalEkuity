@@ -6,6 +6,7 @@
             <div class="brand-logo">
                 <i class="ti ti-building" aria-hidden="true"></i>
             </div>
+
             <div class="brand-text">
                 <h1>El Emar</h1>
                 <span>Plateforme de qualification</span>
@@ -13,14 +14,20 @@
         </div>
 
         <nav class="nav-actions">
-            <button class="btn-nav-outline" (click)="openElEmarLogin()">Connexion El Emar</button>
-            <button class="btn-nav-gold">Espace candidat</button>
+            <button type="button" class="btn-nav-outline" (click)="openElEmarLogin()">
+        Connexion El Emar
+      </button>
+
+            <button type="button" class="btn-nav-gold" (click)="openCandidatLogin()">
+        Espace candidat
+      </button>
         </nav>
     </header>
 
     <!-- Hero -->
     <section class="hero">
         <div class="hero-inner">
+
             <div class="hero-badge">
                 <i class="ti ti-star" aria-hidden="true"></i> Plateforme officielle de qualification — El Emar
             </div>
@@ -35,12 +42,15 @@
             </p>
 
             <div class="hero-actions">
-                <button class="btn-gold-pill">
+                <button type="button" class="btn-gold-pill" (click)="openCandidatLogin()">
           Accéder à mon espace
-          <i class="ti ti-arrow-right" aria-hidden="true"></i>
         </button>
-                <button class="btn-outline-pill" (click)="openElEmarLogin()">Connexion El Emar</button>
+
+                <button type="button" class="btn-outline-pill" (click)="openElEmarLogin()">
+          Connexion El Emar
+        </button>
             </div>
+
         </div>
     </section>
 
@@ -55,15 +65,26 @@
 
         <div class="steps-grid">
             <div class="step-card" *ngFor="let step of steps">
+
                 <div class="step-icon" [class.gold]="step.number === '06'">
-                    <i class="ti" [ngClass]="getStepIcon(step.number)" aria-hidden="true"></i>
+                    <i class="ti" [ngClass]="getStepIcon(step.number)" aria-hidden="true">
+          </i>
                 </div>
 
                 <div class="step-body">
-                    <div class="step-label">ÉTAPE {{ step.number }}</div>
-                    <h4 class="step-title">{{ step.title }}</h4>
-                    <p class="step-desc">{{ step.description }}</p>
+                    <div class="step-label">
+                        ÉTAPE {{ step.number }}
+                    </div>
+
+                    <h4 class="step-title">
+                        {{ step.title }}
+                    </h4>
+
+                    <p class="step-desc">
+                        {{ step.description }}
+                    </p>
                 </div>
+
             </div>
         </div>
     </section>
@@ -71,23 +92,32 @@
     <!-- CTA Section -->
     <section class="cta-section">
         <div class="cta-inner">
+
             <div class="cta-check-icon">
                 <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="12" cy="12" r="10"/>
-          <polyline points="9 12 11 14 15 10"/>
+          <circle cx="12" cy="12" r="10"></circle>
+          <polyline points="9 12 11 14 15 10"></polyline>
         </svg>
             </div>
 
-            <h2 class="cta-title">Prêt à compléter votre dossier ?</h2>
+            <h2 class="cta-title">
+                Prêt à compléter votre dossier ?
+            </h2>
 
             <p class="cta-desc">
                 Connectez-vous avec les identifiants fournis par El Emar et accédez directement à l’appel qui vous a été affecté.
             </p>
 
             <div class="cta-actions">
-                <button class="btn-gold-pill">Accéder à mon espace candidat</button>
-                <button class="btn-outline-dark-pill" (click)="openElEmarLogin()">Interface El Emar</button>
+                <button type="button" class="btn-nav-gold" (click)="openCandidatLogin()">
+          Espace candidat
+        </button>
+
+                <button type="button" class="btn-outline-dark-pill" (click)="openElEmarLogin()">
+          Interface El Emar
+        </button>
             </div>
+
         </div>
     </section>
 
@@ -97,13 +127,25 @@
             <div class="footer-logo">
                 <i class="ti ti-building" aria-hidden="true"></i>
             </div>
-            <span><strong>El Emar</strong> — Plateforme de qualification des structures partenaires</span> </div>
-        <p class="footer-copy">© 2026 El Emar. Tous droits réservés.</p>
+
+            <span>
+        <strong>El Emar</strong>
+        — Plateforme de qualification des structures partenaires
+      </span>
+        </div>
+
+        <p class="footer-copy">
+            © 2026 El Emar. Tous droits réservés.
+        </p>
     </footer>
 
 </div>
-<!-- El Emar Login Modal -->
+
+<!-- =========================
+     EL EMAR LOGIN MODAL
+========================= -->
 <div class="login-overlay" *ngIf="showElEmarLogin" (click)="closeElEmarLogin()">
+
     <div class="login-card" (click)="$event.stopPropagation()">
 
         <button class="login-close" type="button" (click)="closeElEmarLogin()">
@@ -115,17 +157,21 @@
         </div>
 
         <h3>Connexion El Emar</h3>
-        <p class="login-subtitle">Accès réservé au personnel El Emar</p>
 
-        <form class="login-form" (submit)="ElEmarLogin($event)">
+        <p class="login-subtitle">
+            Accès réservé au personnel El Emar
+        </p>
+
+        <form class="login-form" #elEmarForm="ngForm" (ngSubmit)="submitElEmarLogin()">
+
             <div class="form-group">
                 <label>Adresse e-mail</label>
-                <input type="email" name="email" [(ngModel)]="elEmarLogin.email" placeholder="admin@elemar.tn" autocomplete="off" />
+                <input type="email" name="elEmarEmail" [(ngModel)]="elEmarLogin.email" placeholder="utilisateur@ske.emar.com.tn" autocomplete="off" required>
             </div>
 
             <div class="form-group">
                 <label>Mot de passe</label>
-                <input type="password" name="motDePasse" [(ngModel)]="elEmarLogin.motDePasse" placeholder="••••••••" autocomplete="off" />
+                <input type="password" name="elEmarMotDePasse" [(ngModel)]="elEmarLogin.motDePasse" placeholder="••••••••" autocomplete="off" required>
             </div>
 
             <p class="login-error" *ngIf="loginError">
@@ -135,9 +181,111 @@
             <button class="login-submit" type="submit">
         Se connecter en tant qu'El Emar
       </button>
+
+            <button type="button" class="forgot-password-link" (click)="openForgotPassword(elEmarLogin.email)">
+        Mot de passe oublié ?
+      </button>
+
         </form>
 
+    </div>
+</div>
 
+<!-- =========================
+     CANDIDAT LOGIN MODAL
+========================= -->
+<div class="login-overlay" *ngIf="showCandidatLogin" (click)="closeCandidatLogin()">
+
+    <div class="login-card" (click)="$event.stopPropagation()">
+
+        <button class="login-close" type="button" (click)="closeCandidatLogin()">
+      <i class="ti ti-x"></i>
+    </button>
+
+        <div class="login-icon">
+            <i class="ti ti-user-check"></i>
+        </div>
+
+        <h3>Connexion candidat</h3>
+
+        <p class="login-subtitle">
+            Accès réservé aux prestataires invités par El Emar
+        </p>
+
+        <form class="login-form" #candidatForm="ngForm" (ngSubmit)="submitCandidatLogin()">
+
+            <div class="form-group">
+                <label>Adresse e-mail</label>
+                <input type="email" name="candidatEmail" [(ngModel)]="candidatLogin.email" placeholder="exemple@bureau.tn" autocomplete="off" required>
+            </div>
+
+            <div class="form-group">
+                <label>Mot de passe</label>
+                <input type="password" name="candidatMotDePasse" [(ngModel)]="candidatLogin.motDePasse" placeholder="••••••••" autocomplete="off" required>
+            </div>
+
+            <p class="login-error" *ngIf="candidatLoginError">
+                {{ candidatLoginError }}
+            </p>
+
+            <button class="login-submit" type="submit">
+        Accéder à mon espace candidat
+      </button>
+
+            <button type="button" class="forgot-password-link" (click)="openForgotPassword(candidatLogin.email)">
+        Mot de passe oublié ?
+      </button>
+
+        </form>
+
+    </div>
+</div>
+
+<!-- =========================
+     FORGOT PASSWORD MODAL
+========================= -->
+<div class="login-overlay" *ngIf="showForgotPassword" (click)="closeForgotPassword()">
+
+    <div class="login-card forgot-card" (click)="$event.stopPropagation()">
+
+        <button class="login-close" type="button" (click)="closeForgotPassword()">
+      <i class="ti ti-x"></i>
+    </button>
+
+        <div class="login-icon">
+            <i class="ti ti-mail"></i>
+        </div>
+
+        <h3>Mot de passe oublié</h3>
+
+        <p class="login-subtitle">
+            Saisissez votre adresse e-mail. Si un compte existe, un lien de réinitialisation vous sera envoyé.
+        </p>
+
+        <form class="login-form" #forgotPasswordForm="ngForm" (ngSubmit)="submitForgotPassword()">
+
+            <div class="form-group">
+                <label>Adresse e-mail</label>
+                <input type="email" name="forgotPasswordEmail" [(ngModel)]="forgotPasswordEmail" placeholder="votre@email.com" autocomplete="off" required>
+            </div>
+
+            <p class="login-error" *ngIf="forgotPasswordError">
+                {{ forgotPasswordError }}
+            </p>
+
+            <p class="login-success" *ngIf="forgotPasswordSuccess">
+                {{ forgotPasswordSuccess }}
+            </p>
+
+            <button class="login-submit" type="submit" [disabled]="sendingForgotPassword">
+        {{ sendingForgotPassword ? 'Envoi en cours...' : 'Envoyer le lien de réinitialisation' }}
+      </button>
+
+            <button type="button" class="forgot-password-link" (click)="closeForgotPassword()">
+        Retour
+      </button>
+
+        </form>
 
     </div>
 </div>

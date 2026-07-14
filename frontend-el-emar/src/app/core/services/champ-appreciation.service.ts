@@ -2,11 +2,42 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
+export interface LiaisonChampPiece {
+  id?: number;
+
+  champAppreciationId?: number | null;
+  labelChamp?: string;
+  codePxx?: string;
+
+  lotId?: number | null;
+  lotNom?: string;
+
+  documentDemandeId?: number | null;
+  codeDocument?: string;
+  nomDocument?: string;
+
+  obligatoire?: boolean;
+  conditionReponse?: string;
+  messagePrestataire?: string;
+  ordreAffichage?: number | null;
+  actif?: boolean;
+}
+
+export interface LiaisonChampPieceRequest {
+  champAppreciationId?: number | null;
+  documentDemandeId: number | null;
+  obligatoire?: boolean;
+  conditionReponse?: string;
+  messagePrestataire?: string;
+  ordreAffichage?: number | null;
+  actif?: boolean;
+}
+
 export interface ChampAppreciation {
   id?: number;
 
   lotId: number;
-  lotNom?: string;
+  lotNom: string;
 
   section: string;
   nomChamp: string;
@@ -15,14 +46,15 @@ export interface ChampAppreciation {
 
   modeleReponse: string;
   typeChamp: string;
-
   conditionProcedure: string;
   codePxx: string;
-  options?: string;
+  options: string;
 
   obligatoire: boolean;
   ordreAffichage: number;
   actif: boolean;
+
+  piecesLiees?: LiaisonChampPiece[];
 }
 
 export interface ChampAppreciationRequest {
@@ -35,14 +67,15 @@ export interface ChampAppreciationRequest {
 
   modeleReponse: string;
   typeChamp: string;
-
   conditionProcedure: string;
   codePxx: string;
-  options?: string;
+  options: string;
 
   obligatoire: boolean;
   ordreAffichage: number;
   actif: boolean;
+
+  piecesLiees?: LiaisonChampPieceRequest[];
 }
 
 @Injectable({
@@ -62,12 +95,16 @@ export class ChampAppreciationService {
     return this.http.get<ChampAppreciation[]>(`${this.apiUrl}/lot/${lotId}`);
   }
 
-  create(champ: ChampAppreciationRequest): Observable<ChampAppreciation> {
-    return this.http.post<ChampAppreciation>(this.apiUrl, champ);
+  getById(id: number): Observable<ChampAppreciation> {
+    return this.http.get<ChampAppreciation>(`${this.apiUrl}/${id}`);
   }
 
-  update(id: number, champ: ChampAppreciationRequest): Observable<ChampAppreciation> {
-    return this.http.put<ChampAppreciation>(`${this.apiUrl}/${id}`, champ);
+  create(request: ChampAppreciationRequest): Observable<ChampAppreciation> {
+    return this.http.post<ChampAppreciation>(this.apiUrl, request);
+  }
+
+  update(id: number, request: ChampAppreciationRequest): Observable<ChampAppreciation> {
+    return this.http.put<ChampAppreciation>(`${this.apiUrl}/${id}`, request);
   }
 
   delete(id: number): Observable<void> {

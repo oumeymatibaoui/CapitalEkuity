@@ -1,0 +1,895 @@
+<div class="candidature-page" [class.readonly-mode]="isCandidatureSoumise()">
+
+    <div class="top-header">
+        <div>
+            <h1>Espace de dépôt</h1>
+            <p>
+                Centralisez vos documents, renseignez les données métier demandées et suivez la constitution de votre dossier avant son analyse par El Emar.
+            </p>
+        </div>
+    </div>
+    <div class="candidate-profile-card">
+
+        <div class="candidate-profile-left">
+
+            <div class="candidate-avatar">
+                {{ getProfileInitial() }}
+            </div>
+
+            <div class="candidate-profile-info">
+                <h2>{{ candidatProfile.nom || 'Candidat' }}</h2>
+
+                <div class="candidate-profile-meta">
+                    <span>
+                    <i class="ti ti-mail"></i>
+                    {{ candidatProfile.email || 'Email non renseigné' }}
+                </span>
+
+                    <span>
+                    <i class="ti ti-briefcase"></i>
+                    {{ candidatProfile.fonction || 'Fonction non renseignée' }}
+                </span>
+                </div>
+                <!-- 
+                <small>
+                Ces informations sont fournies par El Emar. Vous pouvez uniquement modifier votre mot de passe.
+            </small> -->
+            </div>
+
+        </div>
+
+        <div class="candidate-profile-actions">
+            <button type="button" class="btn secondary" (click)="togglePasswordForm()">
+            {{ showPasswordForm ? 'Annuler' : 'Changer mot de passe' }}
+        </button>
+        </div>
+
+    </div>
+
+    <div class="password-panel" *ngIf="showPasswordForm">
+
+        <div class="password-panel-header">
+            <h3>Changer mon mot de passe</h3>
+            <p>Seul le mot de passe peut être modifié depuis cet espace.</p>
+        </div>
+
+        <form [formGroup]="passwordForm" class="password-grid">
+
+            <div class="field">
+                <label>Mot de passe actuel</label>
+                <input type="password" formControlName="oldPassword" class="form-control" placeholder="Mot de passe actuel">
+            </div>
+
+            <div class="field">
+                <label>Nouveau mot de passe</label>
+                <input type="password" formControlName="newPassword" class="form-control" placeholder="Nouveau mot de passe">
+            </div>
+
+            <div class="field">
+                <label>Confirmer le nouveau mot de passe</label>
+                <input type="password" formControlName="confirmPassword" class="form-control" placeholder="Confirmer le mot de passe">
+            </div>
+
+        </form>
+
+        <p class="login-error" *ngIf="passwordErrorMessage">
+            {{ passwordErrorMessage }}
+        </p>
+
+        <p class="password-success" *ngIf="passwordSuccessMessage">
+            {{ passwordSuccessMessage }}
+        </p>
+
+        <div class="password-actions">
+            <button type="button" class="btn primary" (click)="changePassword()" [disabled]="changingPassword">
+            {{ changingPassword ? 'Modification...' : 'Enregistrer le mot de passe' }}
+        </button>
+        </div>
+
+    </div>
+    <div *ngIf="pageError" class="alert error">
+        {{ pageError }}
+    </div>
+
+    <div *ngIf="successMessage" class="alert success">
+        {{ successMessage }}
+    </div>
+
+    <div *ngIf="isCandidatureSoumise()" class="alert readonly-alert">
+        Cette candidature a été soumise. Vous pouvez la consulter, mais vous ne pouvez plus la modifier.
+    </div>
+
+    <div class="stepper">
+        <button type="button" class="stepper-item" *ngFor="let step of steps" [class.active]="isStepCurrent(step.number)" [class.done]="isStepDone(step.number)" [class.pending]="isStepPending(step.number)" (click)="goToStep(step.number)">
+      <span class="step-number" *ngIf="!isStepDone(step.number)">
+        {{ step.number }}
+      </span>
+
+      <span class="step-number done-icon" *ngIf="isStepDone(step.number)">
+        ✓
+      </span>
+
+      <strong>{{ step.label }}</strong>
+    </button>
+    </div>
+
+    <div *ngIf="loading" class="loading-card">
+        Chargement de la candidature...
+    </div>
+
+    <!-- STEP 1 : DONNEES GENERALES -->
+    <div class="lot-form-card" *ngIf="!loading && isStepCurrent(1)">
+
+        <div class="lot-form-header">
+            <h2>Données générales de la société</h2>
+            <p>Renseignez les informations principales de votre bureau.</p>
+        </div>
+
+        <form [formGroup]="societeForm" class="form-grid">
+
+            <div class="field">
+                <label>Raison sociale</label>
+                <input type="text" formControlName="raisonSociale" class="form-control" [readonly]="isCandidatureSoumise()">
+            </div>
+
+            <div class="field">
+                <label>Forme juridique</label>
+                <input type="text" formControlName="formeJuridique" class="form-control" [readonly]="isCandidatureSoumise()">
+            </div>
+
+            <div class="field">
+                <label>RNE / Matricule fiscal</label>
+                <input type="text" formControlName="rneMatriculeFiscal" class="form-control" [readonly]="isCandidatureSoumise()">
+            </div>
+
+            <div class="field">
+                <label>Date de création du bureau</label>
+                <input type="date" formControlName="dateCreationBureau" class="form-control" [readonly]="isCandidatureSoumise()">
+            </div>
+
+            <div class="field full">
+                <label>Adresse du siège</label>
+                <input type="text" formControlName="adresseSiege" class="form-control" [readonly]="isCandidatureSoumise()">
+            </div>
+
+            <div class="field">
+                <label>Téléphone</label>
+                <input type="text" formControlName="telephone" class="form-control" [readonly]="isCandidatureSoumise()">
+            </div>
+
+            <div class="field">
+                <label>Email principal</label>
+                <input type="email" formControlName="emailPrincipal" class="form-control" [readonly]="isCandidatureSoumise()">
+            </div>
+
+            <div class="field">
+                <label>Site internet</label>
+                <input type="text" formControlName="siteInternet" class="form-control" [readonly]="isCandidatureSoumise()">
+            </div>
+
+            <div class="field">
+                <label>Ville</label>
+                <input type="text" formControlName="ville" class="form-control" [readonly]="isCandidatureSoumise()">
+            </div>
+
+            <div class="field">
+                <label>Représentant légal</label>
+                <input type="text" formControlName="representantLegal" class="form-control" [readonly]="isCandidatureSoumise()">
+            </div>
+
+            <div class="field">
+                <label>Fonction du représentant</label>
+                <input type="text" formControlName="fonctionRepresentant" class="form-control" [readonly]="isCandidatureSoumise()">
+            </div>
+
+            <div class="field full">
+                <label>Spécialités</label>
+                <textarea rows="3" formControlName="specialites" class="form-control" [readonly]="isCandidatureSoumise()"></textarea>
+            </div>
+
+            <div class="field full">
+                <label>Agréments / Certifications</label>
+                <textarea rows="3" formControlName="agrementsCertifications" class="form-control" [readonly]="isCandidatureSoumise()"></textarea>
+            </div>
+
+            <div class="field">
+                <label>Banque principale</label>
+                <input type="text" formControlName="banquePrincipale" class="form-control" [readonly]="isCandidatureSoumise()">
+            </div>
+
+            <div class="field">
+                <label>Localisation</label>
+                <input type="text" formControlName="localisation" class="form-control" [readonly]="isCandidatureSoumise()">
+            </div>
+
+        </form>
+
+        <div class="section-card documents-section">
+
+            <div class="section-header">
+                <div class="section-left">
+                    <span class="section-icon">☆</span>
+                    <div>
+                        <h3>Pièces générales obligatoires</h3>
+                        <small>Ces pièces sont déposées une seule fois pour toute la candidature.</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="documents-upload-list">
+
+                <label class="upload-doc-row" *ngFor="let document of documentsGeneraux" [class.has-file]="getGeneralDocumentFileName(document.id)" [class.readonly-upload]="isCandidatureSoumise()">
+          <div class="upload-doc-left">
+
+            <span class="upload-doc-icon">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path d="M7 3h7l5 5v13H7V3Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
+                <path d="M14 3v6h5" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
+                <path d="M9 13h6M9 17h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+              </svg>
+            </span>
+
+            <span class="upload-doc-content">
+
+              <span class="upload-doc-title-line">
+                <span class="upload-doc-code">
+                  {{ document.codeDocument }}
+                </span>
+
+                <span class="upload-doc-title">
+                  {{ document.nomDocument }}
+                </span>
+
+                <span class="upload-doc-star" *ngIf="document.obligatoire">
+                  *
+                </span>
+              </span>
+
+              <span class="upload-doc-subtitle" *ngIf="!getGeneralDocumentFileName(document.id)">
+                Format accepté : {{ document.formatAccepte }} —
+                Statut : {{ getGeneralDocumentStatus(document.id) }}
+              </span>
+
+           <span class="upload-doc-subtitle selected" *ngIf="getGeneralDocumentFileName(document.id)">
+  <span class="file-name-row">
+    <span>
+      Fichier sélectionné : {{ getGeneralDocumentFileName(document.id) }}
+    </span>
+
+    <button
+      type="button"
+      class="file-remove-btn"
+      title="Supprimer le fichier"
+      *ngIf="canModifyGeneralDocuments()"
+      (click)="removeGeneralDocument($event, document)">
+      <i class="ti ti-trash"></i>
+    </button>
+  </span>
+</span>
+
+            </span>
+          </div>
+
+          <span class="upload-doc-action">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path d="M12 16V4M12 4l-4 4M12 4l4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+              <path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+            </svg>
+            Télécharger
+          </span>
+
+<input
+  [id]="getGeneralDocumentInputId(document)"
+  type="file"
+  accept="application/pdf"
+  class="native-file-input"
+  (change)="onGeneralDocumentSelected($event, document)"
+  [disabled]="isCandidatureSoumise()">
+        </label>
+
+            </div>
+        </div>
+
+        <div class="page-actions">
+            <button type="button" class="btn secondary" (click)="saveInformationsSociete(false)" [disabled]="savingSociete || uploadingPiecesSociete || isCandidatureSoumise()">
+        {{ savingSociete || uploadingPiecesSociete ? 'Sauvegarde...' : 'Sauvegarder' }}
+      </button>
+
+            <button type="button" class="btn primary" (click)="nextStep()" [disabled]="savingSociete || uploadingPiecesSociete">
+        Suivant
+      </button>
+        </div>
+
+    </div>
+
+    <!-- STEP 2 : FORMULAIRE PAR LOT -->
+    <div class="lot-form-card" *ngIf="!loading && isStepCurrent(2)">
+
+        <div class="lot-form-header">
+            <h2>Formulaire d’appréciation — Lot {{ selectedLotName }}</h2>
+            <p>Choisissez un lot, renseignez les champs demandés et ajoutez les pièces justificatives si nécessaire.</p>
+        </div>
+
+        <div class="lot-tabs" *ngIf="lots.length > 0">
+            <button type="button" *ngFor="let lot of lots" [class.active]="selectedLotId === lot.id" [class.notification-target-lot]="isNotificationTargetLot(lot.id)" [disabled]="!canOpenLot(lot.id)" (click)="selectLot(lot.id)">
+  {{ lot.nomLot }}
+</button>
+        </div>
+
+        <div *ngIf="lots.length === 0" class="empty-card">
+            Aucun lot disponible pour le moment.
+        </div>
+
+        <div *ngIf="loadingChamps" class="loading-card">
+            Chargement du formulaire du lot...
+        </div>
+
+        <div *ngIf="!loadingChamps && groupedSections.length === 0" class="empty-card">
+            Aucun formulaire configuré pour ce lot.
+        </div>
+
+        <div *ngIf="!loadingChamps && groupedSections.length > 0">
+
+            <div class="section-card" *ngFor="let section of groupedSections">
+
+                <div class="section-header">
+                    <div class="section-left">
+                        <span class="section-icon">☆</span>
+                        <div>
+                            <h3>{{ section.section }}</h3>
+                            <small>{{ getSectionTotalRows(section) }} ligne(s)</small>
+                        </div>
+                    </div>
+                </div>
+
+                <table class="smart-form-table">
+
+                    <thead>
+                        <tr>
+                            <th>Champ demandé</th>
+                            <th>Réponse candidat</th>
+                            <th>Pièce justificative</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+
+                        <tr *ngFor="let critere of section.noPieceCriteres" [attr.id]="getCritereDomId(critere)" [class.notification-highlight]="isCritereHighlighted(critere)">
+
+                            <td class="critere-cell">
+                                <div class="critere-title">
+                                    {{ getCritereLabel(critere) }}
+                                </div>
+
+                                <div class="critere-meta">
+                                    <span class="type-badge">
+                    {{ getTypeLabel(critere.typeChamp) }}
+                  </span>
+
+                                    <span class="required-badge" *ngIf="critere.obligatoire">
+                    Obligatoire
+                  </span>
+                                </div>
+                            </td>
+
+                            <td class="response-cell">
+                                <ng-container [ngSwitch]="getTypeUpper(critere.typeChamp)">
+
+                                    <input *ngSwitchCase="'TEXT'" type="text" [(ngModel)]="$any(critereValues)[critere.id]" (ngModelChange)="onCritereValueChange()" class="form-control" placeholder="Saisir votre réponse" [readonly]="isCandidatureSoumise()">
+
+                                    <textarea *ngSwitchCase="'TEXTAREA'" rows="3" [(ngModel)]="$any(critereValues)[critere.id]" (ngModelChange)="onCritereValueChange()" class="form-control" placeholder="Saisir votre réponse" [readonly]="isCandidatureSoumise()"></textarea>
+
+                                    <input *ngSwitchCase="'NUMBER'" type="number" [(ngModel)]="$any(critereValues)[critere.id]" (ngModelChange)="onCritereValueChange()" class="form-control" placeholder="Saisir un nombre" [readonly]="isCandidatureSoumise()">
+
+                                    <input *ngSwitchCase="'DATE'" type="date" [(ngModel)]="$any(critereValues)[critere.id]" (ngModelChange)="onCritereValueChange()" class="form-control" [readonly]="isCandidatureSoumise()">
+
+                                    <select *ngSwitchCase="'SELECT'" [(ngModel)]="$any(critereValues)[critere.id]" (ngModelChange)="onCritereValueChange()" class="form-control" [disabled]="isCandidatureSoumise()">
+                    <option value="">Sélectionner</option>
+                    <option *ngFor="let opt of getSelectOptions(critere)" [value]="opt">
+                      {{ opt }}
+                    </option>
+                  </select>
+
+                                    <div *ngSwitchCase="'BOOLEAN'" class="boolean-group">
+                                        <button type="button" class="bool-btn" [class.active]="$any(critereValues)[critere.id] === true" (click)="$any(critereValues)[critere.id] = true; onCritereValueChange()" [disabled]="isCandidatureSoumise()">
+                      Oui
+                    </button>
+
+                                        <button type="button" class="bool-btn" [class.active]="$any(critereValues)[critere.id] === false" (click)="$any(critereValues)[critere.id] = false; onCritereValueChange()" [disabled]="isCandidatureSoumise()">
+                      Non
+                    </button>
+                                    </div>
+
+                                    <input *ngSwitchDefault type="text" [(ngModel)]="$any(critereValues)[critere.id]" (ngModelChange)="onCritereValueChange()" class="form-control" placeholder="Saisir votre réponse" [readonly]="isCandidatureSoumise()">
+
+                                </ng-container>
+                            </td>
+
+                            <td class="piece-cell no-piece">
+                                <span class="no-piece-text">Aucune pièce requise</span>
+                            </td>
+
+                        </tr>
+
+                        <ng-container *ngFor="let group of section.pieceGroups">
+
+                            <tr *ngFor="let critere of group.criteres; let i = index" [attr.id]="getCritereDomId(critere)" [class.notification-highlight]="isCritereHighlighted(critere)">
+
+                                <td class="critere-cell">
+                                    <div class="critere-title">
+                                        {{ getCritereLabel(critere) }}
+                                    </div>
+
+                                    <div class="critere-meta">
+                                        <span class="type-badge">
+                      {{ getTypeLabel(critere.typeChamp) }}
+                    </span>
+
+                                        <span class="required-badge" *ngIf="critere.obligatoire">
+                      Obligatoire
+                    </span>
+                                    </div>
+                                </td>
+
+                                <td class="response-cell">
+                                    <ng-container [ngSwitch]="getTypeUpper(critere.typeChamp)">
+
+                                        <input *ngSwitchCase="'TEXT'" type="text" [(ngModel)]="$any(critereValues)[critere.id]" (ngModelChange)="onCritereValueChange()" class="form-control" placeholder="Saisir votre réponse" [readonly]="isCandidatureSoumise()">
+
+                                        <textarea *ngSwitchCase="'TEXTAREA'" rows="3" [(ngModel)]="$any(critereValues)[critere.id]" (ngModelChange)="onCritereValueChange()" class="form-control" placeholder="Saisir votre réponse" [readonly]="isCandidatureSoumise()"></textarea>
+
+                                        <input *ngSwitchCase="'NUMBER'" type="number" [(ngModel)]="$any(critereValues)[critere.id]" (ngModelChange)="onCritereValueChange()" class="form-control" placeholder="Saisir un nombre" [readonly]="isCandidatureSoumise()">
+
+                                        <input *ngSwitchCase="'DATE'" type="date" [(ngModel)]="$any(critereValues)[critere.id]" (ngModelChange)="onCritereValueChange()" class="form-control" [readonly]="isCandidatureSoumise()">
+
+                                        <select *ngSwitchCase="'SELECT'" [(ngModel)]="$any(critereValues)[critere.id]" (ngModelChange)="onCritereValueChange()" class="form-control" [disabled]="isCandidatureSoumise()">
+                      <option value="">Sélectionner</option>
+                      <option *ngFor="let opt of getSelectOptions(critere)" [value]="opt">
+                        {{ opt }}
+                      </option>
+                    </select>
+
+                                        <div *ngSwitchCase="'BOOLEAN'" class="boolean-group">
+                                            <button type="button" class="bool-btn" [class.active]="$any(critereValues)[critere.id] === true" (click)="$any(critereValues)[critere.id] = true; onCritereValueChange()" [disabled]="isCandidatureSoumise()">
+                        Oui
+                      </button>
+
+                                            <button type="button" class="bool-btn" [class.active]="$any(critereValues)[critere.id] === false" (click)="$any(critereValues)[critere.id] = false; onCritereValueChange()" [disabled]="isCandidatureSoumise()">
+                        Non
+                      </button>
+                                        </div>
+
+                                        <input *ngSwitchDefault type="text" [(ngModel)]="$any(critereValues)[critere.id]" (ngModelChange)="onCritereValueChange()" class="form-control" placeholder="Saisir votre réponse" [readonly]="isCandidatureSoumise()">
+
+                                    </ng-container>
+                                </td>
+
+                                <td class="piece-cell" *ngIf="i === 0" [attr.rowspan]="getGroupRowspan(group)" [class.notification-piece-highlight]="isPieceGroupHighlighted(group)">
+
+                                    <div class="piece-box clean-piece-box" *ngIf="isPieceGroupVisible(group); else pieceDisabledBlock">
+
+                                        <ng-container *ngFor="let piece of group.pieces">
+
+                                            <label class="upload-line" *ngIf="isPieceVisibleForCritereAndPiece(critere, piece)" [class.has-file]="getPieceFileName(group, piece)" [class.readonly-upload]="!canEditPieceGroup(group)">
+
+                                            <div class="upload-line-left">
+
+                                                <span class="upload-file-icon">
+                            <svg viewBox="0 0 24 24" fill="none">
+                              <path d="M7 3h7l5 5v13H7V3Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
+                              <path d="M14 3v6h5" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
+                              <path d="M9 13h6M9 17h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                            </svg>
+                          </span>
+
+                                                <div class="upload-line-info">
+
+                                                    <div class="upload-line-title">
+                                                        <span class="upload-name">
+                                {{ piece.nomPiece || piece.codePiece }}
+                              </span>
+
+                                                        <span class="upload-required" *ngIf="piece.obligatoire">
+                                *
+                              </span>
+
+                                                        <span class="upload-format">
+                                {{ piece.formatAccepte || 'PDF' }}
+                              </span>
+                                                    </div>
+
+                                                    <div class="upload-selected-file" *ngIf="getPieceFileName(group, piece)">
+                                                        <span class="file-name-row">
+    <span>{{ getPieceFileName(group, piece) }}</span>
+
+                                                        <button type="button" class="file-remove-btn" title="Supprimer le fichier" *ngIf="canDeletePieceFile(group)" (click)="removePieceFile($event, group, piece)">
+      <i class="ti ti-trash"></i>
+    </button>
+                                                        </span>
+                                                    </div>
+
+                                                </div>
+
+                                            </div>
+
+                                            <span class="upload-line-button">
+                          <svg viewBox="0 0 24 24" fill="none">
+                            <path d="M12 16V4M12 4l-4 4M12 4l4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                            <path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                          </svg>
+                          <span>Télécharger</span>
+                                            </span>
+
+                                            <input [id]="getPieceInputId(group, piece)" type="file" class="native-file-input" (change)="onPieceFileSelected($event, group, piece)" [disabled]="!canEditPieceGroup(group)">
+
+                                            </label>
+
+                                        </ng-container>
+                                    </div>
+
+                                    <ng-template #pieceDisabledBlock>
+                                        <div class="piece-disabled-box">
+                                            Pièce non requise pour les réponses actuelles.
+                                        </div>
+                                    </ng-template>
+
+                                </td>
+
+                            </tr>
+
+                        </ng-container>
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </div>
+
+        <div class="page-actions">
+            <button type="button" class="btn secondary" (click)="previousStep()">
+        Retour
+      </button>
+
+            <button type="button" class="btn secondary" (click)="saveCurrentLotFormulaire(false)" [disabled]="savingLot || !canSaveCurrentLot()">
+  {{
+    savingLot
+      ? 'Sauvegarde...'
+      : isCorrectionFromNotification()
+        ? 'Sauvegarder la correction'
+        : 'Sauvegarder ce lot'
+  }}
+</button>
+
+            <button type="button" class="btn primary" (click)="nextStep()" [disabled]="savingLot">
+        Suivant
+      </button>
+        </div>
+
+    </div>
+
+    <!-- STEP 3 : REFERENCES PAR LOT -->
+    <div class="lot-form-card" *ngIf="!loading && isStepCurrent(3)">
+
+        <div class="lot-form-header">
+            <h2>Projets de référence</h2>
+            <p>Choisissez l’emplacement du projet sur la carte. L’adresse sera remplie automatiquement.</p>
+        </div>
+
+        <div class="empty-card" *ngIf="getReferenceLots().length === 0">
+            Aucun lot rempli pour le moment. Retournez à l’étape formulaire et remplissez au moins un lot.
+        </div>
+
+        <div class="lot-tabs" *ngIf="getReferenceLots().length > 0">
+            <button type="button" *ngFor="let lot of getReferenceLots()" [class.active]="selectedReferenceLotId === lot.id" (click)="selectReferenceLot(lot.id)">
+      {{ lot.nomLot }}
+    </button>
+        </div>
+
+        <ng-container *ngIf="selectedReferenceLotId">
+
+            <div class="reference-lot-header">
+                <h3>{{ getReferenceLotName() }}</h3>
+
+                <button type="button" class="btn small primary" (click)="addReferenceProject(selectedReferenceLotId)" [disabled]="isCandidatureSoumise()">
+        + Ajouter un projet
+      </button>
+            </div>
+
+            <div class="empty-card" *ngIf="getReferenceProjectsByLotId(selectedReferenceLotId).length === 0">
+                Aucun projet de référence ajouté pour ce lot.
+            </div>
+
+            <div class="reference-project-card" *ngFor="let projet of getReferenceProjectsByLotId(selectedReferenceLotId); let i = index">
+
+                <div class="reference-project-header">
+                    <strong>Projet {{ i + 1 }}</strong>
+
+                    <button type="button" class="btn small danger" (click)="removeReferenceProject(selectedReferenceLotId, i)" [disabled]="isCandidatureSoumise()">
+          Supprimer
+        </button>
+                </div>
+
+                <div class="form-grid">
+
+                    <div class="field">
+                        <label>Nom du projet</label>
+                        <input type="text" [(ngModel)]="projet.nomProjet" [ngModelOptions]="{ standalone: true }" class="form-control" [readonly]="isCandidatureSoumise()">
+                    </div>
+
+                    <div class="field">
+                        <label>Maître d’ouvrage</label>
+                        <input type="text" [(ngModel)]="projet.maitreOuvrage" [ngModelOptions]="{ standalone: true }" class="form-control" [readonly]="isCandidatureSoumise()">
+                    </div>
+
+                    <div class="field full">
+                        <label>Localisation du projet sur la carte</label>
+
+                        <div class="reference-map" [id]="getReferenceMapId(projet)" [class.map-readonly]="isCandidatureSoumise()"></div>
+
+                        <small>
+            Cliquez sur la carte ou déplacez le marqueur pour choisir l’emplacement exact.
+          </small>
+                    </div>
+
+                    <div class="field full">
+                        <label>Adresse détectée automatiquement</label>
+                        <textarea rows="2" [(ngModel)]="projet.adresseProjet" [ngModelOptions]="{ standalone: true }" class="form-control" readonly [readonly]="isCandidatureSoumise()"></textarea>
+                    </div>
+
+                    <div class="field">
+                        <label>Ville</label>
+                        <input type="text" [(ngModel)]="projet.ville" [ngModelOptions]="{ standalone: true }" class="form-control" readonly [readonly]="isCandidatureSoumise()">
+                    </div>
+
+                    <div class="field">
+                        <label>Zone</label>
+                        <input type="text" [(ngModel)]="projet.zone" [ngModelOptions]="{ standalone: true }" class="form-control" readonly [readonly]="isCandidatureSoumise()">
+                    </div>
+
+
+
+                    <div class="field">
+                        <label>Type du projet</label>
+                        <input type="text" [(ngModel)]="projet.typeProjet" [ngModelOptions]="{ standalone: true }" class="form-control" [readonly]="isCandidatureSoumise()">
+                    </div>
+
+                    <div class="field">
+                        <label>Surface en m²</label>
+                        <input type="number" [(ngModel)]="projet.surfaceM2" [ngModelOptions]="{ standalone: true }" class="form-control" [readonly]="isCandidatureSoumise()">
+                    </div>
+
+                    <div class="field">
+                        <label>Nombre de niveaux R+</label>
+                        <input type="number" [(ngModel)]="projet.niveauxRPlus" [ngModelOptions]="{ standalone: true }" class="form-control" [readonly]="isCandidatureSoumise()">
+                    </div>
+
+                    <div class="field">
+                        <label>Nombre de sous-sols</label>
+                        <input type="number" [(ngModel)]="projet.nombreSousSols" [ngModelOptions]="{ standalone: true }" class="form-control" [readonly]="isCandidatureSoumise()">
+                    </div>
+
+                    <div class="field">
+                        <label>Année de livraison</label>
+                        <input type="number" [(ngModel)]="projet.anneeLivraison" [ngModelOptions]="{ standalone: true }" class="form-control" [readonly]="isCandidatureSoumise()">
+                    </div>
+
+                    <div class="field">
+                        <label>BIM</label>
+                        <select [(ngModel)]="projet.bimOuiNon" [ngModelOptions]="{ standalone: true }" class="form-control" [disabled]="isCandidatureSoumise()">
+            <option [ngValue]="null">Sélectionner</option>
+            <option [ngValue]="true">Oui</option>
+            <option [ngValue]="false">Non</option>
+          </select>
+                    </div>
+
+                    <div class="field">
+                        <label>Seuil OK</label>
+                        <select [(ngModel)]="projet.seuilOk" [ngModelOptions]="{ standalone: true }" class="form-control" [disabled]="isCandidatureSoumise()">
+            <option [ngValue]="null">Sélectionner</option>
+            <option [ngValue]="true">Oui</option>
+            <option [ngValue]="false">Non</option>
+          </select>
+                    </div>
+
+                    <div class="field">
+                        <label>Montant</label>
+                        <input type="number" [(ngModel)]="projet.montant" [ngModelOptions]="{ standalone: true }" class="form-control" [readonly]="isCandidatureSoumise()">
+                    </div>
+
+                    <div class="field full">
+                        <label>Mission réalisée</label>
+                        <textarea rows="3" [(ngModel)]="projet.missionRealisee" [ngModelOptions]="{ standalone: true }" class="form-control" [readonly]="isCandidatureSoumise()"></textarea>
+                    </div>
+
+                    <div class="field full">
+                        <label>Pièces justificatives du projet</label>
+
+                        <div class="reference-files-grid">
+
+                            <!-- FICHIER REFERENCES METIER -->
+                            <label class="upload-line reference-upload-line" [class.has-file]="getReferenceFileName(projet, 'P11')" [class.readonly-upload]="isCandidatureSoumise()">
+
+      <div class="upload-line-left">
+
+        <span class="upload-file-icon">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M7 3h7l5 5v13H7V3Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
+            <path d="M14 3v6h5" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
+            <path d="M9 13h6M9 17h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+          </svg>
+        </span>
+
+        <div class="upload-line-info">
+
+          <div class="upload-line-title">
+            <span class="upload-name">
+              Références similaires dans le même métier
+            </span>
+            <span class="upload-required">*</span>
+            <span class="upload-format">PDF</span>
+          </div>
+
+          <div class="upload-selected-file" *ngIf="getReferenceFileName(projet, 'P11')">
+            {{ getReferenceFileName(projet, 'P11') }}
+          </div>
+
+          <div class="upload-help-text" *ngIf="!getReferenceFileName(projet, 'P11')">
+            Déposer les références ou preuves des projets similaires réalisés.
+          </div>
+
+        </div>
+
+      </div>
+
+      <span class="upload-line-button">
+        <svg viewBox="0 0 24 24" fill="none">
+          <path d="M12 16V4M12 4l-4 4M12 4l4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+        </svg>
+        <span>Télécharger</span>
+      </span>
+
+      <input
+        type="file"
+        accept="application/pdf"
+        class="native-file-input"
+        [disabled]="isCandidatureSoumise()"
+        (change)="onReferenceFileSelected($event, projet, 'P11')"
+      >
+
+    </label>
+
+                            <!-- FICHIER ATTESTATION MAITRE OUVRAGE -->
+                            <label class="upload-line reference-upload-line" [class.has-file]="getReferenceFileName(projet, 'P12')" [class.readonly-upload]="isCandidatureSoumise()">
+
+      <div class="upload-line-left">
+
+        <span class="upload-file-icon">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M7 3h7l5 5v13H7V3Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
+            <path d="M14 3v6h5" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
+            <path d="M9 13h6M9 17h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+          </svg>
+        </span>
+
+        <div class="upload-line-info">
+
+          <div class="upload-line-title">
+            <span class="upload-name">
+              Attestation du maître d’ouvrage
+            </span>
+            <span class="upload-required">*</span>
+            <span class="upload-format">PDF</span>
+          </div>
+
+          <div class="upload-selected-file" *ngIf="getReferenceFileName(projet, 'P12')">
+            {{ getReferenceFileName(projet, 'P12') }}
+          </div>
+
+          <div class="upload-help-text" *ngIf="!getReferenceFileName(projet, 'P12')">
+            Déposer l’attestation ou justificatif délivré par le maître d’ouvrage.
+          </div>
+
+        </div>
+
+      </div>
+
+      <span class="upload-line-button">
+        <svg viewBox="0 0 24 24" fill="none">
+          <path d="M12 16V4M12 4l-4 4M12 4l4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+        </svg>
+        <span>Télécharger</span>
+      </span>
+
+      <input
+        type="file"
+        accept="application/pdf"
+        class="native-file-input"
+        [disabled]="isCandidatureSoumise()"
+        (change)="onReferenceFileSelected($event, projet, 'P12')"
+      >
+
+    </label>
+
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </ng-container>
+
+        <div class="page-actions">
+            <button type="button" class="btn secondary" (click)="previousStep()" [disabled]="savingReferences">
+      Retour
+    </button>
+
+            <button type="button" class="btn secondary" (click)="saveSelectedReferenceLot(false)" [disabled]="savingReferences || getReferenceLots().length === 0 || isCandidatureSoumise()">
+      {{ savingReferences ? 'Sauvegarde...' : 'Sauvegarder les références' }}
+    </button>
+
+            <button type="button" class="btn primary" (click)="nextStep()" [disabled]="savingReferences || getReferenceLots().length === 0">
+      Suivant
+    </button>
+        </div>
+
+    </div>
+
+
+    <!-- STEP 4 : SOUMISSION -->
+    <div class="lot-form-card" *ngIf="!loading && isStepCurrent(4)">
+
+        <div class="lot-form-header">
+            <h2>Révision & soumission</h2>
+            <p>Vérifiez votre candidature avant soumission finale.</p>
+        </div>
+
+        <div class="summary-box">
+            <p>
+                <strong>Données générales :</strong> {{ stepSocieteDone ? 'Complétées' : 'Non complétées' }}
+            </p>
+
+            <p>
+                <strong>Formulaire par lot :</strong> {{ stepFormulaireDone ? 'Complété' : 'Non complété' }}
+            </p>
+
+            <p>
+                <strong>Références :</strong> {{ stepReferencesDone ? 'Complétées' : 'Non complétées' }}
+            </p>
+
+            <p>
+                <strong>Lots sélectionnés :</strong> {{ getFilledLotNames() }}
+            </p>
+
+            <p>
+                <strong>RNE :</strong> {{ getGeneralDocumentStatus(1) }}
+            </p>
+
+            <p>
+                <strong>CNSS :</strong> {{ getGeneralDocumentStatus(2) }}
+            </p>
+
+            <p>
+                <strong>Statut :</strong> {{ candidature?.statut || 'BROUILLON' }}
+            </p>
+        </div>
+
+        <div class="page-actions">
+            <button type="button" class="btn secondary" (click)="previousStep()">
+        Retour
+      </button>
+
+            <button type="button" class="btn primary" (click)="submitCandidature()" [disabled]="submitting || isCandidatureSoumise()" *ngIf="!isCandidatureSoumise()">
+        {{ submitting ? 'Soumission...' : 'Soumettre la candidature' }}
+      </button>
+
+            <span *ngIf="isCandidatureSoumise()" class="submitted-badge">
+                Candidature déjà soumise
+            </span>
+        </div>
+
+    </div>
+
+</div>

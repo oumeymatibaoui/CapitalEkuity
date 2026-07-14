@@ -1,1 +1,451 @@
-<p>tableau-de-bord works!</p>
+<div class="dashboard-page">
+
+    <div class="top-header">
+        <div>
+            <h1>Tableau de bord</h1>
+            <p>Pilotage des intervenants, conformité des dossiers, scores et décisions.</p>
+        </div>
+
+        <button type="button" class="btn secondary" (click)="loadDashboard()" [disabled]="loading">
+      {{ loading ? 'Chargement...' : 'Actualiser' }}
+    </button>
+    </div>
+
+    <div *ngIf="pageError" class="alert error">
+        {{ pageError }}
+    </div>
+
+    <div class="filters-card">
+
+        <div class="filter-field">
+            <label>Type d’intervenant</label>
+            <select [ngModel]="filters.typeIntervenantId" (ngModelChange)="onTypeChange($event)">
+        <option [ngValue]="null">Tous les types</option>
+        <option *ngFor="let type of typesIntervenant" [ngValue]="type.id">
+          {{ type.label }}
+        </option>
+      </select>
+        </div>
+
+        <div class="filter-field">
+            <label>Lot / domaine</label>
+            <select [ngModel]="filters.lotId" (ngModelChange)="onLotChange($event)">
+        <option [ngValue]="null">Tous les lots</option>
+        <option *ngFor="let lot of lots" [ngValue]="lot.id">
+          {{ lot.label }}
+        </option>
+      </select>
+        </div>
+
+        <div class="filter-field">
+            <label>Décision</label>
+            <select [ngModel]="filters.decision" (ngModelChange)="onDecisionChange($event)">
+        <option value="ALL">Toutes les décisions</option>
+        <option value="ADMIS">Admis</option>
+        <option value="EN_COURS">En cours</option>
+        <option value="A_CORRIGER">À corriger</option>
+        <option value="REJETES">Rejetés</option>
+      </select>
+        </div>
+
+        <div class="filter-field search-field">
+            <label>Recherche</label>
+            <input type="text" [ngModel]="filters.search" (ngModelChange)="onSearchChange($event)" placeholder="Intervenant, email, lot, zone..." (keyup.enter)="applyFilters()">
+        </div>
+
+        <div class="filter-actions">
+            <button type="button" class="btn primary" (click)="applyFilters()">
+        Filtrer
+      </button>
+
+            <button type="button" class="btn light" (click)="resetFilters()">
+        Réinitialiser
+      </button>
+        </div>
+
+    </div>
+
+    <div class="stats-grid">
+
+        <div class="stat-card">
+            <div class="stat-icon blue">
+                <i class="ti ti-users"></i>
+            </div>
+
+            <div>
+                <strong>{{ stats.totalCandidatures || 0 }}</strong>
+                <span>Intervenants</span>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon navy">
+                <i class="ti ti-layout-grid"></i>
+            </div>
+
+            <div>
+                <strong>{{ stats.totalApplications || 0 }}</strong>
+                <span>Applications / lots</span>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon purple">
+                <i class="ti ti-chart-bar"></i>
+            </div>
+
+            <div>
+                <strong>{{ getAverageScore() | number:'1.0-2' }}%</strong>
+                <span>Note moyenne /100</span>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon orange">
+                <i class="ti ti-trending-down"></i>
+            </div>
+
+            <div>
+                <strong>{{ stats.scoreInferieur100 || 0 }}</strong>
+                <span>Notes &lt; 100</span>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon green">
+                <i class="ti ti-shield-check"></i>
+            </div>
+
+            <div>
+                <strong>{{ getTauxConformite() | number:'1.0-2' }}%</strong>
+                <span>Taux conformité</span>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon red">
+                <i class="ti ti-alert-circle"></i>
+            </div>
+
+            <div>
+                <strong>{{ stats.piecesNonConformes || 0 }}</strong>
+                <span>Non conformes</span>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="overview-grid">
+
+        <div class="card mini-card success">
+            <div>
+                <span>Pièces conformes</span>
+                <strong>{{ stats.piecesConformes || 0 }}</strong>
+            </div>
+            <i class="ti ti-circle-check"></i>
+        </div>
+
+        <div class="card mini-card warning">
+            <div>
+                <span>À corriger</span>
+                <strong>{{ stats.aCorriger || 0 }}</strong>
+            </div>
+            <i class="ti ti-edit-circle"></i>
+        </div>
+
+        <div class="card mini-card info">
+            <div>
+                <span>En cours</span>
+                <strong>{{ stats.enCours || 0 }}</strong>
+            </div>
+            <i class="ti ti-clock"></i>
+        </div>
+
+        <div class="card mini-card danger">
+            <div>
+                <span>Rejetés</span>
+                <strong>{{ stats.rejetes || 0 }}</strong>
+            </div>
+            <i class="ti ti-circle-x"></i>
+        </div>
+
+    </div>
+
+    <div class="dashboard-grid">
+
+        <div class="card chart-card score-chart-card">
+
+            <div class="card-header with-icon">
+                <div>
+                    <h3>Scores par intervenant</h3>
+                    <p>Vue comparative des notes obtenues par lot.</p>
+                </div>
+
+                <div class="header-icon">
+                    <i class="ti ti-chart-bar"></i>
+                </div>
+            </div>
+
+            <div *ngIf="loading" class="loading-card">
+                Chargement des scores...
+            </div>
+
+            <div *ngIf="!loading && scoreIntervenants.length === 0" class="empty-card">
+                Aucun intervenant trouvé pour ces filtres.
+            </div>
+
+            <div class="bar-chart-wrapper" *ngIf="!loading && scoreIntervenants.length > 0">
+
+                <div class="chart-scale">
+                    <span>100</span>
+                    <span>75</span>
+                    <span>50</span>
+                    <span>25</span>
+                    <span>0</span>
+                </div>
+
+                <div class="bar-chart">
+
+                    <div class="bar-item" *ngFor="let item of scoreIntervenants; trackBy: trackByApplicationId">
+
+                        <div class="bar-value">
+                            {{ getScoreValue(item) | number:'1.0-0' }}
+                        </div>
+
+                        <div class="bar-track">
+                            <div class="bar-fill" [ngClass]="getScoreClass(item.score)" [style.height.%]="getBarHeight(item)">
+                            </div>
+                        </div>
+
+                        <div class="bar-label">
+                            <strong>{{ getShortIntervenantName(item.raisonSociale) }}</strong>
+                            <small>{{ item.lotNom || '-' }}</small>
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+        <div class="card chart-card decision-chart-card">
+
+            <div class="card-header">
+                <h3>Répartition des décisions</h3>
+                <p>Statut global des applications analysées.</p>
+            </div>
+
+            <div class="donut-wrapper">
+
+                <div class="donut-chart" [style.background]="getDecisionPieStyle()">
+
+                    <div class="donut-center">
+                        <strong>{{ getDecisionTotal() }}</strong>
+                        <span>Total</span>
+                    </div>
+
+                </div>
+
+            </div>
+
+            <div class="decision-legend">
+
+                <div class="legend-item">
+                    <span class="legend-dot admis"></span>
+                    <span>Admis</span>
+                    <strong>{{ getDecisionCount('ADMIS') }}</strong>
+                    <small>{{ getDecisionPercent('ADMIS') }}%</small>
+                </div>
+
+                <div class="legend-item">
+                    <span class="legend-dot en-cours"></span>
+                    <span>En cours</span>
+                    <strong>{{ getDecisionCount('EN_COURS') }}</strong>
+                    <small>{{ getDecisionPercent('EN_COURS') }}%</small>
+                </div>
+
+                <div class="legend-item">
+                    <span class="legend-dot correction"></span>
+                    <span>À corriger</span>
+                    <strong>{{ getDecisionCount('A_CORRIGER') }}</strong>
+                    <small>{{ getDecisionPercent('A_CORRIGER') }}%</small>
+                </div>
+
+                <div class="legend-item">
+                    <span class="legend-dot rejete"></span>
+                    <span>Rejetés</span>
+                    <strong>{{ getDecisionCount('REJETES') }}</strong>
+                    <small>{{ getDecisionPercent('REJETES') }}%</small>
+                </div>
+
+            </div>
+
+        </div>
+
+        <div class="card conformity-card">
+
+            <div class="card-header">
+                <h3>Conformité des contrôles</h3>
+                <p>Suivi des éléments conformes et non conformes.</p>
+            </div>
+
+            <div class="conformity-main">
+                <div>
+                    <strong>{{ getTauxConformite() | number:'1.0-2' }}%</strong>
+                    <span>de conformité</span>
+                </div>
+            </div>
+
+            <div class="progress-track">
+                <div class="progress-fill" [style.width.%]="getConformityWidth()">
+                </div>
+            </div>
+
+            <div class="conformity-list">
+
+                <div class="conformity-item positive">
+                    <span>Conformes</span>
+                    <strong>{{ stats.piecesConformes || 0 }}</strong>
+                </div>
+
+                <div class="conformity-item negative">
+                    <span>Non conformes</span>
+                    <strong>{{ stats.piecesNonConformes || 0 }}</strong>
+                </div>
+
+                <div class="conformity-item neutral">
+                    <span>Total contrôles</span>
+                    <strong>{{ stats.totalControles || 0 }}</strong>
+                </div>
+
+            </div>
+
+        </div>
+
+        <div class="card notes-card">
+
+            <div class="card-header">
+                <h3>Répartition des notes</h3>
+                <p>Lecture rapide des performances /100.</p>
+            </div>
+
+            <div class="note-band-list">
+
+                <div class="note-band high">
+                    <div class="note-band-top">
+                        <span>≥ 80 / 100</span>
+                        <strong>{{ getNoteBandCount('SUP_80') }}</strong>
+                    </div>
+
+                    <div class="note-progress">
+                        <div [style.width.%]="getNoteBandPercent('SUP_80')"></div>
+                    </div>
+
+                    <small>{{ getNoteBandPercent('SUP_80') }}%</small>
+                </div>
+
+                <div class="note-band medium">
+                    <div class="note-band-top">
+                        <span>60 - 79 / 100</span>
+                        <strong>{{ getNoteBandCount('BETWEEN_60_79') }}</strong>
+                    </div>
+
+                    <div class="note-progress">
+                        <div [style.width.%]="getNoteBandPercent('BETWEEN_60_79')"></div>
+                    </div>
+
+                    <small>{{ getNoteBandPercent('BETWEEN_60_79') }}%</small>
+                </div>
+
+                <div class="note-band low">
+                    <div class="note-band-top">
+                        <span>&lt; 60 / 100</span>
+                        <strong>{{ getNoteBandCount('INF_60') }}</strong>
+                    </div>
+
+                    <div class="note-progress">
+                        <div [style.width.%]="getNoteBandPercent('INF_60')"></div>
+                    </div>
+
+                    <small>{{ getNoteBandPercent('INF_60') }}%</small>
+                </div>
+
+            </div>
+
+        </div>
+
+        <div class="card zones-card">
+
+            <div class="card-header">
+                <h3>Intervenants par zone</h3>
+                <p>Répartition selon le classement par zone.</p>
+            </div>
+
+            <div *ngIf="zones.length === 0" class="empty-card">
+                Aucune zone disponible.
+            </div>
+
+            <div class="zone-list" *ngIf="zones.length > 0">
+
+                <div class="zone-row" *ngFor="let zone of zones; trackBy: trackByZone">
+
+                    <div class="zone-row-header">
+                        <span>{{ zone.zoneNom || 'Non classé' }}</span>
+                        <strong>{{ zone.count }}</strong>
+                    </div>
+
+                    <div class="zone-track">
+                        <div class="zone-fill" [style.width.%]="getZoneWidth(zone)">
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+        <div class="card ranking-card">
+
+            <div class="card-header">
+                <h3>Intervenants les mieux notés</h3>
+                <p>Classement rapide selon la note finale.</p>
+            </div>
+
+            <div *ngIf="getTopIntervenants().length === 0" class="empty-card">
+                Aucun classement disponible.
+            </div>
+
+            <div class="ranking-list" *ngIf="getTopIntervenants().length > 0">
+
+                <div class="ranking-item" *ngFor="let item of getTopIntervenants(); let i = index">
+
+                    <div class="rank-number">
+                        {{ i + 1 }}
+                    </div>
+
+                    <div class="rank-info">
+                        <strong>{{ item.raisonSociale || 'Intervenant' }}</strong>
+                        <span>
+              {{ item.lotNom || '-' }}
+              <ng-container *ngIf="item.zoneNom">
+                • {{ item.zoneNom }}
+              </ng-container>
+            </span>
+                    </div>
+
+                    <div class="rank-score" [ngClass]="getScoreClass(item.score)">
+                        {{ getScoreValue(item) | number:'1.0-0' }}
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>

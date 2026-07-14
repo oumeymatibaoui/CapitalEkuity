@@ -577,3 +577,39 @@
     border-color: #ef4444 !important;
     background: #fff7f7 !important;
 }
+
+.filter-card {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 18px;
+    padding: 16px 18px;
+    margin-bottom: 18px;
+    display: grid;
+    gap: 8px;
+    max-width: 420px;
+}
+
+.filter-card label {
+    color: #64748b;
+    font-weight: 900;
+    font-size: 13px;
+}
+
+.filter-card select,
+.form-group select {
+    width: 100%;
+    min-height: 44px;
+    border: 1px solid #d1d5db;
+    border-radius: 14px;
+    padding: 10px 12px;
+    background: #ffffff;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.lot-type {
+    margin: 6px 0;
+    color: #16245f;
+    font-weight: 900;
+    font-size: 14px;
+}

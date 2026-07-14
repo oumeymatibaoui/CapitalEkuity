@@ -1,14 +1,19 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
 export interface Lot {
   id?: number;
   codeLot: string;
   nomLot: string;
-  description?: string;
+  description?: string | null;
   actif?: boolean | string | number;
   createdAt?: string;
+  updatedAt?: string;
+
+  typeIntervenantId?: number | null;
+  typeIntervenantCode?: string | null;
+  typeIntervenantLibelle?: string | null;
 }
 
 @Injectable({
@@ -16,12 +21,18 @@ export interface Lot {
 })
 export class LotService {
 
-  private apiUrl = 'http://localhost:8089/api/lots';
+  private readonly apiUrl = 'http://localhost:8089/api/lots';
 
   constructor(private http: HttpClient) {}
 
-  getAll(): Observable<Lot[]> {
-    return this.http.get<Lot[]>(this.apiUrl);
+  getAll(typeIntervenantId?: number | null): Observable<Lot[]> {
+    let params = new HttpParams();
+
+    if (typeIntervenantId) {
+      params = params.set('typeIntervenantId', String(typeIntervenantId));
+    }
+
+    return this.http.get<Lot[]>(this.apiUrl, { params });
   }
 
   create(lot: Lot): Observable<Lot> {

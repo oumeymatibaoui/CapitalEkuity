@@ -1,0 +1,119 @@
+<div class="notifications-cnd-page">
+
+    <div class="top-header">
+        <div>
+            <h1>Notifications El Emar</h1>
+
+            <p>
+                Consultez les commentaires envoyés par El Emar concernant les critères ou pièces à corriger.
+            </p>
+        </div>
+
+        <div class="notification-counter">
+            <span>Nouvelles notifications</span>
+            <strong>{{ getUnreadCount() }}</strong>
+        </div>
+    </div>
+
+    <div *ngIf="pageError" class="alert error">
+        {{ pageError }}
+    </div>
+
+    <div *ngIf="successMessage" class="alert success">
+        {{ successMessage }}
+    </div>
+
+    <div *ngIf="loading" class="loading-card">
+        Chargement des notifications...
+    </div>
+
+    <div *ngIf="!loading && notifications.length === 0" class="empty-card">
+        Aucune notification reçue pour le moment.
+    </div>
+
+    <div class="notifications-table-card" *ngIf="!loading && notifications.length > 0">
+
+        <div class="table-header">
+            <h2>Commentaires reçus</h2>
+
+            <button type="button" class="btn secondary" (click)="loadNotifications()">
+        Actualiser
+      </button>
+        </div>
+
+        <table class="notifications-table">
+
+            <thead>
+                <tr>
+                    <th>État</th>
+                    <th>Date</th>
+                    <th>Lot</th>
+                    <th>Critère / Pièce concernée</th>
+                    <th>Commentaire El Emar</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+
+            <tbody>
+
+                <tr *ngFor="let notification of notifications" [class.unread-row]="!notification.lu" [class.read-row]="notification.lu">
+
+                    <td>
+                        <span class="status-badge" [ngClass]="getNotificationStatusClass(notification)">
+              {{ getNotificationStatusLabel(notification) }}
+            </span>
+                    </td>
+
+                    <td>
+                        {{ formatDate(notification.dateCreation) }}
+                    </td>
+
+                    <td>
+                        <strong>
+              {{ getLotLabel(notification) }}
+            </strong>
+                    </td>
+
+                    <td>
+                        <div class="critere-info">
+
+                            <strong>
+                {{ getCritereLabel(notification) }}
+              </strong>
+
+                            <small *ngIf="notification.codeCritere">
+                Code : {{ notification.codeCritere }}
+              </small>
+
+                            <small *ngIf="notification.critereEvaluationId">
+                Critère #{{ notification.critereEvaluationId }}
+              </small>
+
+                            <small *ngIf="notification.reponseCritereId">
+                Réponse critère #{{ notification.reponseCritereId }}
+              </small>
+
+                        </div>
+                    </td>
+
+                    <td>
+                        <div class="message-box">
+                            {{ getCommentaire(notification) }}
+                        </div>
+                    </td>
+
+                    <td>
+                        <button type="button" class="btn primary small" [disabled]="notification.traitee" (click)="ouvrirNotification(notification)">
+  {{ notification.traitee ? 'Correction traitée' : 'Ouvrir le champ à corriger' }}
+</button>
+                    </td>
+
+                </tr>
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</div>

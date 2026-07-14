@@ -1,42 +1,88 @@
-import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Lot, LotService } from '../../../core/services/lot.service';
+
+import {
+  Lot,
+  LotService
+} from '../../../core/services/lot.service';
+
+import {
+  TypeIntervenant,
+  TypeIntervenantService
+} from '../../../core/services/type-intervenant.service';
 
 @Component({
   selector: 'app-lots',
   standalone: true,
   imports: [CommonModule, FormsModule],
   templateUrl: './lots.html',
-  styleUrl: './lots.scss',
+  styleUrl: './lots.scss'
 })
 export class Lots implements OnInit {
 
   lots: Lot[] = [];
+  types: TypeIntervenant[] = [];
+
+  selectedTypeFilter: number | null = null;
 
   showModal = false;
-  isEditMode = false;
-  selectedLotId: number | null = null;
-
   showDeleteModal = false;
+  isEditMode = false;
+
+  lotToEdit: Lot | null = null;
   lotToDelete: Lot | null = null;
+
+  form: Lot = this.getEmptyForm();
 
   formError = '';
   fieldErrors: { [key: string]: string } = {};
 
-  form: Lot = {
-    codeLot: '',
-    nomLot: '',
-    description: '',
-    actif: true
-  };
+  loading = false;
 
   constructor(
     private lotService: LotService,
-    private cdr: ChangeDetectorRef
+    private typeService: TypeIntervenantService
   ) {}
 
   ngOnInit(): void {
+    this.loadTypes();
+    this.loadLots();
+  }
+
+  loadTypes(): void {
+    this.typeService.getAll(true).subscribe({
+      next: (data: TypeIntervenant[]) => {
+        this.types = data || [];
+
+        if (!this.form.typeIntervenantId && this.types.length > 0) {
+          this.form.typeIntervenantId = this.types[0].id || null;
+        }
+      },
+      error: (error: unknown) => {
+        console.error('ERROR LOAD TYPES', error);
+        this.formError = 'Erreur lors du chargement des types d’intervenants.';
+      }
+    });
+  }
+
+  loadLots(): void {
+    this.loading = true;
+
+    this.lotService.getAll(this.selectedTypeFilter).subscribe({
+      next: (data: Lot[]) => {
+        this.lots = data || [];
+        this.loading = false;
+      },
+      error: (error: unknown) => {
+        console.error('ERROR LOAD LOTS', error);
+        this.formError = 'Erreur lors du chargement des domaines.';
+        this.loading = false;
+      }
+    });
+  }
+
+  onTypeFilterChange(): void {
     this.loadLots();
   }
 
@@ -44,177 +90,79 @@ export class Lots implements OnInit {
     return this.lots.filter(lot => this.isLotActive(lot)).length;
   }
 
-  loadLots(): void {
-    this.lotService.getAll().subscribe({
-      next: data => {
-        this.lots = [...data];
-      },
-      error: err => console.error(err)
-    });
-  }
-
-  isLotActive(lot: Lot): boolean {
-    const value = lot.actif as any;
-
-    return value === true ||
-           value === 'true' ||
-           value === 't' ||
-           value === 1 ||
-           value === '1';
-  }
-
-  resetErrors(): void {
-    this.formError = '';
-    this.fieldErrors = {};
-  }
-
-handleApiError(err: any): void {
-  console.log('API ERROR LOT = ', err);
-
-  const message =
-    err?.error?.message ||
-    err?.error?.detail ||
-    err?.error?.error ||
-    'Une erreur est survenue';
-
-  const newFieldErrors: { [key: string]: string } = {
-    ...(err?.error?.errors || {})
-  };
-
-  const lowerMessage = message.toLowerCase();
-
-  if (lowerMessage.includes('code')) {
-    newFieldErrors['codeLot'] = message;
-  }
-
-  if (lowerMessage.includes('nom')) {
-    newFieldErrors['nomLot'] = message;
-  }
-
-  this.formError = message;
-  this.fieldErrors = { ...newFieldErrors };
-  this.showModal = true;
-
-  console.log('FORM ERROR = ', this.formError);
-  console.log('FIELD ERRORS = ', this.fieldErrors);
-
-  setTimeout(() => {
-    this.cdr.detectChanges();
-  }, 0);
-}
-
-validateLotForm(): boolean {
-  this.resetErrors();
-
-  if (!this.form.codeLot || !this.form.codeLot.trim()) {
-    this.fieldErrors['codeLot'] = 'Le code du lot est obligatoire';
-  }
-
-  if (!this.form.nomLot || !this.form.nomLot.trim()) {
-    this.fieldErrors['nomLot'] = 'Le nom du lot est obligatoire';
-  }
-
-  if (!this.form.description || !this.form.description.trim()) {
-    this.fieldErrors['description'] = 'La description est obligatoire';
-  }
-
-  if (this.form.codeLot && this.form.codeLot.trim().length > 50) {
-    this.fieldErrors['codeLot'] = 'Le code ne doit pas dépasser 50 caractères';
-  }
-
-  if (this.form.nomLot && this.form.nomLot.trim().length > 150) {
-    this.fieldErrors['nomLot'] = 'Le nom ne doit pas dépasser 150 caractères';
-  }
-
-  return Object.keys(this.fieldErrors).length === 0;
-}
-
   openCreateModal(): void {
-    this.showModal = true;
     this.isEditMode = false;
-    this.selectedLotId = null;
+    this.lotToEdit = null;
+    this.form = this.getEmptyForm();
+
+    if (this.selectedTypeFilter) {
+      this.form.typeIntervenantId = this.selectedTypeFilter;
+    } else if (this.types.length > 0) {
+      this.form.typeIntervenantId = this.types[0].id || null;
+    }
 
     this.resetErrors();
-
-    this.form = {
-      codeLot: '',
-      nomLot: '',
-      description: '',
-      actif: true
-    };
+    this.showModal = true;
   }
 
   openEditModal(lot: Lot): void {
-    this.showModal = true;
     this.isEditMode = true;
-    this.selectedLotId = lot.id ?? null;
-
-    this.resetErrors();
+    this.lotToEdit = lot;
 
     this.form = {
+      id: lot.id,
       codeLot: lot.codeLot,
       nomLot: lot.nomLot,
-      description: lot.description ?? '',
-      actif: this.isLotActive(lot)
+      description: lot.description || '',
+      actif: this.isLotActive(lot),
+      typeIntervenantId: lot.typeIntervenantId || null
     };
+
+    this.resetErrors();
+    this.showModal = true;
   }
 
   closeModal(): void {
     this.showModal = false;
+    this.lotToEdit = null;
     this.resetErrors();
   }
 
   saveLot(): void {
-    if (!this.validateLotForm()) {
+    if (!this.validateForm()) return;
+
+    const payload: Lot = {
+      codeLot: this.form.codeLot.trim().toUpperCase(),
+      nomLot: this.form.nomLot.trim(),
+      description: this.form.description?.trim() || null,
+      actif: this.form.actif === true,
+      typeIntervenantId: Number(this.form.typeIntervenantId)
+    };
+
+    if (this.isEditMode && this.lotToEdit?.id) {
+      this.lotService.update(this.lotToEdit.id, payload).subscribe({
+        next: () => {
+          this.closeModal();
+          this.loadLots();
+        },
+        error: (error: unknown) => {
+          console.error('ERROR UPDATE LOT', error);
+          this.formError = 'Erreur lors de la modification du domaine.';
+        }
+      });
+
       return;
     }
 
-    const lotToSave: Lot = {
-      ...this.form,
-      codeLot: this.form.codeLot.trim().toUpperCase(),
-      nomLot: this.form.nomLot.trim(),
-      description: this.form.description?.trim() ?? '',
-      actif: this.form.actif ?? true
-    };
-
-    if (this.isEditMode && this.selectedLotId) {
-      this.lotService.update(this.selectedLotId, lotToSave).subscribe({
-        next: () => {
-          this.closeModal();
-          this.loadLots();
-        },
-        error: err => {
-          console.error(err);
-          this.handleApiError(err);
-        }
-      });
-    } else {
-      this.lotService.create(lotToSave).subscribe({
-        next: () => {
-          this.closeModal();
-          this.loadLots();
-        },
-        error: err => {
-          console.error(err);
-          this.handleApiError(err);
-        }
-      });
-    }
-  }
-
-  toggleLotStatus(lot: Lot): void {
-    if (!lot.id) return;
-
-    const updatedLot: Lot = {
-      ...lot,
-      actif: !this.isLotActive(lot)
-    };
-
-    this.lotService.update(lot.id, updatedLot).subscribe({
+    this.lotService.create(payload).subscribe({
       next: () => {
+        this.closeModal();
         this.loadLots();
       },
-      error: err => console.error(err)
+      error: (error: unknown) => {
+        console.error('ERROR CREATE LOT', error);
+        this.formError = 'Erreur lors de la création du domaine.';
+      }
     });
   }
 
@@ -224,8 +172,8 @@ validateLotForm(): boolean {
   }
 
   closeDeleteModal(): void {
-    this.showDeleteModal = false;
     this.lotToDelete = null;
+    this.showDeleteModal = false;
   }
 
   confirmDeleteLot(): void {
@@ -236,19 +184,89 @@ validateLotForm(): boolean {
         this.closeDeleteModal();
         this.loadLots();
       },
-      error: err => console.error(err)
+      error: (error: unknown) => {
+        console.error('ERROR DELETE LOT', error);
+        this.formError = 'Erreur lors de la suppression du domaine.';
+        this.closeDeleteModal();
+      }
     });
   }
 
-  getLotTheme(codeLot: string): string {
-    const code = codeLot?.toUpperCase() ?? '';
+  toggleLotStatus(lot: Lot): void {
+    if (!lot.id) return;
 
-    if (code.includes('ARC')) return 'archi';
-    if (code.includes('STR')) return 'structure';
-    if (code.includes('FLU')) return 'fluides';
-    if (code.includes('ELEC')) return 'electricite';
-    if (code.includes('OPC')) return 'opc';
+    const payload: Lot = {
+      ...lot,
+      actif: !this.isLotActive(lot),
+      typeIntervenantId: lot.typeIntervenantId || null
+    };
 
-    return 'default';
+    this.lotService.update(lot.id, payload).subscribe({
+      next: () => this.loadLots(),
+      error: (error: unknown) => {
+        console.error('ERROR TOGGLE LOT', error);
+        this.formError = 'Erreur lors du changement de statut.';
+      }
+    });
+  }
+
+  isLotActive(lot: Lot): boolean {
+    return lot.actif === true ||
+      lot.actif === 'true' ||
+      lot.actif === 1 ||
+      lot.actif === '1';
+  }
+
+  getLotTheme(codeLot?: string | null): string {
+    const code = (codeLot || '').toUpperCase();
+
+    if (code.includes('ELEC')) return 'theme-electricite';
+    if (code.includes('FLUID')) return 'theme-fluides';
+    if (code.includes('STRUCT')) return 'theme-structure';
+    if (code.includes('OPC')) return 'theme-opc';
+    if (code.includes('ARCH')) return 'theme-architecture';
+
+    return 'theme-default';
+  }
+
+  getTypeLabel(typeId?: number | null): string {
+    if (!typeId) return '-';
+
+    const type = this.types.find(t => t.id === Number(typeId));
+
+    return type?.libelle || '-';
+  }
+
+  private validateForm(): boolean {
+    this.resetErrors();
+
+    if (!this.form.typeIntervenantId) {
+      this.fieldErrors['typeIntervenantId'] = 'Le type d’intervenant est obligatoire.';
+    }
+
+    if (!this.form.codeLot || !this.form.codeLot.trim()) {
+      this.fieldErrors['codeLot'] = 'Le code du domaine est obligatoire.';
+    }
+
+    if (!this.form.nomLot || !this.form.nomLot.trim()) {
+      this.fieldErrors['nomLot'] = 'Le nom du domaine est obligatoire.';
+    }
+
+    return Object.keys(this.fieldErrors).length === 0;
+  }
+
+  private resetErrors(): void {
+    this.formError = '';
+    this.fieldErrors = {};
+  }
+
+  private getEmptyForm(): Lot {
+    return {
+      codeLot: '',
+      nomLot: '',
+      description: '',
+      actif: true,
+      typeIntervenantId: null
+    };
   }
 }

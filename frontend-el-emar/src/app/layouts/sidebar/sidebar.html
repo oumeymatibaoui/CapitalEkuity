@@ -1,0 +1,76 @@
+<aside class="sidebar">
+
+    <div class="sidebar-brand">
+
+        <div class="brand-main">
+            <div class="brand-icon">
+                <i class="ti ti-building-bank"></i>
+            </div>
+
+            <div class="brand-text">
+                <h2>El Emar</h2>
+            </div>
+        </div>
+
+        <button type="button" class="account-button" [class.active]="isActive(getCompteRoute())" (click)="goTo(getCompteRoute())">
+
+      <span class="account-avatar">
+        {{ getConnectedUserInitial() }}
+      </span>
+
+      <span class="account-info">
+        <strong>{{ getConnectedUserEmail() }}</strong>
+        <small>{{ getConnectedUserRole() }}</small>
+      </span>
+
+      <i class="ti ti-chevron-right account-arrow"></i>
+    </button>
+
+    </div>
+
+    <nav class="sidebar-nav">
+
+        <div class="nav-group" *ngFor="let group of getGroups()">
+
+            <button type="button" class="nav-group-toggle" [class.open]="isGroupOpen(group)" [class.active]="isGroupActive(group)" (click)="toggleGroup(group)">
+
+        <div class="group-left">
+          <i
+            class="ti group-chevron"
+            [ngClass]="isGroupOpen(group) ? 'ti-chevron-down' : 'ti-chevron-right'">
+          </i>
+
+          <span>{{ group }}</span>
+        </div>
+
+        <span class="group-count">
+          {{ getGroupCount(group) }}
+        </span>
+
+      </button>
+
+            <div class="nav-items" *ngIf="isGroupOpen(group)">
+
+                <button type="button" class="nav-link" *ngFor="let item of getItemsByGroup(group)" [class.active]="isActive(item.route)" (click)="goTo(item.route)">
+
+          <i [class]="item.icon"></i>
+          <span>{{ item.label }}</span>
+
+        </button>
+
+            </div>
+
+        </div>
+
+    </nav>
+
+    <div class="sidebar-footer">
+
+        <button type="button" class="logout-btn" (click)="logout()">
+      <i class="ti ti-logout"></i>
+      <span>Déconnexion</span>
+    </button>
+
+    </div>
+
+</aside>

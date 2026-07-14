@@ -1,0 +1,190 @@
+<div class="evaluation-page">
+
+    <div class="top-header">
+        <div>
+            <h1>Évaluation des candidatures</h1>
+            <p>
+                Choisissez le type d’intervenant, consultez les dossiers soumis et lancez l’évaluation par lot.
+            </p>
+        </div>
+
+        <button type="button" class="btn primary" (click)="refresh()" [disabled]="loading">
+      {{ loading ? 'Chargement...' : 'Actualiser' }}
+    </button>
+    </div>
+
+    <div *ngIf="pageError" class="alert error">
+        {{ pageError }}
+    </div>
+
+    <div *ngIf="successMessage" class="alert success">
+        {{ successMessage }}
+    </div>
+
+    <div class="stats-grid">
+
+        <div class="stat-card">
+            <span class="stat-label">Type sélectionné</span>
+            <strong>{{ getSelectedTypeLabel() }}</strong>
+        </div>
+
+        <div class="stat-card">
+            <span class="stat-label">Candidatures affichées</span>
+            <strong>{{ filteredCandidatures.length }}</strong>
+        </div>
+
+        <div class="stat-card">
+            <span class="stat-label">Moyenne générale</span>
+            <strong>{{ getAverageNote() | number:'1.0-2' }} %</strong>
+        </div>
+
+    </div>
+
+    <div class="filter-card">
+
+        <div class="field">
+            <label>Type d’intervenant</label>
+
+            <select [(ngModel)]="selectedTypeIntervenantId" (ngModelChange)="onTypeIntervenantChange()" class="form-control">
+        <option [ngValue]="null">Tous les types</option>
+
+        <option
+          *ngFor="let type of types"
+          [ngValue]="type.id"
+        >
+          {{ type.libelle }}
+        </option>
+      </select>
+
+            <small *ngIf="loadingTypes">
+        Chargement des types...
+      </small>
+        </div>
+
+        <div class="field">
+            <label>Recherche</label>
+
+            <input type="text" [(ngModel)]="searchTerm" class="form-control" placeholder="Rechercher par société, ville, email, lot..." />
+        </div>
+
+        <div class="field">
+            <label>Statut</label>
+
+            <select [(ngModel)]="selectedStatut" class="form-control">
+        <option value="ALL">Tous les statuts</option>
+        <option value="SOUMIS">Soumis</option>
+        <option value="SOUMISE">Soumise</option>
+        <option value="SUBMITTED">Submitted</option>
+      </select>
+        </div>
+
+    </div>
+
+    <div *ngIf="loading" class="loading-card">
+        Chargement des candidatures soumises...
+    </div>
+
+    <div *ngIf="!loading && filteredCandidatures.length === 0" class="empty-card">
+        Aucune candidature soumise trouvée pour ce filtre.
+    </div>
+
+    <div class="table-card" *ngIf="!loading && filteredCandidatures.length > 0">
+
+        <div class="table-header">
+            <h2>Liste des candidatures</h2>
+            <span>{{ filteredCandidatures.length }} dossier(s)</span>
+        </div>
+
+        <div class="table-responsive">
+
+            <table class="evaluation-table">
+
+                <thead>
+                    <tr>
+                        <th>Société</th>
+                        <th>Type</th>
+                        <th>Contact</th>
+                        <th>Lots & notes</th>
+                        <th>Date soumission</th>
+                        <th>Statut</th>
+                        <th class="action-col">Action</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    <tr *ngFor="let candidature of filteredCandidatures">
+
+                        <td>
+                            <div class="company-cell">
+                                <strong>{{ candidature.raisonSociale || '-' }}</strong>
+                                <small>{{ candidature.ville || '-' }}</small>
+                            </div>
+                        </td>
+
+                        <td>
+                            <span class="type-badge">
+                {{ candidature.typeIntervenantLibelle || '-' }}
+              </span>
+                        </td>
+
+                        <td>
+                            <div class="contact-cell">
+                                <span>{{ candidature.emailPrincipal || '-' }}</span>
+                                <small>{{ candidature.telephone || '-' }}</small>
+                            </div>
+                        </td>
+
+                        <td>
+                            <div class="lots-notes-list">
+
+                                <div class="lot-note-chip" *ngFor="let lot of getLotsNotes(candidature)">
+                                    <div class="lot-note-info">
+                                        <span class="lot-name">
+                      {{ lot.nomLot || '-' }}
+                    </span>
+
+                                        <small *ngIf="lot.decisionFinale">
+                      Décision : {{ lot.decisionFinale }}
+                    </small>
+                                    </div>
+
+                                    <span class="lot-note" [ngClass]="getLotNoteClass(lot.noteLot)">
+                    {{ lot.noteLot || 0 | number:'1.0-2' }} %
+                  </span>
+                                </div>
+
+                                <span class="empty-text" *ngIf="getLotsNotes(candidature).length === 0">
+                  -
+                </span>
+
+                            </div>
+                        </td>
+
+                        <td>
+                            {{ formatDate(candidature.dateSoumission) }}
+                        </td>
+
+                        <td>
+                            <span class="status-badge">
+                {{ candidature.statut || 'SOUMIS' }}
+              </span>
+                        </td>
+
+                        <td class="action-col">
+                            <button type="button" class="btn small primary" (click)="openCandidature(candidature)">
+                Voir / Évaluer
+              </button>
+                        </td>
+
+                    </tr>
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+</div>

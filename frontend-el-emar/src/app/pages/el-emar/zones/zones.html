@@ -2,7 +2,7 @@
 
     <div class="page-header">
         <div>
-            <h2>Zones</h2>
+            <h2>Zones géographiques</h2>
             <p>Gestion des zones géographiques concernées par les appels à candidature</p>
         </div>
 
@@ -88,11 +88,38 @@
             <div class="form-group">
                 <label>Nom de la zone *</label>
 
-                <input type="text" [(ngModel)]="form.nomZone" placeholder="Ex : Tunis Nord, Lac 2, Zone Sud..." [class.input-error]="fieldErrors['nomZone']" />
+                <div class="zone-name-row" *ngIf="!showCustomZoneNameInput">
+                    <select [(ngModel)]="form.nomZone" (ngModelChange)="onZoneNameSelected($event)" [class.input-error]="fieldErrors['nomZone']">
+      <option value="">Choisir une zone</option>
+
+      <option
+        *ngFor="let option of getZoneNameOptions()"
+        [value]="option.nomZone"
+      >
+        {{ option.nomZone }}
+      </option>
+    </select>
+
+                    <button class="add-zone-name-btn" type="button" title="Ajouter un autre nom" (click)="enableCustomZoneName()">
+      <i class="ti ti-plus"></i>
+    </button>
+                </div>
+
+                <div class="zone-name-row" *ngIf="showCustomZoneNameInput">
+                    <input type="text" [(ngModel)]="form.nomZone" placeholder="Ex : Zone 4, Grand Tunis, Zone spéciale..." [class.input-error]="fieldErrors['nomZone']" />
+
+                    <button class="cancel-zone-name-btn" type="button" title="Revenir à la liste" (click)="disableCustomZoneName()">
+      <i class="ti ti-x"></i>
+    </button>
+                </div>
+
+                <small class="field-help">
+    Choisissez Zone 1, Zone 2 ou Zone 3, ou cliquez sur + pour ajouter un autre nom.
+  </small>
 
                 <small class="field-error" *ngIf="fieldErrors['nomZone']">
-          {{ fieldErrors['nomZone'] }}
-        </small>
+    {{ fieldErrors['nomZone'] }}
+  </small>
             </div>
 
             <div class="form-group">

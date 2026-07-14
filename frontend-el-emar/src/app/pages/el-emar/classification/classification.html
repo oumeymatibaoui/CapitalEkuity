@@ -1,0 +1,89 @@
+<div class="classification-page">
+
+    <div class="page-header">
+        <div>
+            <h1>Classification par zone</h1>
+            <p>
+                Liste des entreprises classées par zone avec leur catégorie et leur état de validation.
+            </p>
+        </div>
+
+        <button type="button" class="primary-btn" (click)="loadClassements()">
+      Actualiser
+    </button>
+    </div>
+
+    <div *ngIf="pageError" class="alert error">
+        {{ pageError }}
+    </div>
+
+    <div *ngIf="successMessage" class="alert success">
+        {{ successMessage }}
+    </div>
+
+    <div class="filter-card">
+        <label>
+      Filtrer par catégorie
+      <select [(ngModel)]="selectedCategorie">
+        <option value="">Toutes les catégories</option>
+        <option value="A">Catégorie A</option>
+        <option value="B">Catégorie B</option>
+        <option value="C">Catégorie C</option>
+        <option value="NON_QUALIFIE">Non qualifié</option>
+        <option value="A_CLASSER">À classer</option>
+      </select>
+    </label>
+    </div>
+
+    <div *ngIf="loading" class="loading-card">
+        Chargement des classements...
+    </div>
+
+    <div *ngIf="!loading && getFilteredClassements().length === 0" class="empty-card">
+        Aucun classement trouvé.
+    </div>
+
+    <div class="table-card" *ngIf="!loading && getFilteredClassements().length > 0">
+
+        <table class="classification-table">
+
+            <thead>
+                <tr>
+                    <th>Zone</th>
+                    <th>Nom entreprise</th>
+                    <th>Catégorie</th>
+                    <th>Validation</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                <tr *ngFor="let item of getFilteredClassements(); trackBy: trackByClassementId">
+
+                    <td>
+                        {{ getZoneLabel(item) }}
+                    </td>
+
+                    <td>
+                        {{ getNomCandidat(item) }}
+                    </td>
+
+                    <td>
+                        <span class="badge" [ngClass]="getCategorieClass(item.categorie)">
+              {{ getCategorieLabel(item.categorie) }}
+            </span>
+                    </td>
+
+                    <td>
+                        <span class="badge" [ngClass]="getValidationClass(item)">
+              {{ getValidationLabel(item) }}
+            </span>
+                    </td>
+
+                </tr>
+            </tbody>
+
+        </table>
+
+    </div>
+
+</div>

@@ -1,0 +1,259 @@
+<div class="utilisateurs-page">
+
+    <!-- =========================
+       HEADER
+  ========================== -->
+    <div class="top-header">
+        <div>
+            <h1>Comptes utilisateurs</h1>
+            <p>
+                Créez les comptes internes El Emar, attribuez les rôles et consultez la liste complète des utilisateurs.
+            </p>
+        </div>
+
+        <button type="button" class="btn secondary" (click)="loadUtilisateurs()" [disabled]="loading">
+      {{ loading ? 'Chargement...' : 'Actualiser' }}
+    </button>
+    </div>
+
+    <!-- =========================
+       MESSAGES GÉNÉRAUX
+  ========================== -->
+    <div *ngIf="pageError" class="alert error">
+        {{ pageError }}
+    </div>
+
+    <div *ngIf="successMessage" class="alert success">
+        {{ successMessage }}
+    </div>
+
+    <!-- =========================
+       CRÉATION + RÉSUMÉ
+  ========================== -->
+    <div class="content-grid">
+
+        <!-- CRÉER UTILISATEUR INTERNE -->
+        <div class="card create-card">
+
+            <div class="card-header">
+                <h3>Créer un utilisateur interne</h3>
+                <p>
+                    Ajouter un compte interne El Emar : El Emar, Direction achat, IT ou Administrateur.
+                </p>
+            </div>
+
+            <!-- MESSAGE SUCCÈS CRÉATION -->
+            <div *ngIf="createSuccessMessage" class="alert success create-alert">
+                {{ createSuccessMessage }}
+            </div>
+
+            <!-- MESSAGE ERREUR CRÉATION -->
+            <div *ngIf="createErrorMessage" class="alert error create-alert">
+                {{ createErrorMessage }}
+            </div>
+
+            <form [formGroup]="createForm" class="form-grid">
+
+                <div class="field">
+                    <label>Nom</label>
+                    <input type="text" class="form-control" formControlName="nom" placeholder="Nom complet" autocomplete="off">
+                </div>
+
+                <div class="field">
+                    <label>Email</label>
+                    <input type="email" class="form-control" formControlName="email" placeholder="exemple@elemar.com" autocomplete="off">
+                </div>
+
+                <div class="field">
+                    <label>Fonction</label>
+                    <input type="text" class="form-control" formControlName="fonction" placeholder="Ex : Responsable achat, IT, Direction..." autocomplete="off">
+                </div>
+
+                <div class="field">
+                    <label>Rôle</label>
+                    <select class="form-control" formControlName="typeUtilisateur">
+            <option *ngFor="let role of roles" [value]="role">
+              {{ getRoleLabel(role) }}
+            </option>
+          </select>
+                </div>
+
+                <div class="field full">
+                    <label>Mot de passe temporaire</label>
+                    <input type="password" class="form-control" formControlName="motDePasse" placeholder="Minimum 6 caractères" autocomplete="new-password">
+                </div>
+
+            </form>
+
+            <div class="actions">
+                <button type="button" class="btn primary" (click)="createUtilisateur()" [disabled]="creating">
+          {{ creating ? 'Création en cours...' : 'Créer le compte' }}
+        </button>
+            </div>
+
+        </div>
+
+        <!-- RÉSUMÉ -->
+        <div class="card stats-card">
+
+            <div class="card-header">
+                <h3>Résumé</h3>
+                <p>Vue rapide des comptes internes.</p>
+            </div>
+
+            <div class="stats-list">
+
+                <div class="stat-item">
+                    <strong>{{ utilisateurs.length }}</strong>
+                    <span>Total utilisateurs</span>
+                </div>
+
+                <div class="stat-item">
+                    <strong>{{ filteredUtilisateurs.length }}</strong>
+                    <span>Résultat affiché</span>
+                </div>
+
+                <div class="stat-item">
+                    <strong>{{ getActiveCount() }}</strong>
+                    <span>Comptes actifs</span>
+                </div>
+
+                <div class="stat-item">
+                    <strong>{{ getInactiveCount() }}</strong>
+                    <span>Comptes inactifs</span>
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- =========================
+       LISTE UTILISATEURS
+  ========================== -->
+    <div class="card users-card">
+
+        <div class="users-toolbar">
+
+            <div>
+                <h3>Liste des utilisateurs internes</h3>
+                <p>
+                    Tous les comptes internes enregistrés dans la plateforme.
+                </p>
+            </div>
+
+            <div class="filters">
+
+                <input type="text" class="form-control search-input" placeholder="Rechercher nom, email, fonction..." [value]="searchTerm" (input)="onSearchChange($event)">
+
+                <select class="form-control role-filter" [value]="selectedRoleFilter" (change)="onRoleFilterChange($event)">
+          <option value="ALL">Tous les rôles</option>
+
+          <option *ngFor="let role of roles" [value]="role">
+            {{ getRoleLabel(role) }}
+          </option>
+        </select>
+
+            </div>
+
+        </div>
+
+        <!-- LOADING -->
+        <div *ngIf="loading" class="loading-card">
+            Chargement des utilisateurs...
+        </div>
+
+        <!-- EMPTY -->
+        <div *ngIf="!loading && filteredUtilisateurs.length === 0" class="empty-card">
+            Aucun utilisateur interne trouvé.
+        </div>
+
+        <!-- TABLE -->
+        <div class="table-wrapper" *ngIf="!loading && filteredUtilisateurs.length > 0">
+
+            <table class="users-table">
+
+                <thead>
+                    <tr>
+                        <th>Utilisateur</th>
+                        <th>Fonction</th>
+                        <th>Rôle</th>
+                        <th>Statut</th>
+                        <th>Créé le</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    <tr *ngFor="let user of filteredUtilisateurs; trackBy: trackByUserId">
+
+                        <!-- UTILISATEUR -->
+                        <td>
+                            <div class="user-cell">
+
+                                <div class="avatar">
+                                    {{ (user.nom || user.email || 'U').charAt(0).toUpperCase() }}
+                                </div>
+
+                                <div>
+                                    <strong>{{ user.nom || '-' }}</strong>
+                                    <small>{{ user.email || '-' }}</small>
+                                </div>
+
+                            </div>
+                        </td>
+
+                        <!-- FONCTION -->
+                        <td>
+                            {{ user.fonction || '-' }}
+                        </td>
+
+                        <!-- RÔLE -->
+                        <td>
+                            <div class="role-control">
+
+                                <span class="role-badge" [ngClass]="getRoleClass(user.typeUtilisateur)">
+                  {{ getRoleLabel(user.typeUtilisateur) }}
+                </span>
+
+                                <select class="role-select" [value]="user.typeUtilisateur || ''" (change)="updateRole(user, $event)">
+                  <option *ngFor="let role of roles" [value]="role">
+                    {{ getRoleLabel(role) }}
+                  </option>
+                </select>
+
+                            </div>
+                        </td>
+
+                        <!-- STATUT -->
+                        <td>
+                            <span class="status-badge" [class.active]="user.actif">
+                {{ user.actif ? 'Actif' : 'Inactif' }}
+              </span>
+                        </td>
+
+                        <!-- DATE -->
+                        <td>
+                            {{ formatDate(user.createdAt) }}
+                        </td>
+
+                        <!-- ACTIONS -->
+                        <td>
+                            <button type="button" class="btn small" [class.danger]="user.actif" [class.success]="!user.actif" (click)="toggleActif(user)">
+                {{ user.actif ? 'Désactiver' : 'Activer' }}
+              </button>
+                        </td>
+
+                    </tr>
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+</div>

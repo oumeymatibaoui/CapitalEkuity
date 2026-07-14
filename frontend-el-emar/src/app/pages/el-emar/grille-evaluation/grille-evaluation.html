@@ -1,1 +1,352 @@
-<p>grille-evaluation works!</p>
+<div class="evaluation-page">
+
+    <div class="page-header">
+        <div>
+            <h1>Grille d'évaluation</h1>
+            <p>Critères, champs dynamiques, pièces liées et barèmes par lot.</p>
+        </div>
+
+        <button type="button" class="primary-btn" (click)="openAddModal()">
+      <i class="ti ti-plus"></i>
+      Ajouter un critère
+    </button>
+    </div>
+
+    <div class="page-error" *ngIf="pageError">
+        <i class="ti ti-alert-circle"></i>
+        <span>{{ pageError }}</span>
+    </div>
+
+    <!-- TYPE INTERVENANT -->
+    <div class="type-card">
+
+        <div class="form-group">
+            <label>Type d’intervenant</label>
+
+            <select [(ngModel)]="selectedTypeIntervenantId" (ngModelChange)="onTypeIntervenantChange($event)">
+        <option
+          *ngFor="let type of typeIntervenantOptions"
+          [ngValue]="type.id"
+        >
+          {{ type.libelle }}
+        </option>
+      </select>
+        </div>
+
+        <div class="current-config">
+            <span>Configuration actuelle</span>
+            <strong>{{ selectedTypeIntervenantLabel }}</strong>
+        </div>
+
+    </div>
+
+    <!-- LOTS + TOTAL -->
+    <div class="toolbar-card">
+
+        <div class="lot-tabs" *ngIf="lots.length > 0">
+            <button type="button" class="lot-tab" *ngFor="let lot of lots" [class.active]="selectedLotId === lot.id" (click)="selectLot(lot)">
+        {{ lot.nomLot }}
+      </button>
+        </div>
+
+        <div class="empty-lots" *ngIf="!loadingLots && lots.length === 0">
+            Aucun lot trouvé pour ce type d’intervenant.
+        </div>
+
+        <div class="total-badge" [ngClass]="getTotalClass()">
+            <i class="ti ti-award"></i>
+            <span>Total maximum :</span>
+            <strong>{{ totalLot }}/100</strong>
+        </div>
+
+    </div>
+
+    <!-- LOADING -->
+    <div class="loading-card" *ngIf="isCurrentLoading()">
+        Chargement de la grille d’évaluation...
+    </div>
+
+    <!-- EMPTY CRITERES -->
+    <div class="empty-card" *ngIf="!isCurrentLoading() && selectedLotId && criteres.length === 0">
+        Aucun critère configuré pour le lot {{ getSelectedLotName() }}.
+    </div>
+
+    <!-- CRITERES BY CATEGORY -->
+    <div class="category-card" *ngFor="let category of getCategories()" [hidden]="isCurrentLoading()">
+
+        <div class="category-header">
+            <div class="category-title">
+                <i class="ti ti-star"></i>
+                <h3>{{ category }}</h3>
+            </div>
+
+            <div class="category-total">
+                {{ getCategoryTotal(category) }} pts
+            </div>
+        </div>
+
+        <div class="table-wrapper">
+
+            <table>
+
+                <thead>
+                    <tr>
+                        <th>Critère</th>
+                        <th>Description</th>
+                        <th>Points max</th>
+                        <th>Règle de notation</th>
+                        <th>Documents requis</th>
+                        <th>Statut</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    <tr *ngFor="let critere of getCriteresByCategory(category)">
+
+                        <td>
+                            <div class="critere-name">
+                                {{ critere.nomCritere }}
+                            </div>
+                        </td>
+
+                        <td>
+                            <div class="description-cell">
+                                {{ critere.descriptionCritere || '-' }}
+                            </div>
+                        </td>
+
+                        <td>
+                            <div class="points-cell">
+                                <strong>{{ critere.pointsMax }}</strong>
+                                <span>pts</span>
+                            </div>
+                        </td>
+
+                        <td>
+                            <div class="bareme-cell">
+                                {{ critere.conditionBareme || '-' }}
+                            </div>
+                        </td>
+
+                        <td>
+                            <div class="documents-tags" *ngIf="getDocumentsList(critere.documentsRequis).length > 0">
+                                <span class="document-tag" *ngFor="let doc of getDocumentsList(critere.documentsRequis)">
+                  {{ doc }}
+                </span>
+                            </div>
+
+                            <span *ngIf="getDocumentsList(critere.documentsRequis).length === 0">
+                -
+              </span>
+                        </td>
+
+                        <td>
+                            <span class="status-pill" [class.inactive]="!critere.actif">
+                {{ critere.actif ? 'Actif' : 'Inactif' }}
+              </span>
+                        </td>
+
+                        <td>
+                            <div class="actions">
+
+                                <button type="button" class="icon-btn edit" title="Modifier" (click)="openEditModal(critere)">
+                  <i class="ti ti-pencil"></i>
+                </button>
+
+                                <button type="button" class="icon-btn deactivate" title="Désactiver" *ngIf="critere.actif" (click)="openDeactivateModal(critere)">
+                  <i class="ti ti-power"></i>
+                </button>
+
+                                <button type="button" class="icon-btn activate" title="Réactiver" *ngIf="!critere.actif" (click)="activateCritere(critere)">
+                  <i class="ti ti-circle-check"></i>
+                </button>
+
+                                <button type="button" class="icon-btn delete" title="Supprimer définitivement" (click)="openDeleteModal(critere)">
+                  <i class="ti ti-trash"></i>
+                </button>
+
+                            </div>
+                        </td>
+
+                    </tr>
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+</div>
+
+<!-- MODAL ADD / EDIT -->
+<div class="modal-overlay" *ngIf="showModal">
+
+    <div class="modal-card">
+
+        <div class="modal-header">
+            <h3>
+                {{ editMode ? 'Modifier le critère' : 'Nouveau critère d’évaluation' }}
+            </h3>
+
+            <button type="button" class="close-btn" (click)="closeModal()">
+        <i class="ti ti-x"></i>
+      </button>
+        </div>
+
+        <form (ngSubmit)="saveCritere()">
+
+            <div class="form-error" *ngIf="formSubmitted && formError">
+                <i class="ti ti-alert-circle"></i>
+                <span>{{ formError }}</span>
+            </div>
+
+            <div class="form-grid">
+
+                <div class="form-group">
+                    <label>Lot *</label>
+
+                    <select name="lotId" [(ngModel)]="form.lotId">
+            <option [ngValue]="null">Sélectionner un lot</option>
+
+            <option
+              *ngFor="let lot of lots"
+              [ngValue]="lot.id"
+            >
+              {{ lot.nomLot }}
+            </option>
+          </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Points max *</label>
+
+                    <input type="number" name="pointsMax" [(ngModel)]="form.pointsMax" min="1" max="100" placeholder="10" />
+                </div>
+
+            </div>
+
+            <div class="form-group full">
+                <label>Catégorie *</label>
+
+                <select [(ngModel)]="selectedCategoryId" (ngModelChange)="onCategoryChange($event)" name="categorieEvaluationId">
+          <option [ngValue]="null">-- Choisir une catégorie --</option>
+
+          <option
+            *ngFor="let category of categoriesEvaluation"
+            [ngValue]="category.id"
+          >
+            {{ category.libelle }}
+          </option>
+        </select>
+
+                <small *ngIf="loadingCategories">
+          Chargement des catégories...
+        </small>
+
+                <small *ngIf="!loadingCategories && categoriesEvaluation.length === 0">
+          Aucune catégorie configurée pour ce lot.
+        </small>
+            </div>
+
+            <div class="form-group full">
+                <label>Nom du critère *</label>
+
+                <input type="text" name="nomCritere" [(ngModel)]="form.nomCritere" placeholder="Ex : Nombre de projets livrés" />
+            </div>
+
+            <div class="form-group full">
+                <label>Description</label>
+
+                <textarea name="descriptionCritere" [(ngModel)]="form.descriptionCritere" placeholder="Décrire le critère d’évaluation..."></textarea>
+            </div>
+
+            <div class="form-group full">
+                <label>Règle de notation</label>
+
+                <input type="text" name="conditionBareme" [(ngModel)]="form.conditionBareme" placeholder="Ex : Conforme = points maximum ; Non conforme = 0" />
+            </div>
+
+            <div class="form-group full">
+                <label>Documents requis</label>
+
+                <input type="text" name="documentsRequis" [(ngModel)]="form.documentsRequis" placeholder="Fiches techniques, attestations, références..." />
+            </div>
+
+            <div class="form-grid">
+
+                <div class="form-group">
+                    <label>Ordre d’affichage</label>
+
+                    <input type="number" name="ordreAffichage" [(ngModel)]="form.ordreAffichage" placeholder="1" />
+                </div>
+
+                <label class="checkbox-row">
+          <input
+            type="checkbox"
+            name="actif"
+            [(ngModel)]="form.actif"
+          />
+
+          <span>Critère actif</span>
+        </label>
+
+            </div>
+
+            <div class="modal-actions">
+
+                <button type="button" class="secondary-btn" (click)="closeModal()">
+          Annuler
+        </button>
+
+                <button type="submit" class="primary-btn">
+          {{ editMode ? 'Modifier' : 'Ajouter' }}
+        </button>
+
+            </div>
+
+        </form>
+
+    </div>
+
+</div>
+
+<!-- MODAL DELETE / DEACTIVATE -->
+<div class="delete-overlay" *ngIf="showDeleteModal">
+
+    <div class="delete-card">
+
+        <div class="delete-icon" [class.hard-delete]="deleteAction === 'DELETE'">
+            <i class="ti" [class.ti-trash]="deleteAction === 'DELETE'" [class.ti-power]="deleteAction === 'DEACTIVATE'"></i>
+        </div>
+
+        <h3>{{ getDeleteTitle() }}</h3>
+
+        <p>
+            Critère concerné :
+            <strong>{{ critereToDelete?.nomCritere }}</strong>
+        </p>
+
+        <div class="delete-info">
+            <i class="ti ti-info-circle"></i>
+            <span>{{ getDeleteMessage() }}</span>
+        </div>
+
+        <div class="delete-actions">
+
+            <button type="button" class="secondary-btn" (click)="closeDeleteModal()">
+        Annuler
+      </button>
+
+            <button type="button" class="danger-btn" (click)="confirmDelete()">
+        {{ getConfirmButtonLabel() }}
+      </button>
+
+        </div>
+
+    </div>
+
+</div>

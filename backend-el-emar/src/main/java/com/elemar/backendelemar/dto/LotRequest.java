@@ -1,17 +1,12 @@
 package com.elemar.backendelemar.dto;
 
-import lombok.Getter;
-import lombok.Setter;
+import lombok.Data;
 
-@Getter
-@Setter
+@Data
 public class LotRequest {
-
     private String codeLot;
-
     private String nomLot;
-
     private String description;
-
     private Boolean actif;
+    private Long typeIntervenantId;
 }

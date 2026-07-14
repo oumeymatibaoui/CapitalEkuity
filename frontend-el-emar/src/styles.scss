@@ -4,26 +4,34 @@
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600;700&display=swap');
 @import "leaflet/dist/leaflet.css";
 html,
-body {
+body,
+app-root {
+    width: 100%;
+    height: 100%;
     margin: 0;
-    padding: 0;
+    overflow: hidden;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+
+/* Apply same layout behavior to ALL pages loaded by router-outlet */
+
+.el-emar-main>router-outlet+* {
+    display: block;
     width: 100%;
     min-height: 100%;
-    overflow-x: hidden;
-    background: #1B2B5E;
 }
 
-body {
-    font-family: 'Inter', sans-serif;
-}
 
-app-root {
-    display: block;
-    min-height: 100vh;
-}
+/* Remove page-level spacing from ALL routed pages */
 
-*,
-*::before,
-*::after {
-    box-sizing: border-box;
+.el-emar-main>router-outlet+*>*:first-child {
+    width: 100%;
+    min-height: 100%;
+    margin: 0 !important;
+    padding: 0 !important;
+    max-width: none !important;
 }
