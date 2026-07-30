@@ -1,6 +1,7 @@
 package com.elemar.backendelemar.repository;
 
 import com.elemar.backendelemar.entity.CandidatureLot;
+import com.elemar.backendelemar.entity.Utilisateur;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -13,7 +14,9 @@ public interface CandidatureLotRepository extends JpaRepository<CandidatureLot, 
     List<CandidatureLot> findByCandidature_IdAndActifTrue(Long candidatureId);
 
     @EntityGraph(attributePaths = {"lot"})
-    List<CandidatureLot> findByCandidature_Id(Long candidatureId);
+    List<CandidatureLot> findByCandidature_Id(
+            Long candidatureId
+    );
 
     Optional<CandidatureLot> findByCandidature_IdAndLot_Id(Long candidatureId, Long lotId);
 

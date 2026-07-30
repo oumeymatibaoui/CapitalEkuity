@@ -39,7 +39,7 @@ public class ElEmarCandidatureAccessService {
             );
         }
 
-        Integer exists = jdbcTemplate.queryForObject(
+        Integer candidatureExists = jdbcTemplate.queryForObject(
                 """
                 SELECT COUNT(*)
                 FROM candidature
@@ -49,63 +49,162 @@ public class ElEmarCandidatureAccessService {
                 candidatureId
         );
 
-        if (exists == null || exists == 0) {
+        if (
+                candidatureExists == null ||
+                        candidatureExists == 0
+        ) {
             throw new ResponseStatusException(
                     HttpStatus.NOT_FOUND,
                     "Candidature introuvable."
             );
         }
 
-    /*
-     Suppression logique :
-     On garde l'historique et les relations, mais on masque la candidature.
-    */
-
+        /*
+         * La table candidature possède utilisateur_id
+         * et cree_par_utilisateur_id.
+         *
+         * Il faut d’abord couper ces références avant
+         * de supprimer les utilisateurs.
+         */
         jdbcTemplate.update(
                 """
                 UPDATE candidature
-                SET actif = false,
-                    updated_at = CURRENT_TIMESTAMP
+                SET utilisateur_id = NULL,
+                    cree_par_utilisateur_id = NULL
                 WHERE id = ?
                 """,
                 candidatureId
         );
 
-        jdbcTemplate.update(
-                """
-                UPDATE candidature_lot
-                SET actif = false
-                WHERE candidature_id = ?
-                """,
-                candidatureId
-        );
-
-        jdbcTemplate.update(
-                """
-                UPDATE utilisateur
-                SET actif = false,
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE candidature_id = ?
-                """,
-                candidatureId
-        );
-
-        try {
-            jdbcTemplate.update(
-                    """
-                    UPDATE application_candidature
-                    SET actif = false,
-                        updated_at = CURRENT_TIMESTAMP
-                    WHERE candidature_id = ?
-                    """,
-                    candidatureId
-            );
-        } catch (Exception ignored) {
         /*
-         Si application_candidature n'a pas la colonne actif ou updated_at,
-         on ignore pour ne pas bloquer la suppression logique.
-        */
+         * 1. Supprimer les applications liées.
+         *
+         * On utilise DELETE et non UPDATE, car ta table
+         * application_candidature ne possède visiblement
+         * pas actif et updated_at.
+         */
+        int applicationsDeleted = jdbcTemplate.update(
+                """
+                DELETE FROM application_candidature
+                WHERE candidature_id = ?
+                """,
+                candidatureId
+        );
+
+        /*
+         * 2. Supprimer les associations candidature/lot.
+         */
+        int lotsDeleted = jdbcTemplate.update(
+                """
+                DELETE FROM candidature_lot
+                WHERE candidature_id = ?
+                """,
+                candidatureId
+        );
+
+        /*
+         * 3. Supprimer les comptes candidats liés.
+         */
+        int usersDeleted = jdbcTemplate.update(
+                """
+                DELETE FROM utilisateur
+                WHERE candidature_id = ?
+                """,
+                candidatureId
+        );
+
+        /*
+         * 4. Supprimer définitivement la candidature.
+         */
+        int candidatureDeleted = jdbcTemplate.update(
+                """
+                DELETE FROM candidature
+                WHERE id = ?
+                """,
+                candidatureId
+        );
+
+        if (candidatureDeleted != 1) {
+            throw new ResponseStatusException(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "La candidature n’a pas pu être supprimée."
+            );
         }
+
+        System.out.println(
+                "=== SUPPRESSION DÉFINITIVE TERMINÉE ==="
+        );
+
+        System.out.println(
+                "Candidature supprimée : " +
+                        candidatureId
+        );
+
+        System.out.println(
+                "Applications supprimées : " +
+                        applicationsDeleted
+        );
+
+        System.out.println(
+                "Lots supprimés : " +
+                        lotsDeleted
+        );
+
+        System.out.println(
+                "Utilisateurs supprimés : " +
+                        usersDeleted
+        );
+    }
+    @Transactional
+    public CandidatureAccessResponse deactivateCandidature(
+            Long candidatureId
+    ) {
+        if (candidatureId == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Identifiant candidature obligatoire."
+            );
+        }
+
+        Candidature candidature =
+                candidatureRepository.findById(candidatureId)
+                        .orElseThrow(() ->
+                                new ResponseStatusException(
+                                        HttpStatus.NOT_FOUND,
+                                        "Candidature introuvable."
+                                )
+                        );
+
+        candidature.setAccesBloque(true);
+        candidature.setUpdatedAt(LocalDateTime.now());
+
+        candidature =
+                candidatureRepository.saveAndFlush(
+                        candidature
+                );
+
+        List<Utilisateur> utilisateurs =
+                utilisateurRepository.findByCandidature_Id(
+                        candidatureId
+                );
+
+        for (Utilisateur utilisateur : utilisateurs) {
+            utilisateur.setActif(false);
+            utilisateur.setUpdatedAt(
+                    LocalDateTime.now()
+            );
+        }
+
+        utilisateurRepository.saveAll(
+                utilisateurs
+        );
+
+        utilisateurRepository.flush();
+
+        return toResponse(
+                candidature,
+                Collections.emptyList()
+        );
     }
     @Transactional
     public CandidatureAccessResponse createAccess(CreateCandidatureAccessRequest request) {
@@ -131,6 +230,7 @@ public class ElEmarCandidatureAccessService {
         candidature.setNomEntreprise(cleanOrDefault(request.getNomEntreprise(), "Société à compléter"));
         candidature.setProfilComplete(false);
         candidature.setActif(true);
+        candidature.setAccesBloque(false);
         candidature.setStatut(StatutCandidature.BROUILLON);
         candidature.setCreatedAt(LocalDateTime.now());
         candidature.setUpdatedAt(LocalDateTime.now());
@@ -150,9 +250,32 @@ public class ElEmarCandidatureAccessService {
 
     @Transactional
     public List<CandidatureAccessResponse> getAll() {
-        return candidatureRepository.findByActifTrueOrderByIdDesc()
+
+        List<Candidature> candidatures =
+                candidatureRepository
+                        .findByActifTrueOrderByIdDesc();
+
+        System.out.println(
+                "Candidatures actives récupérées = "
+                        + candidatures.size()
+        );
+
+        candidatures.forEach(candidature ->
+                System.out.println(
+                        "ID = " + candidature.getId()
+                                + ", actif = "
+                                + candidature.getActif()
+                )
+        );
+
+        return candidatures
                 .stream()
-                .map(candidature -> toResponse(candidature, Collections.emptyList()))
+                .map(candidature ->
+                        toResponse(
+                                candidature,
+                                Collections.emptyList()
+                        )
+                )
                 .toList();
     }
 
@@ -195,7 +318,89 @@ public class ElEmarCandidatureAccessService {
         Candidature candidature = findCandidature(candidatureId);
         return createUserForCandidature(candidature, request);
     }
+    @Transactional
+    public CandidatureAccessResponse activateCandidature(
+            Long candidatureId
+    ) {
+        if (candidatureId == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Identifiant candidature obligatoire."
+            );
+        }
 
+        Candidature candidature =
+                candidatureRepository.findById(candidatureId)
+                        .orElseThrow(() ->
+                                new ResponseStatusException(
+                                        HttpStatus.NOT_FOUND,
+                                        "Candidature introuvable."
+                                )
+                        );
+
+        /*
+         * Réactiver l’accès de la candidature.
+         */
+        candidature.setAccesBloque(false);
+        candidature.setActif(true);
+        candidature.setUpdatedAt(LocalDateTime.now());
+
+        candidature =
+                candidatureRepository.saveAndFlush(
+                        candidature
+                );
+
+        /*
+         * Réactiver les comptes utilisateurs liés.
+         */
+        List<Utilisateur> utilisateurs =
+                utilisateurRepository.findByCandidature_Id(
+                        candidatureId
+                );
+
+        for (Utilisateur utilisateur : utilisateurs) {
+            utilisateur.setActif(true);
+            utilisateur.setStatutCompte(
+                    StatutCompte.ACTIF
+            );
+            utilisateur.setUpdatedAt(
+                    LocalDateTime.now()
+            );
+        }
+
+        utilisateurRepository.saveAll(
+                utilisateurs
+        );
+
+        utilisateurRepository.flush();
+
+        return toResponse(
+                candidature,
+                Collections.emptyList()
+        );
+    }
+    @Transactional
+    public void activateUser(Long userId) {
+
+        if (userId == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Identifiant utilisateur obligatoire."
+            );
+        }
+
+        Utilisateur user = utilisateurRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Utilisateur introuvable."
+                ));
+
+        user.setActif(true);
+        user.setStatutCompte(StatutCompte.ACTIF);
+        user.setUpdatedAt(LocalDateTime.now());
+
+        utilisateurRepository.saveAndFlush(user);
+    }
     @Transactional
     public void deactivateUser(Long userId) {
         Utilisateur user = utilisateurRepository.findById(userId)
@@ -207,7 +412,7 @@ public class ElEmarCandidatureAccessService {
         user.setActif(false);
         user.setUpdatedAt(LocalDateTime.now());
 
-        utilisateurRepository.save(user);
+        utilisateurRepository.saveAndFlush(user);
     }
 
     @Transactional
@@ -465,6 +670,7 @@ public class ElEmarCandidatureAccessService {
                         .telephone(user.getTelephone())
                         .fonction(user.getFonction())
                         .actif(user.getActif())
+                        .actif(candidature.getActif())
                         .mustChangePassword(user.getMustChangePassword())
                         .build())
                 .toList();
@@ -481,6 +687,11 @@ public class ElEmarCandidatureAccessService {
                 .lots(lots)
                 .utilisateurs(utilisateurs)
                 .comptesGeneres(comptesGeneres)
+                .accesBloque(
+                        Boolean.TRUE.equals(
+                                candidature.getAccesBloque()
+                        )
+                )
                 .build();
     }
 
@@ -502,5 +713,124 @@ public class ElEmarCandidatureAccessService {
         }
 
         return value.trim();
+    }
+    @Transactional
+    public CandidatureAccessResponse updateCandidature(
+            Long candidatureId,
+            UpdateCandidatureAccessRequest request
+    ) {
+        if (candidatureId == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Identifiant candidature obligatoire."
+            );
+        }
+
+        if (request == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Les informations de modification sont obligatoires."
+            );
+        }
+
+        String nomEntreprise = clean(request.getNomEntreprise());
+
+        if (nomEntreprise == null || nomEntreprise.isBlank()) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Le nom de l’entreprise est obligatoire."
+            );
+        }
+
+        if (request.getTypeIntervenantId() == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Le type d’intervenant est obligatoire."
+            );
+        }
+
+        if (
+                request.getLotIds() == null ||
+                        request.getLotIds().isEmpty()
+        ) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Veuillez choisir au moins un lot."
+            );
+        }
+
+        /*
+         * Vérifier les doublons dans les lots.
+         */
+        Set<Long> uniqueLotIds = new HashSet<>();
+
+        for (Long lotId : request.getLotIds()) {
+            if (lotId == null) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "Un lot sélectionné est invalide."
+                );
+            }
+
+            if (!uniqueLotIds.add(lotId)) {
+                throw new ResponseStatusException(
+                        HttpStatus.CONFLICT,
+                        "Le lot " + lotId +
+                                " est sélectionné plusieurs fois."
+                );
+            }
+        }
+
+        /*
+         * Charger la candidature active.
+         */
+        Candidature candidature =
+                findCandidature(candidatureId);
+
+        /*
+         * Charger le nouveau type d’intervenant.
+         */
+        TypeIntervenant type =
+                typeIntervenantRepository
+                        .findById(
+                                request.getTypeIntervenantId()
+                        )
+                        .orElseThrow(() ->
+                                new ResponseStatusException(
+                                        HttpStatus.NOT_FOUND,
+                                        "Type d’intervenant introuvable."
+                                )
+                        );
+
+        /*
+         * Modifier les informations principales.
+         */
+        candidature.setNomEntreprise(nomEntreprise);
+        candidature.setTypeIntervenant(type);
+        candidature.setUpdatedAt(LocalDateTime.now());
+
+        /*
+         * La candidature reste active après modification.
+         */
+        candidature.setActif(true);
+
+        candidature =
+                candidatureRepository.saveAndFlush(
+                        candidature
+                );
+
+        /*
+         * Synchroniser les lots selon le nouveau type.
+         */
+        syncLots(
+                candidature,
+                type,
+                request.getLotIds()
+        );
+
+        return toResponse(
+                candidature,
+                Collections.emptyList()
+        );
     }
 }

@@ -905,3 +905,735 @@
         grid-template-columns: 1fr;
     }
 }
+
+
+/* =========================================================
+   AMÉLIORATIONS UI — CONTRÔLE PRIVÉ ET ZONES
+========================================================= */
+
+.evaluation-detail-page {
+    max-width: 1600px;
+    margin: 0 auto;
+}
+
+.form-control {
+    min-height: 44px;
+    transition: border-color 0.16s ease, box-shadow 0.16s ease, background-color 0.16s ease;
+}
+
+.form-control:hover {
+    border-color: #94a3b8;
+}
+
+.form-control:focus {
+    border-color: #3154b8;
+    box-shadow: 0 0 0 4px rgba(49, 84, 184, 0.12);
+}
+
+
+/* =========================================================
+   CONTRÔLE PRIVÉ DE SOLVABILITÉ
+========================================================= */
+
+.internal-control-section {
+    border-color: #c7d2fe;
+    background: linear-gradient(145deg, #ffffff 0%, #fafaff 100%);
+}
+
+.internal-header {
+    border-bottom-color: #dbe2ff;
+}
+
+.internal-icon {
+    background: linear-gradient(135deg, #312e81, #4f46e5);
+    box-shadow: 0 8px 18px rgba(79, 70, 229, 0.22);
+}
+
+.private-badge {
+    min-height: 34px;
+    padding: 0 12px;
+    border: 1px solid #c7d2fe;
+    border-radius: 999px;
+    background: #eef2ff;
+    color: #3730a3;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 11px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.045em;
+}
+
+.solvability-content {
+    padding: 24px;
+}
+
+.solvability-intro {
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 18px;
+}
+
+.solvability-intro>div {
+    display: flex;
+    align-items: flex-start;
+    gap: 13px;
+}
+
+.solvability-step {
+    width: 38px;
+    height: 38px;
+    flex: 0 0 38px;
+    border-radius: 12px;
+    background: #eef2ff;
+    color: #3730a3;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 900;
+}
+
+.solvability-intro h3 {
+    margin: 0;
+    color: #172554;
+    font-size: 18px;
+    font-weight: 900;
+}
+
+.solvability-intro p {
+    margin: 5px 0 0;
+    color: #64748b;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.solvability-current-status {
+    min-height: 34px;
+    padding: 0 13px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    font-size: 11px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.045em;
+    white-space: nowrap;
+}
+
+.solvability-current-status.status-pending {
+    border: 1px solid #fde68a;
+    background: #fffbeb;
+    color: #a16207;
+}
+
+.solvability-current-status.status-solvable {
+    border: 1px solid #86efac;
+    background: #f0fdf4;
+    color: #15803d;
+}
+
+.solvability-current-status.status-not-solvable {
+    border: 1px solid #fecaca;
+    background: #fff1f2;
+    color: #be123c;
+}
+
+.solvability-options {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.solvability-choice {
+    position: relative;
+    min-height: 110px;
+    padding: 16px;
+    border: 2px solid #e2e8f0;
+    border-radius: 18px;
+    background: #ffffff;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    text-align: left;
+    cursor: pointer;
+    transition: transform 0.16s ease, border-color 0.16s ease, background-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.solvability-choice:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+}
+
+.solvability-choice:disabled {
+    opacity: 0.65;
+    cursor: wait;
+}
+
+.choice-icon {
+    width: 42px;
+    height: 42px;
+    flex: 0 0 42px;
+    border-radius: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+}
+
+.choice-text {
+    min-width: 0;
+    display: grid;
+    gap: 5px;
+}
+
+.choice-text strong {
+    color: #172554;
+    font-size: 14px;
+    font-weight: 900;
+}
+
+.choice-text small {
+    color: #64748b;
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+.selected-check {
+    position: absolute;
+    top: 11px;
+    right: 11px;
+    font-size: 18px;
+}
+
+.pending-choice .choice-icon {
+    background: #fef3c7;
+    color: #a16207;
+}
+
+.pending-choice.selected {
+    border-color: #f59e0b;
+    background: #fffbeb;
+}
+
+.pending-choice.selected .selected-check {
+    color: #d97706;
+}
+
+.solvable-choice .choice-icon {
+    background: #dcfce7;
+    color: #15803d;
+}
+
+.solvable-choice.selected {
+    border-color: #22c55e;
+    background: #f0fdf4;
+}
+
+.solvable-choice.selected .selected-check {
+    color: #16a34a;
+}
+
+.not-solvable-choice .choice-icon {
+    background: #fee2e2;
+    color: #dc2626;
+}
+
+.not-solvable-choice.selected {
+    border-color: #ef4444;
+    background: #fff7f7;
+}
+
+.not-solvable-choice.selected .selected-check {
+    color: #dc2626;
+}
+
+.solvability-comment {
+    margin-top: 20px;
+}
+
+.solvability-comment label {
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 14px;
+}
+
+.solvability-comment label span {
+    color: #172554;
+    font-size: 13px;
+    font-weight: 900;
+}
+
+.solvability-comment label small {
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.solvability-comment textarea {
+    min-height: 105px;
+    resize: vertical;
+}
+
+.solvability-footer {
+    margin-top: 18px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 15px;
+}
+
+.solvability-meta {
+    display: grid;
+    gap: 4px;
+}
+
+.solvability-meta small {
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.solvability-saved-message {
+    color: #15803d;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12px;
+    font-weight: 900;
+}
+
+.save-solvability-btn {
+    min-height: 46px;
+    padding: 0 19px;
+    border: none;
+    border-radius: 14px;
+    background: linear-gradient(135deg, #3730a3, #4f46e5);
+    color: #ffffff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-weight: 900;
+    cursor: pointer;
+    box-shadow: 0 10px 22px rgba(79, 70, 229, 0.2);
+}
+
+.save-solvability-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+}
+
+.save-solvability-btn:disabled {
+    opacity: 0.62;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+
+/* =========================================================
+   CLASSEMENT PRIVÉ DES RÉFÉRENCES PAR ZONE
+========================================================= */
+
+.reference-card {
+    padding: 0;
+    overflow: hidden;
+    background: #ffffff;
+}
+
+.reference-header {
+    margin: 0;
+    padding: 17px 18px;
+    border-bottom: 1px solid #e2e8f0;
+    background: #f8fafc;
+}
+
+.reference-zone-box {
+    margin: 16px;
+    padding: 18px;
+    border: 1px solid #dbe4f0;
+    border-radius: 18px;
+    background: linear-gradient(145deg, #f8fafc 0%, #ffffff 100%);
+}
+
+.reference-zone-box.zone-is-saved {
+    border-color: #86efac;
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.07);
+}
+
+.zone-box-header {
+    margin-bottom: 17px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 14px;
+}
+
+.zone-box-header>div {
+    display: flex;
+    align-items: flex-start;
+    gap: 11px;
+}
+
+.zone-step-number {
+    width: 36px;
+    height: 36px;
+    flex: 0 0 36px;
+    border-radius: 11px;
+    background: #e0e7ff;
+    color: #3730a3;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 900;
+}
+
+.zone-box-header h4 {
+    margin: 0;
+    color: #172554;
+    font-size: 15px;
+    font-weight: 900;
+}
+
+.zone-box-header p {
+    margin: 4px 0 0;
+    color: #64748b;
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+.zone-save-status {
+    min-height: 31px;
+    padding: 0 10px;
+    border: 1px solid #fde68a;
+    border-radius: 999px;
+    background: #fffbeb;
+    color: #a16207;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 10px;
+    font-weight: 900;
+    white-space: nowrap;
+}
+
+.zone-save-status.saved {
+    border-color: #86efac;
+    background: #f0fdf4;
+    color: #15803d;
+}
+
+.zone-form-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+    gap: 14px;
+}
+
+.zone-field {
+    display: grid;
+    align-content: start;
+    gap: 7px;
+}
+
+.zone-field>span {
+    color: #334155;
+    font-size: 12px;
+    font-weight: 900;
+}
+
+.zone-field textarea {
+    min-height: 82px;
+    resize: vertical;
+}
+
+.selected-zone-preview {
+    margin-top: 14px;
+    padding: 13px 15px;
+    border: 1px solid #c7d2fe;
+    border-radius: 14px;
+    background: #f5f7ff;
+    display: flex;
+    align-items: center;
+    gap: 11px;
+}
+
+.selected-zone-icon {
+    width: 39px;
+    height: 39px;
+    flex: 0 0 39px;
+    border-radius: 12px;
+    background: #e0e7ff;
+    color: #3730a3;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 19px;
+}
+
+.selected-zone-preview>div {
+    display: grid;
+    gap: 2px;
+}
+
+.selected-zone-preview small {
+    color: #64748b;
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.selected-zone-preview strong {
+    color: #172554;
+    font-size: 14px;
+    font-weight: 900;
+}
+
+.selected-zone-preview span {
+    color: #64748b;
+    font-size: 11px;
+}
+
+.zone-actions-line {
+    margin-top: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 15px;
+}
+
+.zone-required-message {
+    color: #64748b;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.save-zone-btn {
+    min-height: 42px;
+    padding: 0 16px;
+    border: none;
+    border-radius: 13px;
+    background: #172554;
+    color: #ffffff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    font-size: 12px;
+    font-weight: 900;
+    cursor: pointer;
+}
+
+.save-zone-btn:hover:not(:disabled) {
+    background: #1e3a8a;
+    transform: translateY(-1px);
+}
+
+.save-zone-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+
+/* =========================================================
+   TABLEAU D’ÉVALUATION
+========================================================= */
+
+.form-evaluation-block {
+    overflow-x: auto;
+}
+
+.evaluation-table {
+    min-width: 1180px;
+}
+
+.evaluation-table tbody tr {
+    transition: background-color 0.14s ease;
+}
+
+.evaluation-table tbody tr:hover {
+    background: #f8fafc;
+}
+
+.button-loading {
+    animation: evaluation-button-spin 0.75s linear infinite;
+}
+
+@keyframes evaluation-button-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@media (max-width: 950px) {
+    .solvability-options,
+    .zone-form-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 700px) {
+    .solvability-intro,
+    .solvability-footer,
+    .zone-box-header,
+    .zone-actions-line {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .private-badge,
+    .solvability-current-status,
+    .zone-save-status {
+        align-self: flex-start;
+    }
+    .save-solvability-btn,
+    .save-zone-btn {
+        width: 100%;
+    }
+    .solvability-comment label {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 4px;
+    }
+}
+
+
+/* =========================================================
+   CLASSES UTILISÉES PAR LE TEMPLATE
+========================================================= */
+
+.spinner {
+    width: 24px;
+    height: 24px;
+    flex: 0 0 24px;
+    border: 3px solid #dbe4f0;
+    border-top-color: #101d56;
+    border-radius: 50%;
+    animation: evaluation-spinner 0.75s linear infinite;
+}
+
+@keyframes evaluation-spinner {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.loading-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.field {
+    display: grid;
+    gap: 8px;
+}
+
+.field>label {
+    color: #334155;
+    font-size: 13px;
+    font-weight: 900;
+}
+
+.decision-final-card {
+    margin: 24px 22px 22px;
+    padding: 22px;
+    border: 1px solid #dfe5ee;
+    border-radius: 20px;
+    background: #ffffff;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+}
+
+.decision-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 18px;
+    margin-bottom: 22px;
+    padding-bottom: 18px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.decision-header h3 {
+    margin: 0;
+    color: #101d56;
+    font-size: 20px;
+    font-weight: 900;
+}
+
+.decision-header p {
+    margin: 7px 0 0;
+    color: #64748b;
+    line-height: 1.55;
+}
+
+.lot-decision-badge {
+    min-height: 34px;
+    padding: 0 12px;
+    border: 1px solid #c7d2fe;
+    border-radius: 999px;
+    background: #eef2ff;
+    color: #3730a3;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 900;
+    white-space: nowrap;
+}
+
+.evaluation-cell {
+    min-width: 165px;
+}
+
+.success-text {
+    color: #15803d;
+    font-size: 12px;
+    font-weight: 900;
+}
+
+@media (max-width: 700px) {
+    .decision-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .lot-decision-badge {
+        align-self: flex-start;
+    }
+    .decision-final-card {
+        margin: 18px 14px;
+        padding: 18px;
+    }
+}
+
+
+/* =========================================================
+   ÉTAT D’ENREGISTREMENT PAR CRITÈRE
+========================================================= */
+
+.critere-evaluation-control {
+    display: grid;
+    gap: 8px;
+}
+
+.critere-save-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 900;
+}
+
+.critere-save-status.saving {
+    color: #64748b;
+}
+
+.critere-save-status.saved {
+    color: #15803d;
+}

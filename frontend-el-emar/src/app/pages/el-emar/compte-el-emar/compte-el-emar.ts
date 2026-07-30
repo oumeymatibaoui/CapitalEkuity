@@ -1,20 +1,32 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import {
+  Component,
+  OnDestroy,
+  OnInit
+} from '@angular/core';
+
 import {
   FormBuilder,
   FormGroup,
   ReactiveFormsModule
 } from '@angular/forms';
-import { Subscription, interval } from 'rxjs';
-import { timeout, catchError } from 'rxjs/operators';
-import { throwError } from 'rxjs';
+
+import {
+  interval,
+  Subscription,
+  timeout
+} from 'rxjs';
 
 import {
   CreateUtilisateurRequest,
-  TypeUtilisateur,
+  UpdateUtilisateurAdminRequest,
   UtilisateurAdminResponse,
   UtilisateurAdminService
 } from '../../../core/services/utilisateur-admin.service';
+import {
+  RoleAccess,
+  RoleAccessService
+} from '../../../core/services/role-access.service';
 
 @Component({
   selector: 'app-compte-el-emar',
@@ -24,16 +36,32 @@ import {
     ReactiveFormsModule
   ],
   templateUrl: './compte-el-emar.html',
-  styleUrl: './compte-el-emar.scss',
+  styleUrl: './compte-el-emar.scss'
 })
 export class CompteElEmar implements OnInit, OnDestroy {
 
   utilisateurs: UtilisateurAdminResponse[] = [];
   filteredUtilisateurs: UtilisateurAdminResponse[] = [];
 
-  createForm: FormGroup;
+  /**
+   * Rôles dynamiques récupérés depuis role_acces.
+   */
+  roles: RoleAccess[] = [];
 
+  createForm: FormGroup;
+// editForm: FormGroup;
+editForm: FormGroup;
+
+showEditModal = false;
+showDeleteModal = false;
+
+editingUser: UtilisateurAdminResponse | null = null;
+userToDelete: UtilisateurAdminResponse | null = null;
+
+savingEdit = false;
+deletingUser = false;
   loading = false;
+  loadingRoles = false;
   creating = false;
 
   pageError = '';
@@ -45,31 +73,37 @@ export class CompteElEmar implements OnInit, OnDestroy {
   searchTerm = '';
   selectedRoleFilter = 'ALL';
 
-  roles: TypeUtilisateur[] = [
-    'EL_EMAR',
-    'DA',
-    'IT',
-    'ADMIN'
-  ];
-
-  // --- Auto-refresh ---
   private autoRefreshSub?: Subscription;
-  private readonly AUTO_REFRESH_INTERVAL_MS = 15000; // 15 secondes
 
-  constructor(
-    private fb: FormBuilder,
-    private utilisateurAdminService: UtilisateurAdminService
-  ) {
-    this.createForm = this.fb.group({
-      nom: [''],
-      email: [''],
-      fonction: [''],
-      typeUtilisateur: ['EL_EMAR'],
-      motDePasse: ['']
-    });
-  }
+  /**
+   * Cette déclaration doit rester sur une seule ligne.
+   */
+  private readonly AUTO_REFRESH_INTERVAL_MS = 15000;
+
+constructor(
+  private fb: FormBuilder,
+  private utilisateurAdminService: UtilisateurAdminService,
+  private roleAccessService: RoleAccessService
+) {
+  this.createForm = this.fb.group({
+    nom: [''],
+    email: [''],
+    fonction: [''],
+    roleId: [null],
+    motDePasse: ['']
+  });
+
+  this.editForm = this.fb.group({
+    nom: [''],
+    email: [''],
+    fonction: [''],
+    roleId: [null],
+    actif: [true]
+  });
+}
 
   ngOnInit(): void {
+    this.loadRoles();
     this.loadUtilisateurs();
     this.startAutoRefresh();
   }
@@ -78,215 +112,349 @@ export class CompteElEmar implements OnInit, OnDestroy {
     this.stopAutoRefresh();
   }
 
-  // ------------------------------------------------------------------
-  // Chargement
-  // ------------------------------------------------------------------
+  // =====================================================
+  // CHARGEMENT DES RÔLES
+  // =====================================================
+
+  loadRoles(): void {
+    this.loadingRoles = true;
+    this.pageError = '';
+
+    this.roleAccessService.getRoles().subscribe({
+      next: (data: RoleAccess[]) => {
+        this.roles = (data || [])
+          .filter((role: RoleAccess) => {
+            const typeRole = String(
+              role.typeRole || 'INTERNE'
+            ).toUpperCase();
+
+            return role.actif === true && typeRole === 'INTERNE';
+          })
+          .sort((a: RoleAccess, b: RoleAccess) =>
+            String(a.nomRole || '').localeCompare(
+              String(b.nomRole || ''),
+              'fr'
+            )
+          );
+
+        this.loadingRoles = false;
+      },
+
+      error: (error: any) => {
+        console.error('ERROR LOAD ROLES', error);
+
+        this.roles = [];
+        this.loadingRoles = false;
+
+        this.pageError =
+          error?.error?.message ||
+          error?.error?.detail ||
+          'Erreur lors du chargement des rôles.';
+      }
+    });
+  }
+
+  // =====================================================
+  // CHARGEMENT DES UTILISATEURS
+  // =====================================================
 
   loadUtilisateurs(): void {
-  this.loading = true;
-  this.pageError = '';
-  this.successMessage = '';
+    this.loading = true;
+    this.pageError = '';
+    this.successMessage = '';
 
-  this.utilisateurAdminService.getAllUsers().subscribe({
-    next: (data: UtilisateurAdminResponse[]) => {
-      this.utilisateurs = data || [];
-      this.applyFilters();
-      this.loading = false;
-    },
-    error: (error: any) => {
-      console.error('ERROR LOAD USERS', error);
-
-      this.loading = false;
-
-      this.pageError =
-        error?.error?.message ||
-        error?.error?.detail ||
-        'Erreur lors du chargement des utilisateurs internes.';
-    }
-  });
-}
-
-  /**
-   * Démarre le rafraîchissement automatique périodique de la liste.
-   * Ce rafraîchissement est silencieux : il ne déclenche pas le spinner
-   * "loading" ni de message d'erreur bloquant, afin de ne pas perturber
-   * l'utilisateur pendant qu'il consulte ou filtre la liste.
-   */
-  private startAutoRefresh(): void {
-    this.stopAutoRefresh();
-
-    this.autoRefreshSub = interval(this.AUTO_REFRESH_INTERVAL_MS).subscribe(() => {
-      this.utilisateurAdminService.getAllUsers().subscribe({
+    this.utilisateurAdminService
+      .getAllUsers()
+      .pipe(timeout(10000))
+      .subscribe({
         next: (data: UtilisateurAdminResponse[]) => {
           this.utilisateurs = data || [];
           this.applyFilters();
+          this.loading = false;
         },
+
         error: (error: any) => {
-          console.error('ERROR AUTO REFRESH USERS', error);
-          // Pas de message d'erreur intrusif pour un rafraîchissement silencieux.
+          console.error('ERROR LOAD USERS', error);
+
+          this.loading = false;
+
+          this.pageError =
+            error?.name === 'TimeoutError'
+              ? 'Le serveur met trop de temps à répondre.'
+              : error?.error?.message ||
+                error?.error?.detail ||
+                'Erreur lors du chargement des utilisateurs internes.';
         }
       });
+  }
+
+  // =====================================================
+  // ACTUALISATION AUTOMATIQUE
+  // =====================================================
+
+  private startAutoRefresh(): void {
+    this.stopAutoRefresh();
+
+    this.autoRefreshSub = interval(
+      this.AUTO_REFRESH_INTERVAL_MS
+    ).subscribe(() => {
+      this.refreshUsersSilently();
     });
   }
 
   private stopAutoRefresh(): void {
-    this.autoRefreshSub?.unsubscribe();
-    this.autoRefreshSub = undefined;
+    if (this.autoRefreshSub) {
+      this.autoRefreshSub.unsubscribe();
+      this.autoRefreshSub = undefined;
+    }
   }
 
-  // ------------------------------------------------------------------
-  // Création
-  // ------------------------------------------------------------------
-
-createUtilisateur(): void {
-  this.pageError = '';
-  this.successMessage = '';
-  this.createSuccessMessage = '';
-  this.createErrorMessage = '';
-
-  const nom = String(this.createForm.value.nom || '').trim();
-  const email = String(this.createForm.value.email || '').trim();
-  const fonction = String(this.createForm.value.fonction || '').trim();
-  const typeUtilisateur = this.createForm.value.typeUtilisateur as TypeUtilisateur;
-  const motDePasse = String(this.createForm.value.motDePasse || '').trim();
-
-  if (!nom || !email || !typeUtilisateur || !motDePasse) {
-    this.createErrorMessage = 'Veuillez remplir le nom, l’email, le rôle et le mot de passe.';
-    return;
-  }
-
-  if (!this.isValidEmail(email)) {
-    this.createErrorMessage = 'Veuillez saisir une adresse email valide.';
-    return;
-  }
-
-  if (motDePasse.length < 6) {
-    this.createErrorMessage = 'Le mot de passe doit contenir au moins 6 caractères.';
-    return;
-  }
-
-  const request: CreateUtilisateurRequest = {
-    nom,
-    email,
-    fonction,
-    typeUtilisateur,
-    motDePasse,
-    createurId: this.getCurrentUserId()
-  };
-
-  this.creating = true;
-  this.loading = false;
-
-  this.utilisateurAdminService.createUser(request).subscribe({
-    next: (createdUser: UtilisateurAdminResponse) => {
-      this.creating = false;
-      this.loading = false;
-
-      this.createSuccessMessage =
-        `Compte interne créé avec succès pour ${createdUser.email || email}.`;
-
-      this.createErrorMessage = '';
-
-      this.createForm.reset({
-        nom: '',
-        email: '',
-        fonction: '',
-        typeUtilisateur: 'EL_EMAR',
-        motDePasse: ''
-      });
-
-      // Ajout direct dans la liste sans bloquer la page
-      if (createdUser && createdUser.id) {
-        this.utilisateurs = [
-          createdUser,
-          ...this.utilisateurs.filter(u => u.id !== createdUser.id)
-        ];
-
+  private refreshUsersSilently(): void {
+    this.utilisateurAdminService.getAllUsers().subscribe({
+      next: (data: UtilisateurAdminResponse[]) => {
+        this.utilisateurs = data || [];
         this.applyFilters();
+      },
+
+      error: (error: any) => {
+        console.error('ERROR AUTO REFRESH USERS', error);
       }
+    });
+  }
 
-      // Rafraîchissement silencieux depuis le backend
-      this.refreshUtilisateursSilently();
-    },
+  // =====================================================
+  // CRÉATION D’UN UTILISATEUR
+  // =====================================================
 
-    error: (error: any) => {
-      console.error('ERROR CREATE USER', error);
+  createUtilisateur(): void {
+    this.pageError = '';
+    this.successMessage = '';
+    this.createSuccessMessage = '';
+    this.createErrorMessage = '';
 
-      this.creating = false;
-      this.loading = false;
-      this.createSuccessMessage = '';
+    const nom = String(
+      this.createForm.get('nom')?.value || ''
+    ).trim();
 
-      if (error?.status === 409) {
-        this.createErrorMessage =
-          error?.error?.message ||
-          'Un compte avec cet email existe déjà.';
-        return;
-      }
+    const email = String(
+      this.createForm.get('email')?.value || ''
+    )
+      .trim()
+      .toLowerCase();
 
-      if (error?.status === 400) {
+    const fonction = String(
+      this.createForm.get('fonction')?.value || ''
+    ).trim();
+
+    const motDePasse = String(
+      this.createForm.get('motDePasse')?.value || ''
+    ).trim();
+
+    const rawRoleId = this.createForm.get('roleId')?.value;
+
+    const roleId =
+      rawRoleId !== null &&
+      rawRoleId !== undefined &&
+      rawRoleId !== ''
+        ? Number(rawRoleId)
+        : null;
+
+    if (!nom) {
+      this.createErrorMessage = 'Le nom est obligatoire.';
+      return;
+    }
+
+    if (!email) {
+      this.createErrorMessage = 'L’email est obligatoire.';
+      return;
+    }
+
+    if (!this.isValidEmail(email)) {
+      this.createErrorMessage =
+        'Veuillez saisir une adresse email valide.';
+      return;
+    }
+
+    if (!roleId || isNaN(roleId)) {
+      this.createErrorMessage =
+        'Veuillez sélectionner un rôle.';
+      return;
+    }
+
+    if (!motDePasse) {
+      this.createErrorMessage =
+        'Le mot de passe temporaire est obligatoire.';
+      return;
+    }
+
+    if (motDePasse.length < 6) {
+      this.createErrorMessage =
+        'Le mot de passe doit contenir au moins 6 caractères.';
+      return;
+    }
+
+    const selectedRole = this.roles.find(
+      (role: RoleAccess) =>
+        Number(role.id) === Number(roleId)
+    );
+
+    if (!selectedRole) {
+      this.createErrorMessage =
+        'Le rôle sélectionné est introuvable ou inactif.';
+      return;
+    }
+
+    const request: CreateUtilisateurRequest = {
+      nom,
+      email,
+      fonction,
+      motDePasse,
+      roleId: selectedRole.id,
+      createurId: this.getCurrentUserId()
+    };
+
+    this.creating = true;
+
+    this.utilisateurAdminService.createUser(request).subscribe({
+      next: (createdUser: UtilisateurAdminResponse) => {
+        this.creating = false;
+
+        this.createSuccessMessage =
+          `Compte interne créé avec succès pour ${
+            createdUser.email || email
+          }.`;
+
+        this.createErrorMessage = '';
+
+        this.createForm.reset({
+          nom: '',
+          email: '',
+          fonction: '',
+          roleId: null,
+          motDePasse: ''
+        });
+
+        this.loadUtilisateurs();
+      },
+
+      error: (error: any) => {
+        console.error('ERROR CREATE USER', error);
+
+        this.creating = false;
+        this.createSuccessMessage = '';
+
+        if (error?.status === 409) {
+          this.createErrorMessage =
+            error?.error?.message ||
+            'Un compte avec cet email existe déjà.';
+
+          return;
+        }
+
+        if (error?.status === 400) {
+          this.createErrorMessage =
+            error?.error?.message ||
+            error?.error?.detail ||
+            'Les informations saisies sont invalides.';
+
+          return;
+        }
+
         this.createErrorMessage =
           error?.error?.message ||
           error?.error?.detail ||
-          'Les informations saisies sont invalides.';
-        return;
+          error?.message ||
+          'Erreur lors de la création de l’utilisateur.';
       }
+    });
+  }
 
-      this.createErrorMessage =
-        error?.error?.message ||
-        error?.error?.detail ||
-        error?.message ||
-        'Erreur lors de la création de l’utilisateur.';
-    }
-  });
-}
-private refreshUtilisateursSilently(): void {
-  this.utilisateurAdminService.getAllUsers().subscribe({
-    next: (data: UtilisateurAdminResponse[]) => {
-      this.utilisateurs = data || [];
-      this.applyFilters();
-      this.loading = false;
-    },
-    error: (error: any) => {
-      console.error('ERROR SILENT REFRESH USERS', error);
-      this.loading = false;
-    }
-  });
-}
-  // ------------------------------------------------------------------
-  // Mise à jour rôle / statut
-  // ------------------------------------------------------------------
+  // =====================================================
+  // MODIFICATION DU RÔLE
+  // =====================================================
 
-  updateRole(user: UtilisateurAdminResponse, event: Event): void {
+  updateRole(
+    user: UtilisateurAdminResponse,
+    event: Event
+  ): void {
     const select = event.target as HTMLSelectElement;
-    const newRole = select.value as TypeUtilisateur;
+    const newRoleId = Number(select.value);
 
-    if (!user.id || !newRole) return;
+    if (!user?.id) {
+      this.pageError = 'Utilisateur introuvable.';
+      return;
+    }
+
+    if (!newRoleId || isNaN(newRoleId)) {
+      this.pageError = 'Veuillez sélectionner un rôle valide.';
+      return;
+    }
+
+    const selectedRole = this.roles.find(
+      (role: RoleAccess) =>
+        Number(role.id) === Number(newRoleId)
+    );
+
+    if (!selectedRole) {
+      this.pageError =
+        'Le rôle sélectionné est introuvable ou inactif.';
+      return;
+    }
+
+    if (Number(user.roleId) === Number(selectedRole.id)) {
+      return;
+    }
 
     this.pageError = '';
     this.successMessage = '';
 
-    this.utilisateurAdminService.updateRole(user.id, {
-      typeUtilisateur: newRole
-    }).subscribe({
+    this.utilisateurAdminService.updateRole(
+      user.id,
+      {
+        roleId: selectedRole.id,
+        modificateurId: this.getCurrentUserId()
+      }
+    ).subscribe({
       next: (updated: UtilisateurAdminResponse) => {
+        user.roleId = updated.roleId;
+        user.roleCode = updated.roleCode;
+        user.roleNom = updated.roleNom;
         user.typeUtilisateur = updated.typeUtilisateur;
-        this.successMessage = 'Rôle utilisateur mis à jour.';
+        user.updatedAt = updated.updatedAt;
+
+        this.successMessage =
+          `Le rôle de ${user.nom || user.email || 'l’utilisateur'} a été modifié.`;
+
         this.pageError = '';
         this.applyFilters();
       },
+
       error: (error: any) => {
         console.error('ERROR UPDATE ROLE', error);
+
         this.pageError =
           error?.error?.message ||
           error?.error?.detail ||
           'Erreur lors de la modification du rôle.';
+
+        /*
+         * Recharge les données pour remettre le select
+         * sur la vraie valeur enregistrée dans la base.
+         */
         this.loadUtilisateurs();
       }
     });
   }
 
+  // =====================================================
+  // ACTIVER / DÉSACTIVER
+  // =====================================================
+
   toggleActif(user: UtilisateurAdminResponse): void {
-    if (!user.id) return;
+    if (!user?.id) {
+      this.pageError = 'Utilisateur introuvable.';
+      return;
+    }
 
     this.pageError = '';
     this.successMessage = '';
@@ -294,14 +462,19 @@ private refreshUtilisateursSilently(): void {
     this.utilisateurAdminService.toggleActif(user.id).subscribe({
       next: (updated: UtilisateurAdminResponse) => {
         user.actif = updated.actif;
-        this.successMessage = updated.actif
-          ? 'Compte activé avec succès.'
-          : 'Compte désactivé avec succès.';
-        this.pageError = '';
+        user.updatedAt = updated.updatedAt;
+
+        this.successMessage =
+          updated.actif === true
+            ? 'Compte activé avec succès.'
+            : 'Compte désactivé avec succès.';
+
         this.applyFilters();
       },
+
       error: (error: any) => {
         console.error('ERROR TOGGLE USER', error);
+
         this.pageError =
           error?.error?.message ||
           error?.error?.detail ||
@@ -310,77 +483,176 @@ private refreshUtilisateursSilently(): void {
     });
   }
 
-  // ------------------------------------------------------------------
-  // Filtres
-  // ------------------------------------------------------------------
+  // =====================================================
+  // FILTRES
+  // =====================================================
 
   onSearchChange(event: Event): void {
     const input = event.target as HTMLInputElement;
+
     this.searchTerm = input.value || '';
     this.applyFilters();
   }
 
   onRoleFilterChange(event: Event): void {
     const select = event.target as HTMLSelectElement;
-    this.selectedRoleFilter = select.value || 'ALL';
+
+    this.selectedRoleFilter =
+      String(select.value || 'ALL').toUpperCase();
+
     this.applyFilters();
   }
 
   applyFilters(): void {
-    const term = this.searchTerm.trim().toLowerCase();
-    const role = this.selectedRoleFilter;
+    const term = this.searchTerm
+      .trim()
+      .toLowerCase();
 
-    this.filteredUtilisateurs = this.utilisateurs.filter(user => {
-      const matchText =
-        !term ||
-        String(user.nom || '').toLowerCase().includes(term) ||
-        String(user.email || '').toLowerCase().includes(term) ||
-        String(user.fonction || '').toLowerCase().includes(term);
+    const selectedRole = String(
+      this.selectedRoleFilter || 'ALL'
+    ).toUpperCase();
 
-      const matchRole =
-        role === 'ALL' ||
-        String(user.typeUtilisateur || '').toUpperCase() === role;
+    this.filteredUtilisateurs = this.utilisateurs.filter(
+      (user: UtilisateurAdminResponse) => {
+        const nom = String(user.nom || '').toLowerCase();
+        const email = String(user.email || '').toLowerCase();
+        const fonction = String(user.fonction || '').toLowerCase();
 
-      return matchText && matchRole;
-    });
+        const matchText =
+          !term ||
+          nom.includes(term) ||
+          email.includes(term) ||
+          fonction.includes(term);
+
+        const currentRole = String(
+          user.roleCode ||
+          user.typeUtilisateur ||
+          ''
+        ).toUpperCase();
+
+        const matchRole =
+          selectedRole === 'ALL' ||
+          currentRole === selectedRole;
+
+        return matchText && matchRole;
+      }
+    );
   }
 
+  // =====================================================
+  // INFORMATIONS D’AFFICHAGE
+  // =====================================================
+
   getActiveCount(): number {
-    return this.utilisateurs.filter(user => user.actif).length;
+    return this.utilisateurs.filter(
+      (user: UtilisateurAdminResponse) =>
+        user.actif === true
+    ).length;
   }
 
   getInactiveCount(): number {
-    return this.utilisateurs.filter(user => !user.actif).length;
+    return this.utilisateurs.filter(
+      (user: UtilisateurAdminResponse) =>
+        user.actif !== true
+    ).length;
   }
 
-  getRoleLabel(role?: string | null): string {
-    switch ((role || '').toUpperCase()) {
+  getRoleLabel(roleCode?: string | null): string {
+    const code = String(roleCode || '')
+      .trim()
+      .toUpperCase();
+
+    const dynamicRole = this.roles.find(
+      (role: RoleAccess) =>
+        String(role.codeRole || '')
+          .trim()
+          .toUpperCase() === code
+    );
+
+    if (dynamicRole?.nomRole) {
+      return dynamicRole.nomRole;
+    }
+
+    switch (code) {
       case 'EL_EMAR':
         return 'Utilisateur El Emar';
+
       case 'DA':
-        return 'Direction achat';
+        return 'Direction des achats';
+
       case 'IT':
         return 'IT';
+
       case 'ADMIN':
         return 'Administrateur';
+
+      case 'CND':
+        return 'Candidat';
+
       default:
-        return role || '-';
+        return roleCode || '-';
     }
   }
 
-  getRoleClass(role?: string | null): string {
-    const value = String(role || '').toUpperCase();
+  getRoleClass(roleCode?: string | null): string {
+    const value = String(roleCode || '')
+      .trim()
+      .toUpperCase();
 
-    if (value === 'EL_EMAR') return 'role-el-emar';
-    if (value === 'DA') return 'role-da';
-    if (value === 'IT') return 'role-it';
-    if (value === 'ADMIN') return 'role-admin';
+    switch (value) {
+      case 'EL_EMAR':
+        return 'role-el-emar';
 
-    return 'role-default';
+      case 'DA':
+        return 'role-da';
+
+      case 'IT':
+        return 'role-it';
+
+      case 'ADMIN':
+        return 'role-admin';
+
+      default:
+        return 'role-default';
+    }
+  }
+
+  getRoleSelectionValue(
+    user: UtilisateurAdminResponse
+  ): number | null {
+    if (
+      user.roleId !== null &&
+      user.roleId !== undefined
+    ) {
+      return Number(user.roleId);
+    }
+
+    /*
+     * Compatibilité avec les anciens utilisateurs
+     * qui possèdent seulement typeUtilisateur.
+     */
+    const code = String(
+      user.roleCode ||
+      user.typeUtilisateur ||
+      ''
+    )
+      .trim()
+      .toUpperCase();
+
+    const role = this.roles.find(
+      (item: RoleAccess) =>
+        String(item.codeRole || '')
+          .trim()
+          .toUpperCase() === code
+    );
+
+    return role ? Number(role.id) : null;
   }
 
   formatDate(value?: string | null): string {
-    if (!value) return '-';
+    if (!value) {
+      return '-';
+    }
 
     const date = new Date(value);
 
@@ -397,9 +669,16 @@ private refreshUtilisateursSilently(): void {
     });
   }
 
-  trackByUserId(index: number, user: UtilisateurAdminResponse): number {
+  trackByUserId(
+    _index: number,
+    user: UtilisateurAdminResponse
+  ): number {
     return user.id;
   }
+
+  // =====================================================
+  // HELPERS
+  // =====================================================
 
   private isValidEmail(email: string): boolean {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -408,7 +687,10 @@ private refreshUtilisateursSilently(): void {
   private getCurrentUserId(): number | null {
     const directUserId = localStorage.getItem('userId');
 
-    if (directUserId && !isNaN(Number(directUserId))) {
+    if (
+      directUserId &&
+      !isNaN(Number(directUserId))
+    ) {
       return Number(directUserId);
     }
 
@@ -424,14 +706,26 @@ private refreshUtilisateursSilently(): void {
     for (const key of keys) {
       const value = localStorage.getItem(key);
 
-      if (!value) continue;
+      if (!value) {
+        continue;
+      }
 
       try {
         const parsed = JSON.parse(value);
 
-        if (parsed?.id) return Number(parsed.id);
-        if (parsed?.userId) return Number(parsed.userId);
-        if (parsed?.utilisateurId) return Number(parsed.utilisateurId);
+        const parsedId =
+          parsed?.id ??
+          parsed?.userId ??
+          parsed?.utilisateurId ??
+          null;
+
+        if (
+          parsedId !== null &&
+          parsedId !== undefined &&
+          !isNaN(Number(parsedId))
+        ) {
+          return Number(parsedId);
+        }
       } catch {
         continue;
       }
@@ -439,4 +733,287 @@ private refreshUtilisateursSilently(): void {
 
     return null;
   }
+  // =====================================================
+// MODIFICATION COMPLÈTE D’UN UTILISATEUR
+// =====================================================
+isCurrentUser(
+  user: UtilisateurAdminResponse
+): boolean {
+  const currentUserId =
+    this.getCurrentUserId();
+
+  return (
+    currentUserId !== null &&
+    Number(currentUserId) === Number(user.id)
+  );
+}
+openEditUser(
+  user: UtilisateurAdminResponse
+): void {
+  if (!user?.id) {
+    this.pageError =
+      'Utilisateur introuvable.';
+    return;
+  }
+
+  this.pageError = '';
+  this.successMessage = '';
+
+  this.editingUser = user;
+
+  this.editForm.reset({
+    nom: user.nom || '',
+    email: user.email || '',
+    fonction: user.fonction || '',
+    roleId: this.getRoleSelectionValue(user),
+    actif: user.actif === true
+  });
+
+  this.stopAutoRefresh();
+  this.showEditModal = true;
+}
+
+closeEditModal(): void {
+  if (this.savingEdit) {
+    return;
+  }
+
+  this.showEditModal = false;
+  this.editingUser = null;
+
+  this.editForm.reset({
+    nom: '',
+    email: '',
+    fonction: '',
+    roleId: null,
+    actif: true
+  });
+
+  this.startAutoRefresh();
+}
+
+saveEditedUser(): void {
+  if (!this.editingUser?.id) {
+    this.pageError =
+      'Utilisateur à modifier introuvable.';
+    return;
+  }
+
+  const nom = String(
+    this.editForm.get('nom')?.value || ''
+  ).trim();
+
+  const email = String(
+    this.editForm.get('email')?.value || ''
+  )
+    .trim()
+    .toLowerCase();
+
+  const fonction = String(
+    this.editForm.get('fonction')?.value || ''
+  ).trim();
+
+  const rawRoleId =
+    this.editForm.get('roleId')?.value;
+
+  const roleId =
+    rawRoleId !== null &&
+    rawRoleId !== undefined &&
+    rawRoleId !== ''
+      ? Number(rawRoleId)
+      : null;
+
+  const actif =
+    this.editForm.get('actif')?.value === true;
+
+  if (!nom) {
+    this.pageError =
+      'Le nom est obligatoire.';
+    return;
+  }
+
+  if (!email) {
+    this.pageError =
+      'L’email est obligatoire.';
+    return;
+  }
+
+  if (!this.isValidEmail(email)) {
+    this.pageError =
+      'Veuillez saisir une adresse email valide.';
+    return;
+  }
+
+  if (!roleId || isNaN(roleId)) {
+    this.pageError =
+      'Veuillez sélectionner un rôle.';
+    return;
+  }
+
+  const selectedRole = this.roles.find(
+    role => Number(role.id) === Number(roleId)
+  );
+
+  if (!selectedRole) {
+    this.pageError =
+      'Le rôle sélectionné est introuvable ou inactif.';
+    return;
+  }
+
+  const request: UpdateUtilisateurAdminRequest = {
+    nom,
+    email,
+    fonction,
+    roleId: selectedRole.id,
+    actif,
+    modificateurId: this.getCurrentUserId()
+  };
+
+  const utilisateurId = this.editingUser.id;
+
+  this.pageError = '';
+  this.successMessage = '';
+  this.savingEdit = true;
+
+  this.utilisateurAdminService
+    .updateUser(utilisateurId, request)
+    .subscribe({
+      next: (
+        updatedUser: UtilisateurAdminResponse
+      ) => {
+        this.savingEdit = false;
+        this.showEditModal = false;
+        this.editingUser = null;
+
+        this.editForm.reset({
+          nom: '',
+          email: '',
+          fonction: '',
+          roleId: null,
+          actif: true
+        });
+
+        this.successMessage =
+          `Le compte de ${
+            updatedUser.nom ||
+            updatedUser.email ||
+            'l’utilisateur'
+          } a été modifié avec succès.`;
+
+        this.loadUtilisateurs();
+        this.startAutoRefresh();
+      },
+
+      error: (error: any) => {
+        console.error(
+          'ERROR UPDATE USER',
+          error
+        );
+
+        this.savingEdit = false;
+
+        this.pageError =
+          error?.error?.message ||
+          error?.error?.detail ||
+          (
+            error?.status === 409
+              ? 'Un autre compte utilise déjà cet email.'
+              : 'Erreur lors de la modification du compte.'
+          );
+      }
+    });
+}
+// =====================================================
+// SUPPRESSION D’UN UTILISATEUR
+// =====================================================
+
+openDeleteUser(
+  user: UtilisateurAdminResponse
+): void {
+  if (!user?.id) {
+    this.pageError =
+      'Utilisateur introuvable.';
+    return;
+  }
+
+  if (this.isCurrentUser(user)) {
+    this.pageError =
+      'Vous ne pouvez pas supprimer votre propre compte.';
+    return;
+  }
+
+  this.pageError = '';
+  this.successMessage = '';
+
+  this.userToDelete = user;
+
+  this.stopAutoRefresh();
+  this.showDeleteModal = true;
+}
+
+closeDeleteModal(): void {
+  if (this.deletingUser) {
+    return;
+  }
+
+  this.showDeleteModal = false;
+  this.userToDelete = null;
+
+  this.startAutoRefresh();
+}
+
+confirmDeleteUser(): void {
+  if (!this.userToDelete?.id) {
+    return;
+  }
+
+  const utilisateurId =
+    this.userToDelete.id;
+
+  const utilisateurNom =
+    this.userToDelete.nom ||
+    this.userToDelete.email ||
+    'Utilisateur';
+
+  this.pageError = '';
+  this.successMessage = '';
+  this.deletingUser = true;
+
+  this.utilisateurAdminService
+    .deleteUser(
+      utilisateurId,
+      this.getCurrentUserId()
+    )
+    .subscribe({
+      next: () => {
+        this.deletingUser = false;
+        this.showDeleteModal = false;
+        this.userToDelete = null;
+
+        this.successMessage =
+          `Le compte "${utilisateurNom}" a été supprimé définitivement.`;
+
+        this.loadUtilisateurs();
+        this.startAutoRefresh();
+      },
+
+      error: (error: any) => {
+        console.error(
+          'ERROR DELETE USER',
+          error
+        );
+
+        this.deletingUser = false;
+
+        this.pageError =
+          error?.error?.message ||
+          error?.error?.detail ||
+          (
+            error?.status === 409
+              ? 'Ce compte est lié à des données. Désactivez-le au lieu de le supprimer.'
+              : 'Erreur lors de la suppression du compte.'
+          );
+      }
+    });
+}
 }

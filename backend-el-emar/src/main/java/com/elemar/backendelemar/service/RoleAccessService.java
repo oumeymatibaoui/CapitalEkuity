@@ -8,9 +8,12 @@ import com.elemar.backendelemar.entity.RoleModuleAcces;
 import com.elemar.backendelemar.repository.ModuleNavbarRepository;
 import com.elemar.backendelemar.repository.RoleAccesRepository;
 import com.elemar.backendelemar.repository.RoleModuleAccesRepository;
+import com.elemar.backendelemar.repository.UtilisateurRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.text.Normalizer;
 import java.util.*;
@@ -20,7 +23,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Transactional
 public class RoleAccessService {
-
+    private final UtilisateurRepository utilisateurRepository;
     private final RoleAccesRepository roleRepository;
     private final ModuleNavbarRepository moduleRepository;
     private final RoleModuleAccesRepository roleModuleRepository;
@@ -35,37 +38,100 @@ public class RoleAccessService {
                 .toList();
     }
 
-    public RoleResponse createRole(CreateRoleRequest request) {
+    public RoleResponse createRole(
+            CreateRoleRequest request
+    ) {
+        if (request == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Les informations du rôle sont obligatoires."
+            );
+        }
 
-        String codeRole = generateCodeRole(request.getNomRole());
+        if (
+                request.getNomRole() == null
+                        || request.getNomRole().trim().isEmpty()
+        ) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Le nom du rôle est obligatoire."
+            );
+        }
+
+        String nomRole = request.getNomRole().trim();
+
+        String typeRole = request.getTypeRole() == null
+                ? "INTERNE"
+                : request.getTypeRole()
+                .trim()
+                .toUpperCase();
+
+        if (
+                !"INTERNE".equals(typeRole)
+                        && !"EXTERNE".equals(typeRole)
+        ) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Le type du rôle doit être INTERNE ou EXTERNE."
+            );
+        }
+
+        String codeRole = generateCodeRole(nomRole);
 
         if (roleRepository.existsByCodeRole(codeRole)) {
-            throw new RuntimeException("Un rôle avec ce nom existe déjà");
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Un rôle avec ce nom existe déjà."
+            );
         }
 
         RoleAcces role = new RoleAcces();
-        role.setNomRole(request.getNomRole());
+
+        role.setNomRole(nomRole);
         role.setCodeRole(codeRole);
-        role.setDescription(request.getDescription());
-        role.setTypeRole(request.getTypeRole() == null ? "INTERNE" : request.getTypeRole());
-        role.setRoleSysteme(false);
+
+        role.setDescription(
+                request.getDescription() == null
+                        ? null
+                        : request.getDescription().trim()
+        );
+
+        role.setTypeRole(typeRole);
+
+        /*
+         * Le choix vient maintenant du formulaire.
+         */
+        role.setRoleSysteme(
+                Boolean.TRUE.equals(
+                        request.getRoleSysteme()
+                )
+        );
+
         role.setActif(true);
 
-        RoleAcces savedRole = roleRepository.save(role);
+        RoleAcces savedRole =
+                roleRepository.saveAndFlush(role);
 
-        List<ModuleNavbar> modules = moduleRepository.findByActifTrueOrderByOrdreGroupeAscOrdreModuleAsc();
+        List<ModuleNavbar> modules =
+                moduleRepository
+                        .findByActifTrueOrderByOrdreGroupeAscOrdreModuleAsc();
 
         for (ModuleNavbar module : modules) {
-            RoleModuleAcces access = new RoleModuleAcces();
+            RoleModuleAcces access =
+                    new RoleModuleAcces();
+
             access.setRole(savedRole);
             access.setModule(module);
             access.setAutorise(false);
+
             roleModuleRepository.save(access);
         }
 
-        return toRoleResponse(savedRole, modules.size());
+        return toRoleResponse(
+                savedRole,
+                modules.size()
+        );
     }
-
     @Transactional(readOnly = true)
     public List<ModuleGroupResponse> getModulesByRole(Long roleId) {
 
@@ -273,44 +339,194 @@ public class RoleAccessService {
                 .replaceAll("[^A-Z0-9]+", "_")
                 .replaceAll("^_|_$", "");
     }
-    public RoleResponse updateRole(Long roleId, UpdateRoleRequest request) {
+    public RoleResponse updateRole(
+            Long roleId,
+            UpdateRoleRequest request
+    ) {
+        if (roleId == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "L'identifiant du rôle est obligatoire."
+            );
+        }
+
+        if (request == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Les informations du rôle sont obligatoires."
+            );
+        }
 
         RoleAcces role = roleRepository.findById(roleId)
-                .orElseThrow(() -> new RuntimeException("Rôle introuvable"));
+                .orElseThrow(() ->
+                        new ResponseStatusException(
+                                HttpStatus.NOT_FOUND,
+                                "Rôle introuvable."
+                        )
+                );
 
-        if (Boolean.TRUE.equals(role.getRoleSysteme()) && "IT".equals(role.getCodeRole())) {
-            if (request.getActif() != null && !request.getActif()) {
-                throw new RuntimeException("Le rôle IT / Administrateur ne peut pas être désactivé");
+        if (
+                request.getNomRole() == null
+                        || request.getNomRole().trim().isEmpty()
+        ) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Le nom du rôle est obligatoire."
+            );
+        }
+
+        String typeRole = request.getTypeRole() == null
+                ? String.valueOf(role.getTypeRole())
+                .trim()
+                .toUpperCase()
+                : request.getTypeRole()
+                .trim()
+                .toUpperCase();
+
+        if (
+                !"INTERNE".equals(typeRole)
+                        && !"EXTERNE".equals(typeRole)
+        ) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Le type du rôle doit être INTERNE ou EXTERNE."
+            );
+        }
+
+        /*
+         * Valeur finale choisie dans le formulaire.
+         */
+        boolean finalRoleSysteme =
+                request.getRoleSysteme() != null
+                        ? Boolean.TRUE.equals(
+                        request.getRoleSysteme()
+                )
+                        : Boolean.TRUE.equals(
+                        role.getRoleSysteme()
+                );
+
+        boolean finalActif =
+                request.getActif() != null
+                        ? Boolean.TRUE.equals(
+                        request.getActif()
+                )
+                        : Boolean.TRUE.equals(
+                        role.getActif()
+                );
+
+        if (finalRoleSysteme && !finalActif) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "Un rôle système ne peut pas être désactivé."
+            );
+        }
+
+        if (!finalActif) {
+            long utilisateursAffectes =
+                    utilisateurRepository
+                            .countByRoleId(roleId);
+
+            if (utilisateursAffectes > 0) {
+                throw new ResponseStatusException(
+                        HttpStatus.CONFLICT,
+                        "Ce rôle est affecté à "
+                                + utilisateursAffectes
+                                + " utilisateur(s)."
+                );
             }
         }
 
-        role.setNomRole(request.getNomRole());
-        role.setDescription(request.getDescription());
-        role.setTypeRole(request.getTypeRole());
+        role.setNomRole(
+                request.getNomRole().trim()
+        );
 
-        if (request.getActif() != null) {
-            role.setActif(request.getActif());
-        }
+        role.setDescription(
+                request.getDescription() == null
+                        ? null
+                        : request.getDescription().trim()
+        );
 
-        RoleAcces saved = roleRepository.save(role);
+        role.setTypeRole(typeRole);
 
-        long totalModules = moduleRepository.findByActifTrueOrderByOrdreGroupeAscOrdreModuleAsc().size();
+        /*
+         * Modification système / standard.
+         */
+        role.setRoleSysteme(finalRoleSysteme);
 
-        return toRoleResponse(saved, totalModules);
+        role.setActif(finalActif);
+
+        /*
+         * On conserve le codeRole.
+         */
+        RoleAcces savedRole =
+                roleRepository.saveAndFlush(role);
+
+        long totalModules =
+                moduleRepository
+                        .findByActifTrueOrderByOrdreGroupeAscOrdreModuleAsc()
+                        .size();
+
+        return toRoleResponse(
+                savedRole,
+                totalModules
+        );
     }
 
+    @Transactional
     public void deleteRole(Long roleId) {
 
-        RoleAcces role = roleRepository.findById(roleId)
-                .orElseThrow(() -> new RuntimeException("Rôle introuvable"));
-
-        if (Boolean.TRUE.equals(role.getRoleSysteme())) {
-            throw new RuntimeException("Un rôle système ne peut pas être supprimé");
+        if (roleId == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "L'identifiant du rôle est obligatoire."
+            );
         }
 
-        // Soft delete : on désactive seulement
-        role.setActif(false);
+        RoleAcces role = roleRepository.findById(roleId)
+                .orElseThrow(() ->
+                        new ResponseStatusException(
+                                HttpStatus.NOT_FOUND,
+                                "Rôle introuvable."
+                        )
+                );
 
-        roleRepository.save(role);
+        /*
+         * Protection des rôles système.
+         */
+        if (Boolean.TRUE.equals(role.getRoleSysteme())) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "Un rôle système ne peut pas être supprimé."
+            );
+        }
+
+        /*
+         * Vérifier que le rôle n'est attribué
+         * à aucun utilisateur.
+         */
+        long utilisateursAffectes =
+                utilisateurRepository.countByRoleId(roleId);
+
+        if (utilisateursAffectes > 0) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Impossible de supprimer ce rôle : "
+                            + utilisateursAffectes
+                            + " utilisateur(s) l'utilisent encore. "
+                            + "Attribuez-leur d'abord un autre rôle."
+            );
+        }
+
+        /*
+         * Supprimer les autorisations du rôle.
+         */
+        roleModuleRepository.deleteAllByRoleId(roleId);
+
+        /*
+         * Suppression définitive du rôle.
+         */
+        roleRepository.delete(role);
+
+        roleRepository.flush();
     }
 }

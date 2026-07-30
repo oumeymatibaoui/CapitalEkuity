@@ -1,10 +1,10 @@
 package com.elemar.backendelemar.controller;
 
-
-
 import com.elemar.backendelemar.dto.*;
 import com.elemar.backendelemar.service.RoleAccessService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -12,7 +12,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/admin/roles-acces")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "http://localhost:4200")
+//@PreAuthorize("hasAuthority('EL_EMAR_ACCESS')") // protège TOUTE la classe
 public class RoleAccessController {
 
     private final RoleAccessService roleAccessService;
@@ -54,6 +54,7 @@ public class RoleAccessController {
     public List<ModuleAccessResponse> getNavigationByRoleCode(@PathVariable String roleCode) {
         return roleAccessService.getNavigationByRoleCode(roleCode);
     }
+
     @PutMapping("/roles/{roleId}")
     public RoleResponse updateRole(
             @PathVariable Long roleId,
@@ -63,7 +64,10 @@ public class RoleAccessController {
     }
 
     @DeleteMapping("/roles/{roleId}")
-    public void deleteRole(@PathVariable Long roleId) {
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteRole(
+            @PathVariable Long roleId
+    ) {
         roleAccessService.deleteRole(roleId);
     }
 }

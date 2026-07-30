@@ -40,7 +40,202 @@ public class ElEmarEvaluationService {
     // =====================================================
     // LISTE DES CANDIDATURES SOUMISES
     // =====================================================
+    private String normalizeSolvabiliteStatut(
+            String statut
+    ) {
+        String value =
+                statut == null
+                        ? "A_VERIFIER"
+                        : statut.trim().toUpperCase();
 
+        if (
+                !List.of(
+                        "A_VERIFIER",
+                        "SOLVABLE",
+                        "NON_SOLVABLE"
+                ).contains(value)
+        ) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Statut de solvabilité invalide."
+            );
+        }
+
+        return value;
+    }
+    @Transactional
+    public SaveDocumentsStatutResponse saveDocumentsStatut(
+            Long candidatureId,
+            SaveDocumentsStatutRequest request
+    ) {
+        if (candidatureId == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Identifiant de l’intervenant obligatoire."
+            );
+        }
+
+        if (request == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Les statuts RNE et CNSS sont obligatoires."
+            );
+        }
+
+        String rneStatut =
+                normalizeStatut(
+                        request.getRneStatut()
+                );
+
+        String cnssStatut =
+                normalizeStatut(
+                        request.getCnssStatut()
+                );
+
+        boolean dossierRecevable =
+                !"NON_CONFORME".equals(rneStatut)
+                        &&
+                        !"NON_CONFORME".equals(cnssStatut);
+
+        String motif =
+                dossierRecevable
+                        ? null
+                        : "RNE ou CNSS non conforme.";
+
+        int updated =
+                jdbcTemplate.update(
+                        """
+                        UPDATE candidature
+                        SET rne_statut = ?,
+                            cnss_statut = ?,
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE id = ?
+                        """,
+                        rneStatut,
+                        cnssStatut,
+                        candidatureId
+                );
+
+        if (updated == 0) {
+            throw new ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "Intervenant introuvable."
+            );
+        }
+
+        historiqueActionService.enregistrerAction(
+                request.getEvaluateurId(),
+                candidatureId,
+                null,
+                "EL_EMAR_CONTROLE_DOCUMENTS",
+                "Contrôle des pièces générales"
+                        + " | RNE : "
+                        + rneStatut
+                        + " | CNSS : "
+                        + cnssStatut
+        );
+
+        return SaveDocumentsStatutResponse
+                .builder()
+                .candidatureId(
+                        candidatureId
+                )
+                .rneStatut(
+                        rneStatut
+                )
+                .cnssStatut(
+                        cnssStatut
+                )
+                .dossierRecevable(
+                        dossierRecevable
+                )
+                .motifNonRecevable(
+                        motif
+                )
+                .build();
+    }
+    @Transactional
+    public SaveSolvabiliteResponse saveSolvabilite(
+            Long candidatureId,
+            SaveSolvabiliteRequest request
+    ) {
+        if (candidatureId == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Identifiant de l’intervenant obligatoire."
+            );
+        }
+
+        if (request == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Les informations de solvabilité sont obligatoires."
+            );
+        }
+
+        String statut = normalizeSolvabiliteStatut(
+                request.getStatut()
+        );
+
+        String commentaire =
+                request.getCommentaire() == null
+                        ? null
+                        : request.getCommentaire().trim();
+
+        if (
+                commentaire != null &&
+                        commentaire.isEmpty()
+        ) {
+            commentaire = null;
+        }
+
+        LocalDateTime dateValidation =
+                LocalDateTime.now();
+
+        int updated = jdbcTemplate.update(
+                """
+                UPDATE candidature
+                SET solvabilite_statut = ?,
+                    solvabilite_commentaire = ?,
+                    solvabilite_evaluateur_id = ?,
+                    solvabilite_date_validation = ?
+                WHERE id = ?
+                """,
+                statut,
+                commentaire,
+                request.getEvaluateurId(),
+                dateValidation,
+                candidatureId
+        );
+
+        if (updated == 0) {
+            throw new ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "Intervenant introuvable."
+            );
+        }
+
+        historiqueActionService.enregistrerAction(
+                request.getEvaluateurId(),
+                candidatureId,
+                null,
+                "EL_EMAR_SOLVABILITE",
+                "El Emar a mis à jour la solvabilité. Statut : "
+                        + statut
+                        + " | Commentaire : "
+                        + safe(commentaire)
+        );
+
+        return SaveSolvabiliteResponse.builder()
+                .candidatureId(candidatureId)
+                .statut(statut)
+                .commentaire(commentaire)
+                .evaluateurId(
+                        request.getEvaluateurId()
+                )
+                .dateValidation(dateValidation)
+                .build();
+    }
     @Transactional(readOnly = true)
     public List<ElEmarCandidatureListItemResponse> getCandidaturesSoumises(
             Long typeIntervenantId
@@ -338,73 +533,315 @@ public class ElEmarEvaluationService {
         return detail;
     }
 
-    private CandidatureDetailResponse loadCandidature(Long candidatureId) {
+    private CandidatureDetailResponse loadCandidature(
+            Long candidatureId
+    ) {
         String sql = """
-                SELECT
-                    id,
-                    raison_sociale,
-                    forme_juridique,
-                    rne_matricule_fiscal,
-                    date_creation_bureau,
-                    adresse_siege,
-                    telephone,
-                    email_principal,
-                    site_internet,
-                    ville,
-                    representant_legal,
-                    fonction_representant,
-                    specialites,
-                    agrements_certifications,
-                    banque_principale,
-                    localisation,
-                    CAST(statut AS TEXT) AS statut,
-                    date_soumission,
-                    rne_nom_fichier,
-                    rne_chemin_fichier,
-                    cnss_nom_fichier,
-                    cnss_chemin_fichier
-                FROM candidature
-                WHERE id = ?
-                """;
+            SELECT
+                id,
+                raison_sociale,
+                forme_juridique,
+                rne_matricule_fiscal,
+                date_creation_bureau,
+                adresse_siege,
+                telephone,
+                email_principal,
+                site_internet,
+                ville,
+                representant_legal,
+                fonction_representant,
+                specialites,
+                agrements_certifications,
+                banque_principale,
+                localisation,
 
-        return jdbcTemplate.queryForObject(
-                sql,
-                (rs, rowNum) -> CandidatureDetailResponse.builder()
-                        .candidatureId(rs.getLong("id"))
-                        .raisonSociale(rs.getString("raison_sociale"))
-                        .formeJuridique(rs.getString("forme_juridique"))
-                        .rneMatriculeFiscal(rs.getString("rne_matricule_fiscal"))
-                        .dateCreationBureau(toLocalDate(rs.getDate("date_creation_bureau")))
-                        .adresseSiege(rs.getString("adresse_siege"))
-                        .telephone(rs.getString("telephone"))
-                        .emailPrincipal(rs.getString("email_principal"))
-                        .siteInternet(rs.getString("site_internet"))
-                        .ville(rs.getString("ville"))
-                        .representantLegal(rs.getString("representant_legal"))
-                        .fonctionRepresentant(rs.getString("fonction_representant"))
-                        .specialites(rs.getString("specialites"))
-                        .agrementsCertifications(rs.getString("agrements_certifications"))
-                        .banquePrincipale(rs.getString("banque_principale"))
-                        .localisation(rs.getString("localisation"))
-                        .statut(rs.getString("statut"))
-                        .dateSoumission(toLocalDateTime(rs.getTimestamp("date_soumission")))
-                        .rneNomFichier(rs.getString("rne_nom_fichier"))
-                        .rnePdfUrl(
-                                hasText(rs.getString("rne_chemin_fichier"))
-                                        ? BASE_API + "/candidatures/" + rs.getLong("id") + "/rne/pdf"
-                                        : null
-                        )
-                        .cnssNomFichier(rs.getString("cnss_nom_fichier"))
-                        .cnssPdfUrl(
-                                hasText(rs.getString("cnss_chemin_fichier"))
-                                        ? BASE_API + "/candidatures/" + rs.getLong("id") + "/cnss/pdf"
-                                        : null
-                        )
-                        .noteGlobale(BigDecimal.ZERO)
-                        .lots(new ArrayList<>())
-                        .build(),
-                candidatureId
-        );
+                CAST(statut AS TEXT) AS statut,
+                date_soumission,
+
+                rne_nom_fichier,
+                rne_chemin_fichier,
+                COALESCE(
+                    rne_statut,
+                    'A_VERIFIER'
+                ) AS rne_statut,
+
+                cnss_nom_fichier,
+                cnss_chemin_fichier,
+                COALESCE(
+                    cnss_statut,
+                    'A_VERIFIER'
+                ) AS cnss_statut,
+
+                COALESCE(
+                    solvabilite_statut,
+                    'A_VERIFIER'
+                ) AS solvabilite_statut,
+
+                solvabilite_commentaire,
+                solvabilite_evaluateur_id,
+                solvabilite_date_validation
+
+            FROM candidature
+            WHERE id = ?
+            """;
+
+        List<CandidatureDetailResponse> results =
+                jdbcTemplate.query(
+                        sql,
+                        (rs, rowNum) -> {
+                            String rneStatut =
+                                    rs.getString(
+                                            "rne_statut"
+                                    );
+
+                            String cnssStatut =
+                                    rs.getString(
+                                            "cnss_statut"
+                                    );
+
+                            boolean dossierRecevable =
+                                    !"NON_CONFORME"
+                                            .equalsIgnoreCase(
+                                                    rneStatut
+                                            )
+                                            &&
+                                            !"NON_CONFORME"
+                                                    .equalsIgnoreCase(
+                                                            cnssStatut
+                                                    );
+
+                            return CandidatureDetailResponse
+                                    .builder()
+
+                                    .candidatureId(
+                                            rs.getLong("id")
+                                    )
+
+                                    .raisonSociale(
+                                            rs.getString(
+                                                    "raison_sociale"
+                                            )
+                                    )
+
+                                    .formeJuridique(
+                                            rs.getString(
+                                                    "forme_juridique"
+                                            )
+                                    )
+
+                                    .rneMatriculeFiscal(
+                                            rs.getString(
+                                                    "rne_matricule_fiscal"
+                                            )
+                                    )
+
+                                    .dateCreationBureau(
+                                            toLocalDate(
+                                                    rs.getDate(
+                                                            "date_creation_bureau"
+                                                    )
+                                            )
+                                    )
+
+                                    .adresseSiege(
+                                            rs.getString(
+                                                    "adresse_siege"
+                                            )
+                                    )
+
+                                    .telephone(
+                                            rs.getString(
+                                                    "telephone"
+                                            )
+                                    )
+
+                                    .emailPrincipal(
+                                            rs.getString(
+                                                    "email_principal"
+                                            )
+                                    )
+
+                                    .siteInternet(
+                                            rs.getString(
+                                                    "site_internet"
+                                            )
+                                    )
+
+                                    .ville(
+                                            rs.getString(
+                                                    "ville"
+                                            )
+                                    )
+
+                                    .representantLegal(
+                                            rs.getString(
+                                                    "representant_legal"
+                                            )
+                                    )
+
+                                    .fonctionRepresentant(
+                                            rs.getString(
+                                                    "fonction_representant"
+                                            )
+                                    )
+
+                                    .specialites(
+                                            rs.getString(
+                                                    "specialites"
+                                            )
+                                    )
+
+                                    .agrementsCertifications(
+                                            rs.getString(
+                                                    "agrements_certifications"
+                                            )
+                                    )
+
+                                    .banquePrincipale(
+                                            rs.getString(
+                                                    "banque_principale"
+                                            )
+                                    )
+
+                                    .localisation(
+                                            rs.getString(
+                                                    "localisation"
+                                            )
+                                    )
+
+                                    .statut(
+                                            rs.getString(
+                                                    "statut"
+                                            )
+                                    )
+
+                                    .dateSoumission(
+                                            toLocalDateTime(
+                                                    rs.getTimestamp(
+                                                            "date_soumission"
+                                                    )
+                                            )
+                                    )
+
+                                    /* =========================
+                                       RNE
+                                    ========================= */
+
+                                    .rneNomFichier(
+                                            rs.getString(
+                                                    "rne_nom_fichier"
+                                            )
+                                    )
+
+                                    .rneStatut(
+                                            rneStatut
+                                    )
+
+                                    .rnePdfUrl(
+                                            hasText(
+                                                    rs.getString(
+                                                            "rne_chemin_fichier"
+                                                    )
+                                            )
+                                                    ? BASE_API
+                                                    + "/candidatures/"
+                                                    + rs.getLong("id")
+                                                    + "/rne/pdf"
+                                                    : null
+                                    )
+
+                                    /* =========================
+                                       CNSS
+                                    ========================= */
+
+                                    .cnssNomFichier(
+                                            rs.getString(
+                                                    "cnss_nom_fichier"
+                                            )
+                                    )
+
+                                    .cnssStatut(
+                                            cnssStatut
+                                    )
+
+                                    .cnssPdfUrl(
+                                            hasText(
+                                                    rs.getString(
+                                                            "cnss_chemin_fichier"
+                                                    )
+                                            )
+                                                    ? BASE_API
+                                                    + "/candidatures/"
+                                                    + rs.getLong("id")
+                                                    + "/cnss/pdf"
+                                                    : null
+                                    )
+
+                                    .dossierRecevable(
+                                            dossierRecevable
+                                    )
+
+                                    .motifNonRecevable(
+                                            dossierRecevable
+                                                    ? null
+                                                    : "RNE ou CNSS non conforme."
+                                    )
+
+                                    /* =========================
+                                       SOLVABILITÉ
+                                    ========================= */
+
+                                    .solvabiliteStatut(
+                                            rs.getString(
+                                                    "solvabilite_statut"
+                                            )
+                                    )
+
+                                    .solvabiliteCommentaire(
+                                            rs.getString(
+                                                    "solvabilite_commentaire"
+                                            )
+                                    )
+
+                                    .solvabiliteEvaluateurId(
+                                            rs.getObject(
+                                                    "solvabilite_evaluateur_id"
+                                            ) != null
+                                                    ? rs.getLong(
+                                                    "solvabilite_evaluateur_id"
+                                            )
+                                                    : null
+                                    )
+
+                                    .solvabiliteDateValidation(
+                                            toLocalDateTime(
+                                                    rs.getTimestamp(
+                                                            "solvabilite_date_validation"
+                                                    )
+                                            )
+                                    )
+
+                                    .noteGlobale(
+                                            BigDecimal.ZERO
+                                    )
+
+                                    .lots(
+                                            new ArrayList<>()
+                                    )
+
+                                    .build();
+                        },
+                        candidatureId
+                );
+
+        if (results.isEmpty()) {
+            throw new ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "Intervenant introuvable."
+            );
+        }
+
+        return results.get(0);
     }
 
     private List<LotEvaluationResponse> loadLots(Long candidatureId) {
@@ -446,78 +883,191 @@ public class ElEmarEvaluationService {
         );
     }
 
-    private List<ElEmarCritereEvaluationResponse> loadCriteres(Long applicationCandidatureId) {
+    private List<ElEmarCritereEvaluationResponse> loadCriteres(
+            Long applicationCandidatureId
+    ) {
         String sql = """
-            SELECT
-                rc.id AS reponse_critere_id,
-                rc.critere_evaluation_id,
-                ce.code_critere,
-                ce.section,
-                COALESCE(NULLIF(ce.label_candidat, ''), ce.libelle_critere) AS libelle,
-                ce.aide_candidat,
-                ce.note_evaluateur,
-                ce.type_champ,
-                ce.points_max,
-                COALESCE(
-                    NULLIF(rc.valeur_text, ''),
-                    rc.valeur_number::text,
-                    CASE
-                        WHEN rc.valeur_boolean IS TRUE THEN 'Oui'
-                        WHEN rc.valeur_boolean IS FALSE THEN 'Non'
-                        ELSE NULL
-                    END,
-                    rc.valeur_date::text,
-                    ''
-                ) AS reponse,
-                COALESCE(CAST(ec.statut AS TEXT), 'A_VERIFIER') AS statut_evaluation,
-                COALESCE(ec.note_obtenue, 0) AS note_obtenue,
-                ec.commentaire_evaluateur
-            FROM reponse_critere rc
-            JOIN critere_evaluation ce ON ce.id = rc.critere_evaluation_id
-            LEFT JOIN LATERAL (
-                SELECT e.*
-                FROM evaluation_critere e
-                WHERE e.reponse_critere_id = rc.id
-                ORDER BY e.id DESC
-                LIMIT 1
-            ) ec ON true
-            WHERE rc.application_candidature_id = ?
-            ORDER BY ce.section, ce.ordre_affichage, ce.id
-            """;
+        SELECT
+            rc.id AS reponse_critere_id,
+            rc.critere_evaluation_id,
+
+            ce.code_critere,
+            ce.section,
+
+            COALESCE(
+                NULLIF(ce.label_candidat, ''),
+                ce.libelle_critere
+            ) AS libelle,
+
+            ce.aide_candidat,
+            ce.note_evaluateur,
+            ce.type_champ,
+            ce.points_max,
+
+            COALESCE(
+                NULLIF(rc.valeur_text, ''),
+                rc.valeur_number::text,
+
+                CASE
+                    WHEN rc.valeur_boolean IS TRUE
+                        THEN 'Oui'
+
+                    WHEN rc.valeur_boolean IS FALSE
+                        THEN 'Non'
+
+                    ELSE NULL
+                END,
+
+                rc.valeur_date::text,
+                ''
+            ) AS reponse,
+
+            COALESCE(
+                CAST(ec.statut AS TEXT),
+                'A_VERIFIER'
+            ) AS statut_evaluation,
+
+            COALESCE(
+                ec.note_obtenue,
+                0
+            ) AS note_obtenue,
+
+            ec.commentaire_evaluateur
+
+        FROM reponse_critere rc
+
+        JOIN critere_evaluation ce
+            ON ce.id = rc.critere_evaluation_id
+
+        LEFT JOIN evaluation_critere ec
+            ON ec.reponse_critere_id = rc.id
+
+        WHERE rc.application_candidature_id = ?
+
+        ORDER BY
+            ce.section,
+            ce.ordre_affichage,
+            ce.id
+        """;
 
         return jdbcTemplate.query(
                 sql,
                 (rs, rowNum) -> {
-                    String statut = Optional.ofNullable(
-                            rs.getString("statut_evaluation")
-                    ).orElse("A_VERIFIER");
+                    String statut =
+                            Optional.ofNullable(
+                                    rs.getString(
+                                            "statut_evaluation"
+                                    )
+                            ).orElse(
+                                    "A_VERIFIER"
+                            );
 
-                    BigDecimal noteObtenue = Optional.ofNullable(
-                            rs.getBigDecimal("note_obtenue")
-                    ).orElse(BigDecimal.ZERO);
+                    BigDecimal noteObtenue =
+                            Optional.ofNullable(
+                                    rs.getBigDecimal(
+                                            "note_obtenue"
+                                    )
+                            ).orElse(
+                                    BigDecimal.ZERO
+                            );
 
-                    return ElEmarCritereEvaluationResponse.builder()
-                            .reponseCritereId(rs.getLong("reponse_critere_id"))
-                            .critereEvaluationId(rs.getLong("critere_evaluation_id"))
-                            .codeCritere(rs.getString("code_critere"))
-                            .section(rs.getString("section"))
-                            .libelle(rs.getString("libelle"))
-                            .aideCandidat(rs.getString("aide_candidat"))
-                            .noteEvaluateur(rs.getString("note_evaluateur"))
-                            .typeChamp(rs.getString("type_champ"))
-                            .reponse(rs.getString("reponse"))
-                            .noteMax(scale(rs.getBigDecimal("points_max")))
-                            .statutEvaluation(statut)
-                            .conforme("CONFORME".equalsIgnoreCase(statut))
-                            .noteObtenue(scale(noteObtenue))
-                            .commentaireEvaluateur(rs.getString("commentaire_evaluateur"))
-                            .pieces(new ArrayList<>())
+                    return ElEmarCritereEvaluationResponse
+                            .builder()
+
+                            .reponseCritereId(
+                                    rs.getLong(
+                                            "reponse_critere_id"
+                                    )
+                            )
+
+                            .critereEvaluationId(
+                                    rs.getLong(
+                                            "critere_evaluation_id"
+                                    )
+                            )
+
+                            .codeCritere(
+                                    rs.getString(
+                                            "code_critere"
+                                    )
+                            )
+
+                            .section(
+                                    rs.getString(
+                                            "section"
+                                    )
+                            )
+
+                            .libelle(
+                                    rs.getString(
+                                            "libelle"
+                                    )
+                            )
+
+                            .aideCandidat(
+                                    rs.getString(
+                                            "aide_candidat"
+                                    )
+                            )
+
+                            .noteEvaluateur(
+                                    rs.getString(
+                                            "note_evaluateur"
+                                    )
+                            )
+
+                            .typeChamp(
+                                    rs.getString(
+                                            "type_champ"
+                                    )
+                            )
+
+                            .reponse(
+                                    rs.getString(
+                                            "reponse"
+                                    )
+                            )
+
+                            .noteMax(
+                                    scale(
+                                            rs.getBigDecimal(
+                                                    "points_max"
+                                            )
+                                    )
+                            )
+
+                            .statutEvaluation(
+                                    statut
+                            )
+
+                            .conforme(
+                                    "CONFORME"
+                                            .equalsIgnoreCase(
+                                                    statut
+                                            )
+                            )
+
+                            .noteObtenue(
+                                    scale(
+                                            noteObtenue
+                                    )
+                            )
+
+                            .commentaireEvaluateur(
+                                    rs.getString(
+                                            "commentaire_evaluateur"
+                                    )
+                            )
+
+                            .pieces(
+                                    new ArrayList<>()
+                            )
+
                             .build();
                 },
                 applicationCandidatureId
         );
     }
-
     private List<PieceEvaluationResponse> loadPiecesForCritere(
             Long applicationCandidatureId,
             Long critereEvaluationId
@@ -566,33 +1116,39 @@ public class ElEmarEvaluationService {
         );
     }
 
-    private List<ProjetReferenceResponse> loadReferences(Long applicationCandidatureId) {
+    private List<ProjetReferenceResponse> loadReferences(
+            Long applicationCandidatureId
+    ) {
         String sql = """
-                SELECT
-                    id,
-                    nom_projet,
-                    maitre_ouvrage,
-                    ville,
-                    zone,
-                    zone_el_emar_id,
-                    zone_el_emar_nom,
-                    zone_validee,
-                    adresse_projet,
-                    type_projet,
-                    surface_m2,
-                    niveaux_r_plus,
-                    nombre_sous_sols,
-                    annee_livraison,
-                    bim_oui_non,
-                    seuil_ok,
-                    mission_realisee,
-                    montant,
-                    fichier_p11,
-                    fichier_p12
-                FROM projet_reference
-                WHERE application_candidature_id = ?
-                ORDER BY id
-                """;
+            SELECT
+                id,
+                nom_projet,
+                maitre_ouvrage,
+                ville,
+                zone,
+
+                zone_el_emar_id,
+                zone_el_emar_nom,
+                zone_el_emar_commentaire,
+                zone_validee,
+
+                adresse_projet,
+                type_projet,
+                surface_m2,
+                niveaux_r_plus,
+                nombre_sous_sols,
+                annee_livraison,
+                bim_oui_non,
+                seuil_ok,
+                mission_realisee,
+                montant,
+                fichier_p11,
+                fichier_p12
+
+            FROM projet_reference
+            WHERE application_candidature_id = ?
+            ORDER BY id
+            """;
 
         return jdbcTemplate.query(
                 sql,
@@ -618,12 +1174,38 @@ public class ElEmarEvaluationService {
                                 ? rs.getLong("zone_el_emar_id")
                                 : null
                 )
-                .zoneElEmarNom(rs.getString("zone_el_emar_nom"))
-                .zoneValidee(
-                        rs.getObject("zone_validee") != null
-                                ? rs.getBoolean("zone_validee")
+                .zoneElEmarId(
+                        rs.getObject(
+                                "zone_el_emar_id"
+                        ) != null
+                                ? rs.getLong(
+                                "zone_el_emar_id"
+                        )
                                 : null
                 )
+
+                .zoneElEmarNom(
+                        rs.getString(
+                                "zone_el_emar_nom"
+                        )
+                )
+
+                .zoneElEmarCommentaire(
+                        rs.getString(
+                                "zone_el_emar_commentaire"
+                        )
+                )
+
+                .zoneValidee(
+                        rs.getObject(
+                                "zone_validee"
+                        ) != null
+                                ? rs.getBoolean(
+                                "zone_validee"
+                        )
+                                : false
+                )
+
                 .adresseProjet(rs.getString("adresse_projet"))
                 .typeProjet(rs.getString("type_projet"))
                 .surfaceM2(scale(rs.getBigDecimal("surface_m2")))
@@ -677,46 +1259,131 @@ public class ElEmarEvaluationService {
             Long reponseCritereId,
             SaveCritereEvaluationRequest request
     ) {
-        Map<String, Object> row = jdbcTemplate.queryForMap(
+        if (applicationCandidatureId == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Identifiant du lot obligatoire."
+            );
+        }
+
+        if (reponseCritereId == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Identifiant de la réponse obligatoire."
+            );
+        }
+
+        if (request == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Évaluation obligatoire."
+            );
+        }
+
+        /*
+         * Vérifier que la réponse appartient bien
+         * au lot/application envoyé dans l’URL.
+         */
+        List<Map<String, Object>> responseRows =
+                jdbcTemplate.queryForList(
+                        """
+                        SELECT
+                            rc.id AS reponse_critere_id,
+                            rc.application_candidature_id,
+                            rc.critere_evaluation_id,
+                            ce.points_max,
+                            ac.candidature_id
+    
+                        FROM reponse_critere rc
+    
+                        JOIN critere_evaluation ce
+                            ON ce.id = rc.critere_evaluation_id
+    
+                        JOIN application_candidature ac
+                            ON ac.id = rc.application_candidature_id
+    
+                        WHERE rc.id = ?
+                          AND rc.application_candidature_id = ?
+                        """,
+                        reponseCritereId,
+                        applicationCandidatureId
+                );
+
+        if (responseRows.isEmpty()) {
+            throw new ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "La réponse critère est introuvable pour ce lot."
+            );
+        }
+
+        Map<String, Object> responseRow =
+                responseRows.get(0);
+
+        BigDecimal pointsMax =
+                asBigDecimal(
+                        responseRow.get("points_max")
+                );
+
+        Long candidatureId =
+                ((Number) responseRow.get(
+                        "candidature_id"
+                )).longValue();
+
+        String statut =
+                normalizeStatut(
+                        request.getStatut()
+                );
+
+        BigDecimal noteObtenue =
+                "CONFORME".equals(statut)
+                        ? pointsMax
+                        : BigDecimal.ZERO;
+
+        Long evaluateurId =
+                request.getEvaluateurId();
+
+        String commentaire =
+                request.getCommentaireEvaluateur();
+
+        if (commentaire != null) {
+            commentaire = commentaire.trim();
+
+            if (commentaire.isEmpty()) {
+                commentaire = null;
+            }
+        }
+
+        /*
+         * Mise à jour directe par reponse_critere_id.
+         *
+         * Aucun ORDER BY.
+         * Aucun LIMIT.
+         * Aucune recherche de dernière modification.
+         */
+        int updated = jdbcTemplate.update(
                 """
-                SELECT
-                    rc.id AS reponse_id,
-                    rc.application_candidature_id,
-                    rc.critere_evaluation_id,
-                    ce.points_max
-                FROM reponse_critere rc
-                JOIN critere_evaluation ce ON ce.id = rc.critere_evaluation_id
-                WHERE rc.id = ?
-                  AND rc.application_candidature_id = ?
-                """,
-                reponseCritereId,
-                applicationCandidatureId
-        );
-
-        BigDecimal pointsMax = asBigDecimal(row.get("points_max"));
-
-        String statut = normalizeStatut(request.getStatut());
-
-        BigDecimal noteObtenue = "CONFORME".equals(statut)
-                ? pointsMax
-                : BigDecimal.ZERO;
-
-        Long evaluateurId = request.getEvaluateurId();
-        String commentaire = request.getCommentaireEvaluateur();
-
-        List<Long> existingIds = jdbcTemplate.query(
-                """
-                SELECT id
-                FROM evaluation_critere
+                UPDATE evaluation_critere
+    
+                SET evaluateur_id = ?,
+                    note_obtenue = ?,
+                    commentaire_evaluateur = ?,
+                    statut = ?,
+                    updated_at = CURRENT_TIMESTAMP
+    
                 WHERE reponse_critere_id = ?
-                ORDER BY id DESC
-                LIMIT 1
                 """,
-                (rs, rn) -> rs.getLong("id"),
+                evaluateurId,
+                noteObtenue,
+                commentaire,
+                statut,
                 reponseCritereId
         );
 
-        if (existingIds.isEmpty()) {
+        /*
+         * Première évaluation de cette réponse :
+         * aucune ligne n’existe encore, donc INSERT.
+         */
+        if (updated == 0) {
             jdbcTemplate.update(
                     """
                     INSERT INTO evaluation_critere
@@ -729,7 +1396,11 @@ public class ElEmarEvaluationService {
                         created_at,
                         updated_at
                     )
-                    VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    VALUES (
+                        ?, ?, ?, ?, ?,
+                        CURRENT_TIMESTAMP,
+                        CURRENT_TIMESTAMP
+                    )
                     """,
                     reponseCritereId,
                     evaluateurId,
@@ -737,83 +1408,107 @@ public class ElEmarEvaluationService {
                     commentaire,
                     statut
             );
-        } else {
-            jdbcTemplate.update(
-                    """
-                    UPDATE evaluation_critere
-                    SET evaluateur_id = ?,
-                        note_obtenue = ?,
-                        commentaire_evaluateur = ?,
-                        statut = ?,
-                        updated_at = CURRENT_TIMESTAMP
-                    WHERE id = ?
-                    """,
-                    evaluateurId,
-                    noteObtenue,
-                    commentaire,
-                    statut,
-                    existingIds.get(0)
-            );
         }
 
-        BigDecimal noteLot = recalculateAndSaveApplicationNote(applicationCandidatureId);
+        /*
+         * Recalcul et sauvegarde de la note du lot.
+         */
+        BigDecimal noteLot =
+                recalculateAndSaveApplicationNote(
+                        applicationCandidatureId
+                );
 
-        Long candidatureId = jdbcTemplate.queryForObject(
-                """
-                SELECT candidature_id
-                FROM application_candidature
-                WHERE id = ?
-                """,
-                Long.class,
-                applicationCandidatureId
-        );
+        /*
+         * Recalcul de la note globale de l’intervenant.
+         */
+        BigDecimal noteGlobale =
+                recalculateGlobalNote(
+                        candidatureId
+                );
 
-        BigDecimal noteGlobale = recalculateGlobalNote(candidatureId);
         historiqueActionService.enregistrerAction(
-                request.getEvaluateurId(),
+                evaluateurId,
                 candidatureId,
                 applicationCandidatureId,
                 "EL_EMAR_EVALUATION_CRITERE",
-                "El Emar a évalué un critère. Réponse critère ID: "
+                "Évaluation du critère"
+                        + " | Réponse ID : "
                         + reponseCritereId
-                        + " | Statut: "
+                        + " | Statut : "
                         + statut
-                        + " | Note obtenue: "
+                        + " | Note : "
                         + scale(noteObtenue)
-                        + " | Commentaire: "
+                        + " | Commentaire : "
                         + safe(commentaire)
         );
+
         return SaveCritereEvaluationResponse.builder()
-                .reponseCritereId(reponseCritereId)
-                .applicationCandidatureId(applicationCandidatureId)
-                .statutEvaluation(statut)
-                .conforme("CONFORME".equals(statut))
-                .noteObtenue(scale(noteObtenue))
-                .noteLot(scale(noteLot))
-                .noteGlobale(scale(noteGlobale))
-                .commentaireEvaluateur(commentaire)
+                .reponseCritereId(
+                        reponseCritereId
+                )
+                .applicationCandidatureId(
+                        applicationCandidatureId
+                )
+                .statutEvaluation(
+                        statut
+                )
+                .conforme(
+                        "CONFORME".equals(statut)
+                )
+                .noteObtenue(
+                        scale(noteObtenue)
+                )
+                .noteLot(
+                        scale(noteLot)
+                )
+                .noteGlobale(
+                        scale(noteGlobale)
+                )
+                .commentaireEvaluateur(
+                        commentaire
+                )
                 .build();
     }
 
     private BigDecimal recalculateAndSaveApplicationNote(Long applicationCandidatureId) {
-        Map<String, Object> totals = jdbcTemplate.queryForMap(
-                """
-                SELECT
-                    COALESCE(SUM(COALESCE(ec.note_obtenue, 0)), 0) AS total_obtenu,
-                    COALESCE(SUM(COALESCE(ce.points_max, 0)), 0) AS total_max
-                FROM reponse_critere rc
-                JOIN critere_evaluation ce ON ce.id = rc.critere_evaluation_id
-                LEFT JOIN LATERAL (
-                    SELECT e.*
-                    FROM evaluation_critere e
-                    WHERE e.reponse_critere_id = rc.id
-                    ORDER BY e.id DESC
-                    LIMIT 1
-                ) ec ON true
-                WHERE rc.application_candidature_id = ?
-                """,
-                applicationCandidatureId
-        );
+        Map<String, Object> totals =
+                jdbcTemplate.queryForMap(
+                        """
+                        SELECT
+                            COALESCE(
+                                SUM(
+                                    COALESCE(
+                                        ec.note_obtenue,
+                                        0
+                                    )
+                                ),
+                                0
+                            ) AS total_obtenu,
+        
+                            COALESCE(
+                                SUM(
+                                    COALESCE(
+                                        ce.points_max,
+                                        0
+                                    )
+                                ),
+                                0
+                            ) AS total_max
+        
+                        FROM reponse_critere rc
+        
+                        JOIN critere_evaluation ce
+                            ON ce.id =
+                               rc.critere_evaluation_id
+        
+                        LEFT JOIN evaluation_critere ec
+                            ON ec.reponse_critere_id =
+                               rc.id
+        
+                        WHERE rc.application_candidature_id = ?
+                        """,
+                        applicationCandidatureId
+                );
 
         BigDecimal totalObtenu = asBigDecimal(totals.get("total_obtenu"));
         BigDecimal totalMax = asBigDecimal(totals.get("total_max"));

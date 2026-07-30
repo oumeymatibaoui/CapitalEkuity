@@ -42,4 +42,5 @@ public class ModuleNavbar {
 
     @Column(name = "actif")
     private Boolean actif = true;
+
 }

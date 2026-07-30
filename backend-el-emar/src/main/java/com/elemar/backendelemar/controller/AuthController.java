@@ -2,9 +2,11 @@ package com.elemar.backendelemar.controller;
 import com.elemar.backendelemar.dto.CandidatLoginRequest;
 import com.elemar.backendelemar.dto.CandidatLoginResponse;
 import com.elemar.backendelemar.dto.LoginRequest;
+import com.elemar.backendelemar.dto.LoginResponse;
 import com.elemar.backendelemar.service.AuthService;
 import com.elemar.backendelemar.service.CandidatAuthService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -17,14 +19,13 @@ public class AuthController {
     private final CandidatAuthService candidatAuthService;
 
     @PostMapping("/el-emar/login")
-    public Object loginElEmar(@RequestBody LoginRequest request) {
-        return authService.loginElEmar(request);
+    public ResponseEntity<LoginResponse> loginElEmar(@RequestBody LoginRequest request) {
+        LoginResponse response = authService.loginElEmar(request);
+        return ResponseEntity.ok(response);
     }
-
     @PostMapping("/candidat/login")
-    public CandidatLoginResponse loginCandidat(
-            @RequestBody CandidatLoginRequest request
-    ) {
-        return candidatAuthService.login(request);
+    public ResponseEntity<LoginResponse> loginCandidat(@RequestBody LoginRequest request) {
+        LoginResponse response = authService.loginCandidat(request);
+        return ResponseEntity.ok(response);
     }
 }

@@ -113,8 +113,9 @@
             <div class="section-header-actions">
                 <strong>{{ getSectionTotal(section) }} pts</strong>
 
-                <button type="button" class="delete-group-btn" title="Supprimer tous les critères de cette catégorie" (click)="deleteCategoryGroup(section)">
-          🗑 Supprimer groupe
+                <button type="button" class="delete-group-btn" title="Supprimer tous les critères de cette catégorie" (click)="openDeleteGroupModal(section)">
+          <i class="ti ti-trash"></i>
+          Supprimer groupe
         </button>
             </div>
         </div>
@@ -218,8 +219,8 @@
           ✎
         </button>
 
-                <button type="button" class="icon-btn danger" title="Supprimer" (click)="deleteCritere(critere.id)">
-          🗑
+                <button type="button" class="icon-btn danger" title="Supprimer le critère" (click)="openDeleteCritereModal(critere)">
+          <i class="ti ti-trash"></i>
         </button>
             </div>
 
@@ -625,6 +626,116 @@
                 <button type="button" class="save-btn" (click)="saveCategoryFromMiniModal()" [disabled]="savingCategory">
           {{ savingCategory ? 'Enregistrement...' : 'Ajouter' }}
         </button>
+            </div>
+
+        </div>
+    </div>
+
+
+    <!-- =====================================================
+         MODAL SUPPRESSION CRITÈRE / GROUPE
+    ====================================================== -->
+    <div class="delete-modal-backdrop" *ngIf="deleteModalOpen" (click)="closeDeleteModal()">
+        <div class="delete-modal-card" (click)="$event.stopPropagation()">
+
+            <div class="delete-modal-icon">
+                <i class="ti ti-trash"></i>
+            </div>
+
+            <span class="delete-modal-label">
+          Suppression de l’affichage
+        </span>
+
+            <h3>
+                {{ getDeleteModalTitle() }}
+            </h3>
+
+            <p class="delete-modal-question">
+                Voulez-vous vraiment supprimer
+
+                <strong>
+            « {{ getDeleteModalName() }} »
+          </strong> de l’affichage ?
+            </p>
+
+            <div class="delete-modal-details" *ngIf="deleteTarget === 'GROUPE'">
+                <div>
+                    <span>Lot concerné</span>
+
+                    <strong>
+              {{ getSelectedLotName() }}
+            </strong>
+                </div>
+
+                <div>
+                    <span>Nombre de critères</span>
+
+                    <strong>
+              {{ getDeleteModalCount() }}
+            </strong>
+                </div>
+            </div>
+
+            <div class="delete-modal-details" *ngIf="deleteTarget === 'CRITERE' && critereToDelete">
+                <div>
+                    <span>Code</span>
+
+                    <strong>
+              {{ critereToDelete.codeCritere || '-' }}
+            </strong>
+                </div>
+
+                <div>
+                    <span>Points maximum</span>
+
+                    <strong>
+              {{ critereToDelete.pointsMax }} pts
+            </strong>
+                </div>
+
+                <div>
+                    <span>Catégorie</span>
+
+                    <strong>
+              {{
+                critereToDelete.categorieEvaluationLibelle ||
+                critereToDelete.section ||
+                'Sans catégorie'
+              }}
+            </strong>
+                </div>
+            </div>
+
+            <div class="delete-modal-warning">
+                <i class="ti ti-info-circle"></i>
+
+                <span>
+            {{ getDeleteModalMessage() }}
+          </span>
+            </div>
+
+            <div class="delete-modal-actions">
+                <button type="button" class="cancel-btn" [disabled]="deleting" (click)="closeDeleteModal()">
+            Annuler
+          </button>
+
+                <button type="button" class="confirm-delete-btn" [disabled]="deleting" (click)="confirmDeleteModal()">
+            <i
+              [class]="
+                deleting
+                  ? 'ti ti-loader-2 delete-loading'
+                  : 'ti ti-trash'
+              "
+            ></i>
+
+            {{
+              deleting
+                ? 'Suppression...'
+                : deleteTarget === 'GROUPE'
+                  ? 'Supprimer le groupe'
+                  : 'Supprimer le critère'
+            }}
+          </button>
             </div>
 
         </div>

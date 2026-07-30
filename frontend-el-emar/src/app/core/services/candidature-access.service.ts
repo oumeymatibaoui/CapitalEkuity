@@ -42,16 +42,27 @@ export interface UtilisateurCndResponse {
   actif?: boolean | null;
   mustChangePassword?: boolean | null;
 }
+export interface UpdateCandidatureAccessRequest {
+  nomEntreprise: string;
+  typeIntervenantId: number | null;
+  lotIds: number[];
+}
 
 export interface CandidatureAccessResponse {
   candidatureId: number;
   nomEntreprise: string;
+
   typeIntervenantId: number;
   typeIntervenantCode?: string | null;
   typeIntervenantLibelle?: string | null;
+
   statut?: string | null;
   profilComplete?: boolean | null;
   actif?: boolean | null;
+
+  // AJOUTER CECI
+  accesBloque?: boolean | null;
+
   lots: LotLightResponse[];
   utilisateurs: UtilisateurCndResponse[];
   comptesGeneres: GeneratedAccountResponse[];
@@ -69,7 +80,32 @@ export class CandidatureAccessService {
   getAll(): Observable<CandidatureAccessResponse[]> {
     return this.http.get<CandidatureAccessResponse[]>(this.baseUrl);
   }
+updateCandidature(
+  candidatureId: number,
+  request: UpdateCandidatureAccessRequest
+): Observable<CandidatureAccessResponse> {
+  return this.http.put<CandidatureAccessResponse>(
+    `${this.baseUrl}/${candidatureId}`,
+    request
+  );
+}
+deactivateCandidature(
+  candidatureId: number
+): Observable<CandidatureAccessResponse> {
+  return this.http.patch<CandidatureAccessResponse>(
+    `${this.baseUrl}/${candidatureId}/deactivate`,
+    {}
+  );
+}
 
+activateCandidature(
+  candidatureId: number
+): Observable<CandidatureAccessResponse> {
+  return this.http.patch<CandidatureAccessResponse>(
+    `${this.baseUrl}/${candidatureId}/activate`,
+    {}
+  );
+}
   getById(candidatureId: number): Observable<CandidatureAccessResponse> {
     return this.http.get<CandidatureAccessResponse>(`${this.baseUrl}/${candidatureId}`);
   }
@@ -91,13 +127,18 @@ export class CandidatureAccessService {
       user
     );
   }
-
-  deactivateUser(userId: number): Observable<void> {
-    return this.http.patch<void>(
-      `${this.baseUrl}/utilisateurs/${userId}/deactivate`,
-      {}
-    );
-  }
+activateUser(userId: number): Observable<void> {
+  return this.http.patch<void>(
+    `${this.baseUrl}/utilisateurs/${userId}/activate`,
+    {}
+  );
+}
+deactivateUser(userId: number): Observable<void> {
+  return this.http.patch<void>(
+    `${this.baseUrl}/utilisateurs/${userId}/deactivate`,
+    {}
+  );
+}
 
   resetPassword(userId: number): Observable<GeneratedAccountResponse> {
     return this.http.patch<GeneratedAccountResponse>(

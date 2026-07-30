@@ -1,7 +1,19 @@
 package com.elemar.backendelemar.entity;
 
-import jakarta.persistence.*;
-import lombok.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.math.BigDecimal;
 
@@ -34,11 +46,14 @@ public class ProjetReference {
     @Column(name = "ville")
     private String ville;
 
+    /**
+     * Zone saisie par le candidat.
+     */
     @Column(name = "zone")
     private String zone;
 
     /**
-     * Zone validée par El Emar.
+     * Zone privée choisie par El Emar.
      */
     @Column(name = "zone_el_emar_id")
     private Long zoneElEmarId;
@@ -46,7 +61,11 @@ public class ProjetReference {
     @Column(name = "zone_el_emar_nom")
     private String zoneElEmarNom;
 
-    @Column(name = "zone_validee")
+    @Column(name = "zone_el_emar_commentaire", columnDefinition = "TEXT")
+    private String zoneElEmarCommentaire;
+
+    @Builder.Default
+    @Column(name = "zone_validee", nullable = false)
     private Boolean zoneValidee = false;
 
     @Column(name = "adresse_projet")

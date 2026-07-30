@@ -12,7 +12,13 @@ import java.math.BigDecimal;
 public class ProjetReferenceResponse {
 
     private Long id;
+    private Long zoneElEmarId;
 
+    private String zoneElEmarNom;
+
+    private String zoneElEmarCommentaire;
+
+    private Boolean zoneValidee;
     private Long applicationCandidatureId;
     private Long lotId;
     private String lotNom;
@@ -29,9 +35,7 @@ public class ProjetReferenceResponse {
     /**
      * Zone validée par El Emar.
      */
-    private Long zoneElEmarId;
-    private String zoneElEmarNom;
-    private Boolean zoneValidee;
+
 
     private String adresseProjet;
     private String typeProjet;
@@ -65,4 +69,5 @@ public class ProjetReferenceResponse {
 
     private Double latitude;
     private Double longitude;
+
 }

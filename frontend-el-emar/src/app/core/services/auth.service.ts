@@ -1,10 +1,16 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, map, tap } from 'rxjs';
 
-// =========================
-// USER EL EMAR
-// =========================
+import {
+  Observable,
+  map,
+  tap
+} from 'rxjs';
+
+// =====================================================
+// MOT DE PASSE
+// =====================================================
+
 export interface ForgotPasswordRequest {
   email: string;
 }
@@ -14,6 +20,11 @@ export interface ResetPasswordRequest {
   newPassword: string;
   confirmPassword: string;
 }
+
+// =====================================================
+// UTILISATEUR INTERNE EL EMAR
+// =====================================================
+
 export interface ConnectedElEmarUser {
   id?: number;
   userId?: number;
@@ -23,16 +34,36 @@ export interface ConnectedElEmarUser {
   prenom?: string;
   email?: string;
 
+  /**
+   * Ancien système, conservé pour compatibilité.
+   *
+   * Exemple :
+   * EL_EMAR, IT, DA, ADMIN
+   */
   typeUtilisateur?: string;
-  role?: string;
-  type?: string;
 
-  token?: string;
+  /**
+   * Nouveau rôle dynamique.
+   *
+   * Exemple :
+   * EVALUATEUR_JUNIOR
+   */
+  roleId?: number | null;
+  roleCode?: string | null;
+  roleNom?: string | null;
+
+  /**
+   * Anciennes formes possibles des réponses backend.
+   */
+  role?: string | Record<string, any> | null;
+  type?: string | null;
+
+  token?: string | null;
 }
 
-// =========================
-// USER CANDIDAT / CND
-// =========================
+// =====================================================
+// UTILISATEUR CANDIDAT
+// =====================================================
 
 export interface ConnectedCndUser {
   id?: number;
@@ -46,92 +77,132 @@ export interface ConnectedCndUser {
   email?: string;
 
   typeUtilisateur?: string;
-  role?: string;
-  type?: string;
+
+  roleId?: number | null;
+  roleCode?: string | null;
+  roleNom?: string | null;
+
+  role?: string | Record<string, any> | null;
+  type?: string | null;
 
   mustChangePassword?: boolean;
   premiereConnexion?: boolean;
   actif?: boolean;
-  statutCompte?: string;
+  statutCompte?: string | null;
 
-  token?: string;
+  token?: string | null;
 }
 
-// Type commun
-export type ConnectedUser = ConnectedElEmarUser | ConnectedCndUser;
+export type ConnectedUser =
+  | ConnectedElEmarUser
+  | ConnectedCndUser;
 
 @Injectable({
   providedIn: 'root'
 })
 export class AuthService {
 
-  private readonly apiUrl = 'http://localhost:8089/api/user';
+  private readonly apiUrl =
+    'http://localhost:8089/api/user';
 
-  constructor(private http: HttpClient) {}
+  constructor(
+    private http: HttpClient
+  ) {}
 
-  // =========================
-  // LOGIN EL EMAR
-  // =========================
+  // =====================================================
+  // LOGIN UTILISATEUR INTERNE
+  // =====================================================
 
-  loginElEmar(email: string, motDePasse: string): Observable<ConnectedElEmarUser> {
+  loginElEmar(
+    email: string,
+    motDePasse: string
+  ): Observable<ConnectedElEmarUser> {
     const body = {
-      email: email.trim().toLowerCase(),
-      motDePasse: motDePasse.trim()
-    };
+      email: String(email || '')
+        .trim()
+        .toLowerCase(),
 
-    console.log('LOGIN EL EMAR BODY = ', JSON.stringify(body));
+      motDePasse: String(motDePasse || '')
+        .trim()
+    };
 
     return this.http.post<any>(
       `${this.apiUrl}/el-emar/login`,
       body
     ).pipe(
-      map((response: any) => this.normalizeElEmarUser(response)),
-      tap((user: ConnectedElEmarUser) => this.saveElEmarUser(user))
+      map((response: any) =>
+        this.normalizeElEmarUser(response)
+      ),
+
+      tap((user: ConnectedElEmarUser) =>
+        this.saveElEmarUser(user)
+      )
     );
   }
 
-  // =========================
+  // =====================================================
   // LOGIN CANDIDAT
-  // =========================
+  // =====================================================
 
-  loginCandidat(email: string, motDePasse: string): Observable<ConnectedCndUser> {
+  loginCandidat(
+    email: string,
+    motDePasse: string
+  ): Observable<ConnectedCndUser> {
     const body = {
-      email: email.trim().toLowerCase(),
-      motDePasse: motDePasse.trim()
-    };
+      email: String(email || '')
+        .trim()
+        .toLowerCase(),
 
-    console.log('LOGIN CANDIDAT BODY = ', JSON.stringify(body));
+      motDePasse: String(motDePasse || '')
+        .trim()
+    };
 
     return this.http.post<any>(
       `${this.apiUrl}/candidat/login`,
       body
     ).pipe(
-      map((response: any) => this.normalizeCndUser(response)),
-      tap((user: ConnectedCndUser) => this.saveCndUser(user))
+      map((response: any) =>
+        this.normalizeCndUser(response)
+      ),
+
+      tap((user: ConnectedCndUser) =>
+        this.saveCndUser(user)
+      )
     );
   }
 
-  // =========================
+  // =====================================================
   // SESSION
-  // =========================
+  // =====================================================
 
   isLoggedIn(): boolean {
     return this.getConnectedUser() !== null;
   }
 
   logout(): void {
-    localStorage.removeItem('userId');
-    localStorage.removeItem('connectedUser');
-    localStorage.removeItem('currentUser');
-    localStorage.removeItem('token');
+    const keysToRemove = [
+      'userId',
+      'connectedUser',
+      'currentUser',
+      'token',
 
-    localStorage.removeItem('elEmarUser');
+      'elEmarUser',
+      'elEmarConnectedUser',
 
-    localStorage.removeItem('candidatUser');
-    localStorage.removeItem('candidatUtilisateurId');
-    localStorage.removeItem('candidatCandidatureId');
-    localStorage.removeItem('candidatMustChangePassword');
-    localStorage.removeItem('candidatPremiereConnexion');
+      'candidatUser',
+      'candidatUtilisateurId',
+      'candidatCandidatureId',
+      'candidatMustChangePassword',
+      'candidatPremiereConnexion',
+
+      'userRoleId',
+      'userRoleCode',
+      'userRoleNom'
+    ];
+
+    for (const key of keysToRemove) {
+      localStorage.removeItem(key);
+    }
   }
 
   getConnectedUser(): ConnectedUser | null {
@@ -164,8 +235,66 @@ export class AuthService {
     }
   }
 
-  getUserRole(user?: ConnectedUser | null): string {
-    const currentUser = user ?? this.getConnectedUser();
+  // =====================================================
+  // INFORMATIONS UTILISATEUR
+  // =====================================================
+
+  /**
+   * Retourne le véritable rôle dynamique.
+   *
+   * La priorité est :
+   * roleCode → objet role → ancien typeUtilisateur.
+   */
+  getUserRole(
+    user?: ConnectedUser | null
+  ): string {
+    const currentUser =
+      user ?? this.getConnectedUser();
+
+    if (!currentUser) {
+      return String(
+        localStorage.getItem('userRoleCode') || ''
+      )
+        .trim()
+        .toUpperCase();
+    }
+
+    const rawUser = currentUser as any;
+
+    const roleObject =
+      rawUser?.role &&
+      typeof rawUser.role === 'object'
+        ? rawUser.role
+        : null;
+
+    return String(
+      rawUser?.roleCode ??
+      roleObject?.codeRole ??
+      roleObject?.code ??
+      (
+        typeof rawUser?.role === 'string'
+          ? rawUser.role
+          : null
+      ) ??
+      rawUser?.typeUtilisateur ??
+      rawUser?.type ??
+      localStorage.getItem('userRoleCode') ??
+      ''
+    )
+      .trim()
+      .toUpperCase();
+  }
+
+  /**
+   * Retourne l’ancien type technique.
+   *
+   * Il sert encore à distinguer CND des utilisateurs internes.
+   */
+  getLegacyUserType(
+    user?: ConnectedUser | null
+  ): string {
+    const currentUser =
+      user ?? this.getConnectedUser();
 
     if (!currentUser) {
       return '';
@@ -175,12 +304,57 @@ export class AuthService {
 
     return String(
       rawUser?.typeUtilisateur ??
-      rawUser?.role ??
       rawUser?.type ??
       ''
     )
       .trim()
       .toUpperCase();
+  }
+
+  getUserRoleId(): number | null {
+    const user = this.getConnectedUser() as any;
+
+    const value =
+      user?.roleId ??
+      localStorage.getItem('userRoleId') ??
+      null;
+
+    if (
+      value === null ||
+      value === undefined ||
+      value === '' ||
+      isNaN(Number(value))
+    ) {
+      return null;
+    }
+
+    return Number(value);
+  }
+
+  getUserRoleName(): string {
+    const user = this.getConnectedUser() as any;
+
+    return String(
+      user?.roleNom ??
+      localStorage.getItem('userRoleNom') ??
+      ''
+    ).trim();
+  }
+
+  isCandidat(
+    user?: ConnectedUser | null
+  ): boolean {
+    const currentUser =
+      user ?? this.getConnectedUser();
+
+    if (!currentUser) {
+      return false;
+    }
+
+    return (
+      this.getLegacyUserType(currentUser) === 'CND' ||
+      this.getUserRole(currentUser) === 'CND'
+    );
   }
 
   getUserName(): string {
@@ -192,17 +366,23 @@ export class AuthService {
 
     const rawUser = user as any;
 
-    const prenom = rawUser?.prenom ?? '';
-    const nom = rawUser?.nom ?? '';
+    const prenom = String(
+      rawUser?.prenom || ''
+    ).trim();
 
-    const fullName = `${prenom} ${nom}`.trim();
+    const nom = String(
+      rawUser?.nom || ''
+    ).trim();
+
+    const fullName =
+      `${prenom} ${nom}`.trim();
 
     if (fullName) {
       return fullName;
     }
 
     if (rawUser?.email) {
-      return rawUser.email;
+      return String(rawUser.email);
     }
 
     return 'Utilisateur';
@@ -212,7 +392,13 @@ export class AuthService {
     const user = this.getConnectedUser();
 
     if (!user) {
-      return null;
+      const storedId =
+        localStorage.getItem('userId');
+
+      return storedId &&
+        !isNaN(Number(storedId))
+          ? Number(storedId)
+          : null;
     }
 
     const rawUser = user as any;
@@ -223,7 +409,11 @@ export class AuthService {
       rawUser?.utilisateurId ??
       null;
 
-    if (userId === null || userId === undefined) {
+    if (
+      userId === null ||
+      userId === undefined ||
+      isNaN(Number(userId))
+    ) {
       return null;
     }
 
@@ -231,143 +421,396 @@ export class AuthService {
   }
 
   getCandidatUtilisateurId(): number | null {
-    const value = localStorage.getItem('candidatUtilisateurId');
-    return value ? Number(value) : null;
+    const value =
+      localStorage.getItem(
+        'candidatUtilisateurId'
+      );
+
+    return value &&
+      !isNaN(Number(value))
+        ? Number(value)
+        : null;
   }
 
   getCandidatCandidatureId(): number | null {
-    const value = localStorage.getItem('candidatCandidatureId');
-    return value ? Number(value) : null;
+    const value =
+      localStorage.getItem(
+        'candidatCandidatureId'
+      );
+
+    return value &&
+      !isNaN(Number(value))
+        ? Number(value)
+        : null;
   }
 
-  // =========================
-  // NORMALISATION EL EMAR
-  // =========================
+  // =====================================================
+  // NORMALISATION UTILISATEUR INTERNE
+  // =====================================================
 
-  private normalizeElEmarUser(response: any): ConnectedElEmarUser {
+  private normalizeElEmarUser(
+    response: any
+  ): ConnectedElEmarUser {
     if (!response) {
-      throw new Error('Réponse login El Emar vide.');
+      throw new Error(
+        'Réponse login El Emar vide.'
+      );
     }
 
     const user =
-      response.user ??
-      response.utilisateur ??
-      response.connectedUser ??
+      response?.user ??
+      response?.utilisateur ??
+      response?.connectedUser ??
       response;
 
-    const token = response.token ?? user.token;
+    const roleObject =
+      user?.role &&
+      typeof user.role === 'object'
+        ? user.role
+        : null;
+
+    const roleId = this.toNumberOrNull(
+      user?.roleId ??
+      roleObject?.id ??
+      null
+    );
+
+    const typeUtilisateur = String(
+      user?.typeUtilisateur ??
+      user?.type ??
+      'EL_EMAR'
+    )
+      .trim()
+      .toUpperCase();
+
+    const roleCode = String(
+      user?.roleCode ??
+      roleObject?.codeRole ??
+      roleObject?.code ??
+      (
+        typeof user?.role === 'string'
+          ? user.role
+          : null
+      ) ??
+      typeUtilisateur
+    )
+      .trim()
+      .toUpperCase();
+
+    const roleNomValue =
+      user?.roleNom ??
+      roleObject?.nomRole ??
+      roleObject?.libelle ??
+      null;
+
+    const roleNom =
+      roleNomValue !== null &&
+      roleNomValue !== undefined
+        ? String(roleNomValue).trim()
+        : null;
+
+    const tokenValue =
+      response?.token ??
+      user?.token ??
+      null;
+
+    const token =
+      tokenValue !== null &&
+      tokenValue !== undefined
+        ? String(tokenValue)
+        : null;
 
     return {
       ...user,
+
+      id: this.toNumberOrUndefined(
+        user?.id
+      ),
+
+      userId: this.toNumberOrUndefined(
+        user?.userId
+      ),
+
+      utilisateurId: this.toNumberOrUndefined(
+        user?.utilisateurId
+      ),
+
+      nom: String(user?.nom ?? ''),
+      prenom: String(user?.prenom ?? ''),
+      email: String(user?.email ?? ''),
+
+      typeUtilisateur,
+
+      roleId,
+      roleCode,
+      roleNom,
+
+      role:
+        typeof user?.role === 'string'
+          ? user.role
+          : roleObject,
+
+      type:
+        user?.type !== undefined &&
+        user?.type !== null
+          ? String(user.type)
+          : null,
+
       token
     };
   }
 
-  // =========================
-  // NORMALISATION CND
-  // =========================
+  // =====================================================
+  // NORMALISATION CANDIDAT
+  // =====================================================
 
-  private normalizeCndUser(response: any): ConnectedCndUser {
+  private normalizeCndUser(
+    response: any
+  ): ConnectedCndUser {
     if (!response) {
-      throw new Error('Réponse login candidat vide.');
+      throw new Error(
+        'Réponse login candidat vide.'
+      );
     }
 
     const user =
-      response.user ??
-      response.utilisateur ??
-      response.connectedUser ??
+      response?.user ??
+      response?.utilisateur ??
+      response?.connectedUser ??
       response;
 
+    const roleObject =
+      user?.role &&
+      typeof user.role === 'object'
+        ? user.role
+        : null;
+
+    const utilisateurId =
+      this.toNumberOrUndefined(
+        user?.utilisateurId ??
+        user?.id ??
+        user?.userId
+      );
+
+    const candidatureId =
+      this.toNumberOrNull(
+        user?.candidatureId
+      );
+
+    const roleId =
+      this.toNumberOrNull(
+        user?.roleId ??
+        roleObject?.id ??
+        null
+      );
+
+    const typeUtilisateur = String(
+      user?.typeUtilisateur ??
+      user?.type ??
+      'CND'
+    )
+      .trim()
+      .toUpperCase();
+
+    const roleCode = String(
+      user?.roleCode ??
+      roleObject?.codeRole ??
+      roleObject?.code ??
+      (
+        typeof user?.role === 'string'
+          ? user.role
+          : null
+      ) ??
+      typeUtilisateur ??
+      'CND'
+    )
+      .trim()
+      .toUpperCase();
+
+    const roleNomValue =
+      user?.roleNom ??
+      roleObject?.nomRole ??
+      roleObject?.libelle ??
+      'Candidat';
+
+    const tokenValue =
+      response?.token ??
+      user?.token ??
+      null;
+
     return {
-      id: user.id,
-      userId: user.userId,
-      utilisateurId: Number(
-        user.utilisateurId ??
-        user.id ??
-        user.userId
+      id: this.toNumberOrUndefined(
+        user?.id
       ),
 
-      candidatureId:
-        user.candidatureId !== null && user.candidatureId !== undefined
-          ? Number(user.candidatureId)
+      userId: this.toNumberOrUndefined(
+        user?.userId
+      ),
+
+      utilisateurId,
+      candidatureId,
+
+      nom: String(user?.nom ?? ''),
+      prenom: String(user?.prenom ?? ''),
+      email: String(user?.email ?? ''),
+
+      typeUtilisateur,
+
+      roleId,
+      roleCode,
+      roleNom: String(roleNomValue),
+
+      role:
+        typeof user?.role === 'string'
+          ? user.role
+          : roleObject,
+
+      type:
+        user?.type !== undefined &&
+        user?.type !== null
+          ? String(user.type)
           : null,
 
-      nom: user.nom ?? '',
-      prenom: user.prenom ?? '',
-      email: user.email ?? '',
+      mustChangePassword:
+        user?.mustChangePassword === true,
 
-      typeUtilisateur: String(
-        user.typeUtilisateur ??
-        user.role ??
-        user.type ??
-        'CND'
-      ).toUpperCase(),
+      premiereConnexion:
+        user?.premiereConnexion === true,
 
-      role: user.role,
-      type: user.type,
+      actif:
+        user?.actif !== false,
 
-      mustChangePassword: user.mustChangePassword === true,
-      premiereConnexion: user.premiereConnexion === true,
-      actif: user.actif !== false,
-      statutCompte: user.statutCompte ?? null,
+      statutCompte:
+        user?.statutCompte !== undefined &&
+        user?.statutCompte !== null
+          ? String(user.statutCompte)
+          : null,
 
-      token: response.token ?? user.token
+      token:
+        tokenValue !== null &&
+        tokenValue !== undefined
+          ? String(tokenValue)
+          : null
     };
   }
 
-  // =========================
-  // SAVE EL EMAR
-  // =========================
+  // =====================================================
+  // SAUVEGARDE UTILISATEUR INTERNE
+  // =====================================================
 
-  private saveElEmarUser(user: ConnectedElEmarUser): void {
-    const rawUser = user as any;
-
+  private saveElEmarUser(
+    user: ConnectedElEmarUser
+  ): void {
     const userId =
-      rawUser?.id ??
-      rawUser?.userId ??
-      rawUser?.utilisateurId ??
+      user.id ??
+      user.userId ??
+      user.utilisateurId ??
       null;
 
-    if (userId !== null && userId !== undefined) {
-      localStorage.setItem('userId', String(userId));
+    if (
+      userId !== null &&
+      userId !== undefined
+    ) {
+      localStorage.setItem(
+        'userId',
+        String(userId)
+      );
     }
 
-    if (rawUser?.token) {
-      localStorage.setItem('token', rawUser.token);
+    this.saveRoleInformation(user);
+
+    if (user.token) {
+      localStorage.setItem(
+        'token',
+        user.token
+      );
+    } else {
+      localStorage.removeItem('token');
     }
 
-    localStorage.setItem('elEmarUser', JSON.stringify(user));
-    localStorage.setItem('connectedUser', JSON.stringify(user));
-    localStorage.setItem('currentUser', JSON.stringify(user));
+    localStorage.setItem(
+      'elEmarUser',
+      JSON.stringify(user)
+    );
+
+    localStorage.setItem(
+      'connectedUser',
+      JSON.stringify(user)
+    );
+
+    localStorage.setItem(
+      'currentUser',
+      JSON.stringify(user)
+    );
   }
 
-  // =========================
-  // SAVE CND
-  // =========================
+  // =====================================================
+  // SAUVEGARDE CANDIDAT
+  // =====================================================
 
-  private saveCndUser(user: ConnectedCndUser): void {
+  private saveCndUser(
+    user: ConnectedCndUser
+  ): void {
     const utilisateurId =
       user.utilisateurId ??
       user.id ??
       user.userId ??
       null;
 
-    if (utilisateurId !== null && utilisateurId !== undefined) {
-      localStorage.setItem('userId', String(utilisateurId));
-      localStorage.setItem('candidatUtilisateurId', String(utilisateurId));
+    if (
+      utilisateurId !== null &&
+      utilisateurId !== undefined
+    ) {
+      localStorage.setItem(
+        'userId',
+        String(utilisateurId)
+      );
+
+      localStorage.setItem(
+        'candidatUtilisateurId',
+        String(utilisateurId)
+      );
     }
 
-    if (user.candidatureId !== null && user.candidatureId !== undefined) {
-      localStorage.setItem('candidatCandidatureId', String(user.candidatureId));
+    if (
+      user.candidatureId !== null &&
+      user.candidatureId !== undefined
+    ) {
+      localStorage.setItem(
+        'candidatCandidatureId',
+        String(user.candidatureId)
+      );
+    } else {
+      localStorage.removeItem(
+        'candidatCandidatureId'
+      );
     }
+
+    this.saveRoleInformation(user);
 
     if (user.token) {
-      localStorage.setItem('token', user.token);
+      localStorage.setItem(
+        'token',
+        user.token
+      );
+    } else {
+      localStorage.removeItem('token');
     }
 
-    localStorage.setItem('candidatUser', JSON.stringify(user));
-    localStorage.setItem('connectedUser', JSON.stringify(user));
-    localStorage.setItem('currentUser', JSON.stringify(user));
+    localStorage.setItem(
+      'candidatUser',
+      JSON.stringify(user)
+    );
+
+    localStorage.setItem(
+      'connectedUser',
+      JSON.stringify(user)
+    );
+
+    localStorage.setItem(
+      'currentUser',
+      JSON.stringify(user)
+    );
 
     localStorage.setItem(
       'candidatMustChangePassword',
@@ -379,33 +822,118 @@ export class AuthService {
       String(user.premiereConnexion === true)
     );
   }
-  forgotPassword(email: string): Observable<string> {
-  const body: ForgotPasswordRequest = {
-    email: email.trim().toLowerCase()
-  };
 
-  return this.http.post(
-    `${this.apiUrl}/forgot-password`,
-    body,
-    { responseType: 'text' }
-  );
-}
+  private saveRoleInformation(
+    user: ConnectedUser
+  ): void {
+    const roleCode =
+      user.roleCode ||
+      user.typeUtilisateur ||
+      '';
 
-resetPassword(
-  token: string,
-  newPassword: string,
-  confirmPassword: string
-): Observable<string> {
-  const body: ResetPasswordRequest = {
-    token,
-    newPassword,
-    confirmPassword
-  };
+    if (
+      user.roleId !== null &&
+      user.roleId !== undefined
+    ) {
+      localStorage.setItem(
+        'userRoleId',
+        String(user.roleId)
+      );
+    } else {
+      localStorage.removeItem('userRoleId');
+    }
 
-  return this.http.post(
-    `${this.apiUrl}/reset-password`,
-    body,
-    { responseType: 'text' }
-  );
-}
+    if (roleCode) {
+      localStorage.setItem(
+        'userRoleCode',
+        String(roleCode).toUpperCase()
+      );
+    } else {
+      localStorage.removeItem('userRoleCode');
+    }
+
+    if (user.roleNom) {
+      localStorage.setItem(
+        'userRoleNom',
+        String(user.roleNom)
+      );
+    } else {
+      localStorage.removeItem('userRoleNom');
+    }
+  }
+
+  // =====================================================
+  // MOT DE PASSE
+  // =====================================================
+
+  forgotPassword(
+    email: string
+  ): Observable<string> {
+    const body: ForgotPasswordRequest = {
+      email: String(email || '')
+        .trim()
+        .toLowerCase()
+    };
+
+    return this.http.post(
+      `${this.apiUrl}/forgot-password`,
+      body,
+      {
+        responseType: 'text'
+      }
+    );
+  }
+
+  resetPassword(
+    token: string,
+    newPassword: string,
+    confirmPassword: string
+  ): Observable<string> {
+    const body: ResetPasswordRequest = {
+      token,
+      newPassword,
+      confirmPassword
+    };
+
+    return this.http.post(
+      `${this.apiUrl}/reset-password`,
+      body,
+      {
+        responseType: 'text'
+      }
+    );
+  }
+
+  // =====================================================
+  // CONVERSION DES VALEURS
+  // =====================================================
+
+  private toNumberOrNull(
+    value: unknown
+  ): number | null {
+    if (
+      value === null ||
+      value === undefined ||
+      value === ''
+    ) {
+      return null;
+    }
+
+    const numberValue = Number(value);
+
+    return isNaN(numberValue)
+      ? null
+      : numberValue;
+  }
+
+  private toNumberOrUndefined(
+    value: unknown
+  ): number | undefined {
+    const numberValue =
+      this.toNumberOrNull(value);
+
+    return numberValue === null
+      ? undefined
+      : numberValue;
+  }
 }

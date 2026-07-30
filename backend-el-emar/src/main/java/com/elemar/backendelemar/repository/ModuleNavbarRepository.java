@@ -11,5 +11,6 @@ public interface ModuleNavbarRepository extends JpaRepository<ModuleNavbar, Long
 
     List<ModuleNavbar> findByActifTrueOrderByOrdreGroupeAscOrdreModuleAsc();
 
+
     List<ModuleNavbar> findAllByOrderByOrdreGroupeAscOrdreModuleAsc();
 }

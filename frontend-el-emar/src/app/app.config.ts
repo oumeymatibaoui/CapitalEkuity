@@ -13,7 +13,9 @@ import {
   provideHttpClient,
   withInterceptors
 } from '@angular/common/http';
-
+import {
+  authInterceptor
+} from './core/interceptors/auth.interceptor';
 import { routes } from './app.routes';
 import { forceRefreshInterceptor } from './core/interceptors/force-refresh.interceptor';
 
@@ -34,7 +36,7 @@ export const appConfig: ApplicationConfig = {
     ),
 
     provideHttpClient(
-      withInterceptors([forceRefreshInterceptor])
+      withInterceptors([forceRefreshInterceptor,authInterceptor])
     )
   ]
 };

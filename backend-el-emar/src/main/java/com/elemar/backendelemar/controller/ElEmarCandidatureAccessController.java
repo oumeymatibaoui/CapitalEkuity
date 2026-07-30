@@ -53,21 +53,62 @@ public class ElEmarCandidatureAccessController {
     }
 
     @PatchMapping("/utilisateurs/{userId}/deactivate")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deactivateUser(
             @PathVariable Long userId
     ) {
         service.deactivateUser(userId);
     }
-
+    @PatchMapping("/utilisateurs/{userId}/activate")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void activateUser(
+            @PathVariable Long userId
+    ) {
+        service.activateUser(userId);
+    }
     @PatchMapping("/utilisateurs/{userId}/reset-password")
     public GeneratedAccountResponse resetPassword(
             @PathVariable Long userId
     ) {
         return service.resetPassword(userId);
     }
+//    @DeleteMapping("/{candidatureId}")
+//    @ResponseStatus(HttpStatus.NO_CONTENT)
+//    public void deleteCandidature(@PathVariable Long candidatureId) {
+//        service.deleteCandidature(candidatureId);
+//    }
+    @PutMapping("/{candidatureId}")
+    public CandidatureAccessResponse updateCandidature(
+            @PathVariable Long candidatureId,
+            @RequestBody UpdateCandidatureAccessRequest request
+    ) {
+        return service.updateCandidature(
+                candidatureId,
+                request
+        );
+    }
+
+
     @DeleteMapping("/{candidatureId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deleteCandidature(@PathVariable Long candidatureId) {
-        service.deleteCandidature(candidatureId);
+    public void deleteCandidature(
+            @PathVariable Long candidatureId
+    ) {
+        service.deleteCandidature(
+                candidatureId
+        );
+    }
+    @PatchMapping("/{candidatureId}/deactivate")
+    public CandidatureAccessResponse deactivateCandidature(
+            @PathVariable Long candidatureId
+    ) {
+        return service.deactivateCandidature(candidatureId);
+    }
+
+    @PatchMapping("/{candidatureId}/activate")
+    public CandidatureAccessResponse activateCandidature(
+            @PathVariable Long candidatureId
+    ) {
+        return service.activateCandidature(candidatureId);
     }
 }

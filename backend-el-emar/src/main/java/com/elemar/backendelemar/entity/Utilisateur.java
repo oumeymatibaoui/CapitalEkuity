@@ -31,14 +31,37 @@ public class Utilisateur {
     @Column(name = "mot_de_passe", nullable = false)
     private String motDePasse;
 
+    /*
+     * Champ historique conservé pendant la migration.
+     * Il ne doit pas encore être supprimé.
+     */
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.NAMED_ENUM)
-    @Column(name = "type_utilisateur", nullable = false, columnDefinition = "type_utilisateur")
+    @Column(
+            name = "type_utilisateur",
+            nullable = false,
+            columnDefinition = "type_utilisateur"
+    )
     private TypeUtilisateur typeUtilisateur;
+
+    /*
+     * Nouveau rôle dynamique.
+     * Nullable pendant la période de migration.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(
+            name = "role_id",
+            foreignKey = @ForeignKey(name = "fk_utilisateur_role_acces")
+    )
+    private RoleAcces roleAcces;
 
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.NAMED_ENUM)
-    @Column(name = "statut_compte", nullable = false, columnDefinition = "statut_compte")
+    @Column(
+            name = "statut_compte",
+            nullable = false,
+            columnDefinition = "statut_compte"
+    )
     @Builder.Default
     private StatutCompte statutCompte = StatutCompte.ACTIF;
 
@@ -50,6 +73,7 @@ public class Utilisateur {
 
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "candidature_id")
     private Candidature candidature;

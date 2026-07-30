@@ -2,6 +2,10 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
+// =====================================================
+// RÔLE
+// =====================================================
+
 export interface RoleAccess {
   id: number;
   codeRole: string;
@@ -13,12 +17,34 @@ export interface RoleAccess {
   modulesAutorises: number;
   totalModules: number;
 }
+
+// =====================================================
+// CRÉATION RÔLE
+// =====================================================
+
+export interface CreateRoleRequest {
+  nomRole: string;
+  description: string;
+  typeRole: string;
+
+  /*
+   * true  = système
+   * false = standard
+   */
+  roleSysteme: boolean;
+}
+
 export interface UpdateRoleRequest {
   nomRole: string;
   description: string;
   typeRole: string;
   actif: boolean;
+  roleSysteme: boolean;
 }
+
+// =====================================================
+// MODULE
+// =====================================================
 
 export interface ModuleAccess {
   moduleId: number;
@@ -33,6 +59,10 @@ export interface ModuleAccess {
   autorise: boolean;
 }
 
+// =====================================================
+// GROUPE DE MODULES
+// =====================================================
+
 export interface ModuleGroup {
   groupe: string;
   ordreGroupe: number;
@@ -41,17 +71,15 @@ export interface ModuleGroup {
   modules: ModuleAccess[];
 }
 
-export interface CreateRoleRequest {
-  nomRole: string;
-  description: string;
-  typeRole: string;
-}
+// =====================================================
+// MODIFICATION DES ACCÈS
+// =====================================================
 
 export interface UpdateRoleModulesRequest {
-  modules: {
+  modules: Array<{
     moduleId: number;
     autorise: boolean;
-  }[];
+  }>;
 }
 
 @Injectable({
@@ -59,42 +87,134 @@ export interface UpdateRoleModulesRequest {
 })
 export class RoleAccessService {
 
-  private apiUrl = 'http://localhost:8089/api/admin/roles-acces';
+  /*
+   * Correspond exactement au :
+   *
+   * @RequestMapping("/api/admin/roles-acces")
+   */
+  private readonly apiUrl =
+    'http://localhost:8089/api/admin/roles-acces';
 
-  constructor(private http: HttpClient) {}
+  constructor(
+    private http: HttpClient
+  ) {}
+
+  // =====================================================
+  // GET /api/admin/roles-acces/roles
+  // =====================================================
 
   getRoles(): Observable<RoleAccess[]> {
-    return this.http.get<RoleAccess[]>(`${this.apiUrl}/roles`);
+    return this.http.get<RoleAccess[]>(
+      `${this.apiUrl}/roles`
+    );
   }
 
-  createRole(request: CreateRoleRequest): Observable<RoleAccess> {
-    return this.http.post<RoleAccess>(`${this.apiUrl}/roles`, request);
+  // =====================================================
+  // POST /api/admin/roles-acces/roles
+  // =====================================================
+
+  createRole(
+    request: CreateRoleRequest
+  ): Observable<RoleAccess> {
+    return this.http.post<RoleAccess>(
+      `${this.apiUrl}/roles`,
+      request
+    );
   }
 
-  getModulesByRole(roleId: number): Observable<ModuleGroup[]> {
-    return this.http.get<ModuleGroup[]>(`${this.apiUrl}/roles/${roleId}/modules`);
+  // =====================================================
+  // PUT /api/admin/roles-acces/roles/{roleId}
+  // =====================================================
+
+  updateRole(
+    roleId: number,
+    request: UpdateRoleRequest
+  ): Observable<RoleAccess> {
+    return this.http.put<RoleAccess>(
+      `${this.apiUrl}/roles/${roleId}`,
+      request
+    );
   }
 
-  updateRoleModules(roleId: number, request: UpdateRoleModulesRequest): Observable<ModuleGroup[]> {
-    return this.http.put<ModuleGroup[]>(`${this.apiUrl}/roles/${roleId}/modules`, request);
+  // =====================================================
+  // DELETE /api/admin/roles-acces/roles/{roleId}
+  // =====================================================
+
+  deleteRole(
+    roleId: number
+  ): Observable<void> {
+    return this.http.delete<void>(
+      `${this.apiUrl}/roles/${roleId}`
+    );
   }
 
-  allowAll(roleId: number): Observable<ModuleGroup[]> {
-    return this.http.patch<ModuleGroup[]>(`${this.apiUrl}/roles/${roleId}/allow-all`, {});
+  // =====================================================
+  // GET /api/admin/roles-acces/roles/{roleId}/modules
+  // =====================================================
+
+  getModulesByRole(
+    roleId: number
+  ): Observable<ModuleGroup[]> {
+    return this.http.get<ModuleGroup[]>(
+      `${this.apiUrl}/roles/${roleId}/modules`
+    );
   }
 
-  blockAll(roleId: number): Observable<ModuleGroup[]> {
-    return this.http.patch<ModuleGroup[]>(`${this.apiUrl}/roles/${roleId}/block-all`, {});
+  // =====================================================
+  // PUT /api/admin/roles-acces/roles/{roleId}/modules
+  // =====================================================
+
+  updateRoleModules(
+    roleId: number,
+    request: UpdateRoleModulesRequest
+  ): Observable<ModuleGroup[]> {
+    return this.http.put<ModuleGroup[]>(
+      `${this.apiUrl}/roles/${roleId}/modules`,
+      request
+    );
   }
 
-  getNavigationByRole(roleCode: string): Observable<ModuleAccess[]> {
-    return this.http.get<ModuleAccess[]>(`${this.apiUrl}/navigation/${roleCode}`);
-  }
-  updateRole(roleId: number, request: UpdateRoleRequest): Observable<RoleAccess> {
-  return this.http.put<RoleAccess>(`${this.apiUrl}/roles/${roleId}`, request);
-}
+  // =====================================================
+  // PATCH /api/admin/roles-acces/roles/{roleId}/allow-all
+  // =====================================================
 
-deleteRole(roleId: number): Observable<void> {
-  return this.http.delete<void>(`${this.apiUrl}/roles/${roleId}`);
-}
+  allowAll(
+    roleId: number
+  ): Observable<ModuleGroup[]> {
+    return this.http.patch<ModuleGroup[]>(
+      `${this.apiUrl}/roles/${roleId}/allow-all`,
+      {}
+    );
+  }
+
+  // =====================================================
+  // PATCH /api/admin/roles-acces/roles/{roleId}/block-all
+  // =====================================================
+
+  blockAll(
+    roleId: number
+  ): Observable<ModuleGroup[]> {
+    return this.http.patch<ModuleGroup[]>(
+      `${this.apiUrl}/roles/${roleId}/block-all`,
+      {}
+    );
+  }
+
+  // =====================================================
+  // GET /api/admin/roles-acces/navigation/{roleCode}
+  // =====================================================
+
+  getNavigationByRole(
+    roleCode: string
+  ): Observable<ModuleAccess[]> {
+    const normalizedRoleCode = encodeURIComponent(
+      String(roleCode || '')
+        .trim()
+        .toUpperCase()
+    );
+
+    return this.http.get<ModuleAccess[]>(
+      `${this.apiUrl}/navigation/${normalizedRoleCode}`
+    );
+  }
 }

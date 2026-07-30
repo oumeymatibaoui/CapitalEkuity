@@ -673,3 +673,665 @@ select:focus {
     box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
     border: 1px solid #edf2f7;
 }
+
+
+/* =========================================================
+   ACTION MODIFICATION
+========================================================= */
+
+.edit-candidature-btn {
+    height: 34px;
+    padding: 0 12px;
+    border: 1px solid #c7d2fe;
+    border-radius: 999px;
+    background: #eef2ff;
+    color: #3730a3;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12px;
+    font-weight: 850;
+    cursor: pointer;
+    transition: 0.18s ease;
+    white-space: nowrap;
+}
+
+.edit-candidature-btn i {
+    font-size: 15px;
+}
+
+.edit-candidature-btn:hover {
+    background: #e0e7ff;
+    border-color: #818cf8;
+    color: #312e81;
+    transform: translateY(-1px);
+}
+
+.edit-candidature-modal {
+    width: min(760px, 100%);
+}
+
+
+/* =========================================================
+   MODAL SUPPRESSION
+========================================================= */
+
+.delete-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 5000;
+    padding: 24px;
+    background: rgba(15, 23, 42, 0.62);
+    backdrop-filter: blur(6px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.delete-modal-card {
+    width: 470px;
+    max-width: 100%;
+    padding: 34px;
+    border-radius: 26px;
+    background: #ffffff;
+    text-align: center;
+    box-shadow: 0 30px 90px rgba(15, 23, 42, 0.38);
+    animation: candidature-modal-appear 0.18s ease-out;
+}
+
+@keyframes candidature-modal-appear {
+    from {
+        opacity: 0;
+        transform: translateY(12px) scale(0.97);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.delete-modal-icon {
+    width: 70px;
+    height: 70px;
+    margin: 0 auto 14px;
+    border-radius: 22px;
+    background: #fee2e2;
+    color: #dc2626;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+}
+
+.delete-modal-label {
+    display: inline-flex;
+    margin-bottom: 10px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: #fff1f2;
+    color: #b91c1c;
+    font-size: 10px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+}
+
+.delete-modal-card h3 {
+    margin: 0;
+    color: #06164a;
+    font-size: 24px;
+    font-weight: 900;
+}
+
+.delete-modal-question {
+    margin: 13px 0 0;
+    color: #64748b;
+    line-height: 1.6;
+}
+
+.delete-modal-question strong {
+    color: #101d56;
+}
+
+.delete-modal-details {
+    margin-top: 20px;
+    padding: 12px 16px;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    background: #f8fafc;
+    text-align: left;
+}
+
+.delete-modal-details>div {
+    padding: 9px 0;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.delete-modal-details>div:not(:last-child) {
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.delete-modal-details span {
+    color: #64748b;
+    font-size: 12px;
+}
+
+.delete-modal-details strong {
+    color: #06164a;
+    font-size: 12px;
+    text-align: right;
+}
+
+.delete-modal-warning {
+    margin-top: 18px;
+    padding: 15px 16px;
+    border: 1px solid #fecaca;
+    border-radius: 16px;
+    background: #fff7f7;
+    color: #991b1b;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    text-align: left;
+    font-size: 12px;
+    line-height: 1.55;
+}
+
+.delete-modal-warning i {
+    flex-shrink: 0;
+    margin-top: 1px;
+    font-size: 19px;
+}
+
+.delete-modal-actions {
+    margin-top: 27px;
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+}
+
+.confirm-delete-btn {
+    min-height: 46px;
+    padding: 0 20px;
+    border: none;
+    border-radius: 14px;
+    background: #dc2626;
+    color: #ffffff;
+    font-weight: 900;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.confirm-delete-btn:hover:not(:disabled) {
+    background: #b91c1c;
+}
+
+.confirm-delete-btn:disabled,
+.delete-modal-actions .cancel-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.delete-loading {
+    animation: candidature-delete-spin 0.8s linear infinite;
+}
+
+@keyframes candidature-delete-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@media (max-width: 600px) {
+    .delete-modal-card {
+        padding: 28px 20px;
+    }
+    .delete-modal-actions {
+        flex-direction: column;
+    }
+    .delete-modal-actions button {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+
+/* =========================================================
+   BOUTON ACTIVER / DÉSACTIVER
+========================================================= */
+
+.access-candidature-btn {
+    min-width: 118px;
+    height: 36px;
+    padding: 0 14px;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    font-size: 12px;
+    font-weight: 850;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.access-candidature-btn i {
+    font-size: 16px;
+}
+
+
+/* =========================================================
+   CANDIDATURE ACTIVE
+   Le bouton propose : Désactiver
+========================================================= */
+
+.access-candidature-btn.deactivate-mode {
+    background: #fff7ed;
+    border-color: #fed7aa;
+    color: #c2410c;
+}
+
+.access-candidature-btn.deactivate-mode:hover:not(:disabled) {
+    background: #ffedd5;
+    border-color: #fb923c;
+    color: #9a3412;
+    transform: translateY(-1px);
+    box-shadow: 0 7px 16px rgba(234, 88, 12, 0.16);
+}
+
+.access-candidature-btn.deactivate-mode:active:not(:disabled) {
+    transform: translateY(0);
+    box-shadow: none;
+}
+
+
+/* =========================================================
+   CANDIDATURE DÉSACTIVÉE
+   Le bouton propose : Activer
+========================================================= */
+
+.access-candidature-btn.activate-mode {
+    background: #f0fdf4;
+    border-color: #bbf7d0;
+    color: #15803d;
+}
+
+.access-candidature-btn.activate-mode:hover:not(:disabled) {
+    background: #dcfce7;
+    border-color: #4ade80;
+    color: #166534;
+    transform: translateY(-1px);
+    box-shadow: 0 7px 16px rgba(22, 163, 74, 0.16);
+}
+
+.access-candidature-btn.activate-mode:active:not(:disabled) {
+    transform: translateY(0);
+    box-shadow: none;
+}
+
+
+/* =========================================================
+   FOCUS CLAVIER
+========================================================= */
+
+.access-candidature-btn:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.16);
+}
+
+
+/* =========================================================
+   ÉTAT CHARGEMENT
+========================================================= */
+
+.access-candidature-btn:disabled {
+    opacity: 0.65;
+    cursor: wait;
+    transform: none;
+    box-shadow: none;
+}
+
+.access-loading {
+    animation: access-loading-spin 0.75s linear infinite;
+}
+
+@keyframes access-loading-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+
+/* =========================================================
+   MOBILE
+========================================================= */
+
+@media (max-width: 760px) {
+    .access-candidature-btn {
+        width: 100%;
+    }
+}
+
+
+/* =========================================================
+   INFORMATIONS UTILISATEUR
+========================================================= */
+
+.user-information {
+    min-width: 0;
+    display: grid;
+    gap: 5px;
+}
+
+.user-name-line {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    flex-wrap: wrap;
+}
+
+.user-status-chip {
+    padding: 4px 9px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.user-status-chip.user-active {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.user-status-chip.user-disabled {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+
+/* =========================================================
+   BOUTON UTILISATEUR ACTIVER / DÉSACTIVER
+========================================================= */
+
+.user-access-btn {
+    min-width: 102px;
+    height: 34px;
+    padding: 0 12px;
+    border-radius: 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    font-size: 12px;
+    font-weight: 900;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: 0.18s ease;
+}
+
+.user-access-btn i {
+    font-size: 15px;
+}
+
+.user-access-btn.deactivate-user {
+    border: 1px solid #fecaca;
+    background: #fff1f2;
+    color: #be123c;
+}
+
+.user-access-btn.deactivate-user:hover {
+    border-color: #fb7185;
+    background: #ffe4e6;
+    color: #9f1239;
+    transform: translateY(-1px);
+}
+
+.user-access-btn.activate-user {
+    border: 1px solid #bbf7d0;
+    background: #f0fdf4;
+    color: #15803d;
+}
+
+.user-access-btn.activate-user:hover {
+    border-color: #4ade80;
+    background: #dcfce7;
+    color: #166534;
+    transform: translateY(-1px);
+}
+
+
+/* =========================================================
+   MODAL UTILISATEUR
+========================================================= */
+
+.user-access-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 6000;
+    padding: 24px;
+    background: rgba(15, 23, 42, 0.62);
+    backdrop-filter: blur(6px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.user-access-modal-card {
+    width: 470px;
+    max-width: 100%;
+    padding: 32px;
+    border-radius: 26px;
+    background: #ffffff;
+    text-align: center;
+    box-shadow: 0 30px 90px rgba(15, 23, 42, 0.38);
+    animation: user-access-modal-appear 0.18s ease-out;
+}
+
+@keyframes user-access-modal-appear {
+    from {
+        opacity: 0;
+        transform: translateY(12px) scale(0.97);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.user-access-modal-icon {
+    width: 68px;
+    height: 68px;
+    margin: 0 auto 14px;
+    border-radius: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 31px;
+}
+
+.user-access-modal-icon.activate-icon {
+    background: #dcfce7;
+    color: #15803d;
+}
+
+.user-access-modal-icon.deactivate-icon {
+    background: #fee2e2;
+    color: #dc2626;
+}
+
+.user-access-modal-label {
+    display: inline-flex;
+    margin-bottom: 10px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+}
+
+.user-access-modal-label.activate-label {
+    background: #f0fdf4;
+    color: #15803d;
+}
+
+.user-access-modal-label.deactivate-label {
+    background: #fff1f2;
+    color: #be123c;
+}
+
+.user-access-modal-card h3 {
+    margin: 0;
+    color: #06164a;
+    font-size: 23px;
+    font-weight: 900;
+}
+
+.user-access-modal-card>p {
+    margin: 13px 0 0;
+    color: #64748b;
+    line-height: 1.6;
+}
+
+.user-access-modal-card>p strong {
+    color: #101d56;
+}
+
+.user-access-details {
+    margin-top: 20px;
+    padding: 11px 16px;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    background: #f8fafc;
+    text-align: left;
+}
+
+.user-access-details>div {
+    padding: 9px 0;
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.user-access-details>div:not(:last-child) {
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.user-access-details span {
+    color: #64748b;
+    font-size: 12px;
+}
+
+.user-access-details strong {
+    color: #06164a;
+    font-size: 12px;
+    text-align: right;
+}
+
+.user-access-warning {
+    margin-top: 18px;
+    padding: 14px 16px;
+    border-radius: 16px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    text-align: left;
+    font-size: 12px;
+    line-height: 1.55;
+}
+
+.user-access-warning i {
+    flex-shrink: 0;
+    margin-top: 1px;
+    font-size: 18px;
+}
+
+.user-access-warning.activate-warning {
+    border: 1px solid #bbf7d0;
+    background: #f0fdf4;
+    color: #166534;
+}
+
+.user-access-warning.deactivate-warning {
+    border: 1px solid #fecaca;
+    background: #fff7f7;
+    color: #991b1b;
+}
+
+.user-access-modal-actions {
+    margin-top: 26px;
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+}
+
+.confirm-user-access-btn {
+    min-height: 46px;
+    padding: 0 20px;
+    border: none;
+    border-radius: 14px;
+    color: #ffffff;
+    font-weight: 900;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.confirm-user-access-btn.confirm-activate {
+    background: #16a34a;
+}
+
+.confirm-user-access-btn.confirm-activate:hover:not(:disabled) {
+    background: #15803d;
+}
+
+.confirm-user-access-btn.confirm-deactivate {
+    background: #dc2626;
+}
+
+.confirm-user-access-btn.confirm-deactivate:hover:not(:disabled) {
+    background: #b91c1c;
+}
+
+.confirm-user-access-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.user-access-loading {
+    animation: user-access-spin 0.75s linear infinite;
+}
+
+@keyframes user-access-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@media (max-width: 600px) {
+    .user-access-modal-card {
+        padding: 27px 20px;
+    }
+    .user-access-modal-actions {
+        flex-direction: column;
+    }
+    .user-access-modal-actions button {
+        width: 100%;
+        justify-content: center;
+    }
+    .user-actions {
+        width: 100%;
+        flex-wrap: wrap;
+    }
+}

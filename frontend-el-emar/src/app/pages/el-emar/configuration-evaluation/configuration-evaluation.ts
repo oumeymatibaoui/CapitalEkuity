@@ -27,6 +27,8 @@ type LotView = Lot & {
   codeLot?: string;
 };
 
+type DeleteTarget = 'CRITERE' | 'GROUPE';
+
 @Component({
   selector: 'app-configuration-evaluation',
   standalone: true,
@@ -38,16 +40,17 @@ export class ConfigurationEvaluation implements OnInit {
 
   types: TypeIntervenant[] = [];
   lots: LotView[] = [];
-categoryModalOpen = false;
-savingCategory = false;
-categoryFormError = '';
 
-categoryForm = {
-  libelle: '',
-  code: '',
-  description: '',
-  globalForType: true
-};
+  categoryModalOpen = false;
+  savingCategory = false;
+  categoryFormError = '';
+
+  categoryForm = {
+    libelle: '',
+    code: '',
+    description: '',
+    globalForType: true
+  };
   selectedTypeIntervenantId: number | null = null;
   selectedLotId: number | null = null;
 
@@ -72,6 +75,12 @@ categoryForm = {
   modalOpen = false;
   editMode = false;
   editingId: number | null = null;
+
+  deleteModalOpen = false;
+  deleting = false;
+  deleteTarget: DeleteTarget = 'CRITERE';
+  critereToDelete: CritereEvaluationResponse | null = null;
+  sectionToDelete = '';
 
   form: CritereEvaluationRequest = this.getEmptyForm();
 
@@ -358,34 +367,70 @@ generateCategoryCode(value: string): string {
     });
   }
 
-  loadEvaluation(): void {
-    if (!this.selectedLotId) {
-      this.criteres = [];
-      this.loading = false;
-      return;
-    }
+loadEvaluation(): void {
+  if (!this.selectedLotId) {
+    this.criteres = [];
+    this.loading = false;
+    return;
+  }
 
-    this.loading = true;
-    this.errorMessage = '';
-    this.successMessage = '';
+  this.loading = true;
+  this.errorMessage = '';
+  this.successMessage = '';
 
-    this.evaluationService.getActiveByLot(this.selectedLotId).subscribe({
-      next: (criteres: CritereEvaluationResponse[]) => {
-        this.criteres = (criteres || []).sort(
-          (a, b) => (a.ordreAffichage || 0) - (b.ordreAffichage || 0)
+  this.evaluationService
+    .getActiveByLot(this.selectedLotId)
+    .subscribe({
+      next: (
+        criteres: CritereEvaluationResponse[]
+      ) => {
+        console.log(
+          'CRITERES REÇUS =',
+          criteres
+        );
+
+        this.criteres = (criteres || [])
+          .map((critere: any) => ({
+            ...critere,
+
+            id: Number(
+              critere.id ??
+              critere.critereEvaluationId
+            )
+          }))
+          .sort(
+            (a, b) =>
+              Number(a.ordreAffichage || 0) -
+              Number(b.ordreAffichage || 0)
+          );
+
+        console.log(
+          'CRITERES NORMALISÉS =',
+          this.criteres
+        );
+
+        console.log(
+          'ID PREMIER CRITERE =',
+          this.criteres?.[0]?.id
         );
 
         this.loading = false;
         this.loadTotals();
       },
+
       error: (error: unknown) => {
-        console.error('LOAD CRITERES ERROR', error);
+        console.error(
+          'LOAD CRITERES ERROR',
+          error
+        );
+
         this.loading = false;
-        this.errorMessage = 'Erreur lors du chargement de la grille d’évaluation.';
+
+        this.errorMessage =
+          'Erreur lors du chargement de la grille d’évaluation.';
       }
     });
-  }
-
+}
   loadTotals(): void {
     if (!this.selectedLotId) return;
 
@@ -548,30 +593,6 @@ generateCategoryCode(value: string): string {
     });
   }
 
-  deleteCritere(id: number): void {
-  const confirmed = confirm(
-    'Voulez-vous vraiment supprimer ce critère de l’affichage ?\n\nIl sera désactivé, pas supprimé définitivement.'
-  );
-
-  if (!confirmed) return;
-
-  this.evaluationService.deactivate(id).subscribe({
-    next: () => {
-      this.successMessage = 'Critère supprimé de l’affichage avec succès.';
-      this.loadEvaluation();
-      this.loadPieceNames();
-      this.loadTotals();
-    },
-    error: (error: any) => {
-      console.error('DEACTIVATE CRITERE ERROR', error);
-
-      this.errorMessage =
-        error?.error?.message ||
-        error?.error?.detail ||
-        'Erreur lors de la suppression du critère.';
-    }
-  });
-}
 
   buildRequest(): CritereEvaluationRequest {
     const nomCritere = this.form.libelleCritere?.trim() || '';
@@ -811,69 +832,232 @@ getTypeChampLabel(type?: string | null): string {
   trackByIndex(index: number): number {
     return index;
   }
-deleteCategoryGroup(section: string): void {
-  if (!this.selectedLotId) {
-    this.errorMessage = 'Veuillez sélectionner un lot.';
-    return;
-  }
+  // =====================================================
+  // MODAL SUPPRESSION
+  // =====================================================
 
-  const lotId = Number(this.selectedLotId);
-
-  const criteresToDeactivate = this.getCriteresBySection(section)
-    .filter(critere => Number(critere.lotId) === lotId);
-
-  if (criteresToDeactivate.length === 0) {
-    this.errorMessage = 'Aucun critère à supprimer dans ce lot.';
-    return;
-  }
-
-  const lotName = this.getSelectedLotName();
-
-  const confirmed = confirm(
-    `Voulez-vous vraiment supprimer le groupe "${section}" uniquement pour le lot "${lotName}" ?\n\nLes critères seront désactivés, pas supprimés définitivement.`
+openDeleteCritereModal(
+  critere: CritereEvaluationResponse
+): void {
+  console.log(
+    'CRITERE REÇU PAR LE MODAL =',
+    critere
   );
 
-  if (!confirmed) {
+  if (
+    critere === null ||
+    critere === undefined ||
+    critere.id === null ||
+    critere.id === undefined
+  ) {
+    console.error(
+      'OBJET CRITERE INVALIDE =',
+      critere
+    );
+
+    this.errorMessage =
+      'Identifiant du critère introuvable.';
     return;
   }
 
-  this.loading = true;
   this.errorMessage = '';
   this.successMessage = '';
 
-  const deactivateRequests = criteresToDeactivate.map(critere =>
-    this.evaluationService.deactivate(critere.id)
-  );
+  this.deleteTarget = 'CRITERE';
+  this.critereToDelete = critere;
+  this.sectionToDelete = '';
+  this.deleteModalOpen = true;
+}
+  openDeleteGroupModal(section: string): void {
+    if (!this.selectedLotId) {
+      this.errorMessage = 'Veuillez sélectionner un lot.';
+      return;
+    }
 
-  forkJoin(deactivateRequests).subscribe({
-    next: () => {
-      this.loading = false;
-
-      this.successMessage =
-        `Le groupe "${section}" a été supprimé de l’affichage uniquement pour le lot "${lotName}".`;
-
-      const ids = new Set(criteresToDeactivate.map(critere => critere.id));
-
-      this.criteres = this.criteres.filter(
-        critere => !ids.has(critere.id)
+    const criteresDuGroupe = this.getCriteresBySection(section)
+      .filter(
+        critere =>
+          Number(critere.lotId) === Number(this.selectedLotId)
       );
 
-      this.loadEvaluation();
-      this.loadTotals();
-    },
-    error: (error: any) => {
-      console.error('DEACTIVATE GROUP ERROR', error);
-
-      this.loading = false;
-
+    if (criteresDuGroupe.length === 0) {
       this.errorMessage =
-        error?.error?.message ||
-        error?.error?.detail ||
-        'Erreur lors de la suppression du groupe pour ce lot.';
+        'Aucun critère à supprimer dans ce groupe.';
+      return;
     }
-  });
-}
-generateCodeCritere(): string {
+
+    this.errorMessage = '';
+    this.successMessage = '';
+
+    this.deleteTarget = 'GROUPE';
+    this.sectionToDelete = section;
+    this.critereToDelete = null;
+    this.deleteModalOpen = true;
+  }
+
+  closeDeleteModal(): void {
+    if (this.deleting) {
+      return;
+    }
+
+    this.deleteModalOpen = false;
+    this.deleteTarget = 'CRITERE';
+    this.critereToDelete = null;
+    this.sectionToDelete = '';
+  }
+
+  confirmDeleteModal(): void {
+    if (this.deleteTarget === 'GROUPE') {
+      this.confirmDeleteGroup();
+      return;
+    }
+
+    this.confirmDeleteCritere();
+  }
+
+  private confirmDeleteCritere(): void {
+    if (!this.critereToDelete?.id) {
+      this.errorMessage = 'Critère introuvable.';
+      this.closeDeleteModal();
+      return;
+    }
+
+    const critereId = this.critereToDelete.id;
+    const critereNom =
+      this.critereToDelete.libelleCritere || 'Critère';
+
+    this.deleting = true;
+    this.errorMessage = '';
+    this.successMessage = '';
+
+    this.evaluationService.deactivate(critereId).subscribe({
+      next: () => {
+        this.deleting = false;
+        this.deleteModalOpen = false;
+        this.critereToDelete = null;
+        this.sectionToDelete = '';
+
+        this.successMessage =
+          `Le critère "${critereNom}" a été supprimé de l’affichage.`;
+
+        this.loadEvaluation();
+        this.loadPieceNames();
+        this.loadTotals();
+      },
+      error: (error: any) => {
+        console.error('DEACTIVATE CRITERE ERROR', error);
+        this.deleting = false;
+
+        this.errorMessage =
+          error?.error?.message ||
+          error?.error?.detail ||
+          'Erreur lors de la suppression du critère.';
+      }
+    });
+  }
+
+  private confirmDeleteGroup(): void {
+    if (!this.selectedLotId || !this.sectionToDelete) {
+      this.errorMessage = 'Groupe ou lot introuvable.';
+      this.closeDeleteModal();
+      return;
+    }
+
+    const lotId = Number(this.selectedLotId);
+    const section = this.sectionToDelete;
+
+    const criteresToDeactivate = this.getCriteresBySection(section)
+      .filter(critere => Number(critere.lotId) === lotId);
+
+    if (criteresToDeactivate.length === 0) {
+      this.errorMessage =
+        'Aucun critère à supprimer dans ce groupe.';
+      this.closeDeleteModal();
+      return;
+    }
+
+    const lotName = this.getSelectedLotName();
+
+    this.deleting = true;
+    this.errorMessage = '';
+    this.successMessage = '';
+
+    const requests = criteresToDeactivate.map(
+      critere => this.evaluationService.deactivate(critere.id)
+    );
+
+    forkJoin(requests).subscribe({
+      next: () => {
+        this.deleting = false;
+        this.deleteModalOpen = false;
+        this.sectionToDelete = '';
+        this.critereToDelete = null;
+
+        this.successMessage =
+          `Le groupe "${section}" a été supprimé de l’affichage pour le lot "${lotName}".`;
+
+        this.loadEvaluation();
+        this.loadTotals();
+      },
+      error: (error: any) => {
+        console.error('DEACTIVATE GROUP ERROR', error);
+        this.deleting = false;
+
+        this.errorMessage =
+          error?.error?.message ||
+          error?.error?.detail ||
+          'Erreur lors de la suppression du groupe.';
+      }
+    });
+  }
+
+  getDeleteModalTitle(): string {
+    return this.deleteTarget === 'GROUPE'
+      ? 'Supprimer le groupe de critères'
+      : 'Supprimer le critère';
+  }
+
+  getDeleteModalName(): string {
+    if (this.deleteTarget === 'GROUPE') {
+      return this.sectionToDelete;
+    }
+
+    return this.critereToDelete?.libelleCritere || 'Critère';
+  }
+
+  getDeleteModalMessage(): string {
+    if (this.deleteTarget === 'GROUPE') {
+      return (
+        'Tous les critères de ce groupe seront désactivés ' +
+        'uniquement pour le lot sélectionné. Ils resteront ' +
+        'conservés dans la base de données.'
+      );
+    }
+
+    return (
+      'Ce critère sera désactivé et retiré de l’affichage. ' +
+      'Il restera conservé dans la base de données.'
+    );
+  }
+
+  getDeleteModalCount(): number {
+    if (
+      this.deleteTarget !== 'GROUPE' ||
+      !this.sectionToDelete ||
+      !this.selectedLotId
+    ) {
+      return 1;
+    }
+
+    return this.getCriteresBySection(this.sectionToDelete)
+      .filter(
+        critere =>
+          Number(critere.lotId) === Number(this.selectedLotId)
+      )
+      .length;
+  }
+
+  generateCodeCritere(): string {
   const existingCodes = this.criteres
     .map(critere => critere.codeCritere || '')
     .map(code => code.trim().toUpperCase())

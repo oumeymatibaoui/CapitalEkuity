@@ -3,15 +3,15 @@
     <div class="top-header">
         <div>
             <button type="button" class="back-link" (click)="goBack()">
-                ← Retour aux candidatures
+                ← Retour aux dossiers de qualification
             </button>
-            <h1>Évaluation du dossier</h1>
-            <p>Consultation des réponses, pièces PDF et notation automatique.</p>
+            <h1>Évaluation administrative et technique du dossier</h1>
+            <p>Analyse de conformité administrative, évaluation technique et qualification par lot.</p>
         </div>
 
         <div class="header-actions" *ngIf="detail">
             <div class="global-score" [ngClass]="getNoteClass(getDisplayedGlobalNote())">
-                <span>Note globale</span>
+                <span>Score global de qualification</span>
                 <strong>{{ getDisplayedGlobalNote() | number:'1.0-2' }} %</strong>
             </div>
         </div>
@@ -23,11 +23,11 @@
 
     <div *ngIf="loading" class="loading-card">
         <div class="spinner"></div>
-        <span>Chargement du dossier candidat...</span>
+        <span>Chargement du dossier de qualification...</span>
     </div>
 
     <div *ngIf="loadFinished && !loading && !detail && !pageError" class="empty-card">
-        Aucun détail trouvé pour cette candidature.
+        Aucun dossier de qualification trouvé.
     </div>
 
     <ng-container *ngIf="!loading && detail">
@@ -38,8 +38,8 @@
                 <div class="section-left">
                     <span class="section-icon">◆</span>
                     <div>
-                        <h2>Données générales de la société</h2>
-                        <small>Informations soumises par le candidat.</small>
+                        <h2>Identification et informations générales de l’entreprise</h2>
+                        <small>Données déclaratives communiquées dans le dossier de qualification.</small>
                     </div>
                 </div>
                 <span class="status-badge">{{ detail.statut || 'SOUMIS' }}</span>
@@ -62,12 +62,12 @@
                 </div>
 
                 <div class="info-item">
-                    <label>Date création</label>
+                    <label>Date de création</label>
                     <strong>{{ formatDate(detail.dateCreationBureau) }}</strong>
                 </div>
 
                 <div class="info-item full">
-                    <label>Adresse siège</label>
+                    <label>Adresse du siège social</label>
                     <strong>{{ detail.adresseSiege || '-' }}</strong>
                 </div>
 
@@ -97,7 +97,7 @@
                 </div>
 
                 <div class="info-item">
-                    <label>Fonction représentant</label>
+                    <label>Fonction du représentant légal</label>
                     <strong>{{ detail.fonctionRepresentant || '-' }}</strong>
                 </div>
 
@@ -112,9 +112,158 @@
                 </div>
 
                 <div class="info-item full">
-                    <label>Agréments / Certifications</label>
+                    <label>Agréments et certifications</label>
                     <strong>{{ detail.agrementsCertifications || '-' }}</strong>
                 </div>
+            </div>
+        </div>
+
+        <!-- =====================================================
+             CONTRÔLE PRIVÉ DE SOLVABILITÉ EL EMAR
+        ====================================================== -->
+        <div class="section-card internal-control-section">
+
+            <div class="section-header internal-header">
+                <div class="section-left">
+                    <span class="section-icon internal-icon">
+                        <i class="ti ti-shield-lock"></i>
+                    </span>
+
+                    <div>
+                        <h2>Analyse interne de la capacité financière</h2>
+                        <small>
+                            Évaluation confidentielle réservée aux équipes habilitées d’El Emar.
+                        </small>
+                    </div>
+                </div>
+
+                <span class="private-badge">
+                    <i class="ti ti-lock"></i>
+                    Analyse interne
+                </span>
+            </div>
+
+            <div class="solvability-content">
+
+                <div class="solvability-intro">
+                    <div>
+                        <span class="solvability-step">01</span>
+
+                        <div>
+                            <h3>Appréciation de la capacité financière de l’entreprise</h3>
+
+                            <p>
+                                Renseignez la conclusion de l’analyse financière interne, puis validez son enregistrement.
+                            </p>
+                        </div>
+                    </div>
+
+                    <span class="solvability-current-status" [class.status-pending]="solvabiliteStatut === 'A_VERIFIER'" [class.status-solvable]="solvabiliteStatut === 'SOLVABLE'" [class.status-not-solvable]="solvabiliteStatut === 'NON_SOLVABLE'">
+                        {{
+                            solvabiliteStatut === 'SOLVABLE'
+                                ? 'Solvable'
+                                : solvabiliteStatut === 'NON_SOLVABLE'
+                                    ? 'Non solvable'
+                                    : 'À vérifier'
+                        }}
+                    </span>
+                </div>
+
+                <div class="solvability-options">
+
+                    <button type="button" class="solvability-choice pending-choice" [class.selected]="solvabiliteStatut === 'A_VERIFIER'" [disabled]="savingSolvabilite" (click)="setSolvabiliteStatut('A_VERIFIER')">
+                        <span class="choice-icon">
+                            <i class="ti ti-clock-question"></i>
+                        </span>
+
+                        <span class="choice-text">
+                            <strong>À vérifier</strong>
+                            <small>L’analyse financière est en cours ou reste à finaliser.</small>
+                        </span>
+
+                        <i
+                            class="ti ti-circle-check selected-check"
+                            *ngIf="solvabiliteStatut === 'A_VERIFIER'"
+                        ></i>
+                    </button>
+
+                    <button type="button" class="solvability-choice solvable-choice" [class.selected]="solvabiliteStatut === 'SOLVABLE'" [disabled]="savingSolvabilite" (click)="setSolvabiliteStatut('SOLVABLE')">
+                        <span class="choice-icon">
+                            <i class="ti ti-shield-check"></i>
+                        </span>
+
+                        <span class="choice-text">
+                            <strong>Capacité financière satisfaisante</strong>
+                            <small>La capacité financière répond aux exigences de qualification.</small>
+                        </span>
+
+                        <i
+                            class="ti ti-circle-check selected-check"
+                            *ngIf="solvabiliteStatut === 'SOLVABLE'"
+                        ></i>
+                    </button>
+
+                    <button type="button" class="solvability-choice not-solvable-choice" [class.selected]="solvabiliteStatut === 'NON_SOLVABLE'" [disabled]="savingSolvabilite" (click)="setSolvabiliteStatut('NON_SOLVABLE')">
+                        <span class="choice-icon">
+                            <i class="ti ti-shield-x"></i>
+                        </span>
+
+                        <span class="choice-text">
+                            <strong>Capacité financière insuffisante</strong>
+                            <small>La capacité financière ne répond pas aux exigences de qualification.</small>
+                        </span>
+
+                        <i
+                            class="ti ti-circle-check selected-check"
+                            *ngIf="solvabiliteStatut === 'NON_SOLVABLE'"
+                        ></i>
+                    </button>
+
+                </div>
+
+                <div class="solvability-comment">
+                    <label>
+                        <span>Commentaire d’analyse financière</span>
+                        <small>Facultatif — réservé à l’usage interne d’El Emar</small>
+                    </label>
+
+                    <textarea rows="4" class="form-control" [ngModel]="solvabiliteCommentaire" [disabled]="savingSolvabilite" (ngModelChange)="onSolvabiliteCommentChange($event)" placeholder="Consigner les éléments justificatifs ou réserves issus de l’analyse financière..."></textarea>
+                </div>
+
+                <div class="solvability-footer">
+
+                    <div class="solvability-meta">
+                        <span class="solvability-saved-message" *ngIf="solvabiliteSaved && !solvabiliteDirty">
+                            <i class="ti ti-circle-check"></i>
+                            Analyse enregistrée
+                        </span>
+
+                        <small *ngIf="detail.solvabiliteDateValidation">
+                            Dernière mise à jour :
+                            {{ formatDate(detail.solvabiliteDateValidation) }}
+                        </small>
+                    </div>
+
+                    <button type="button" class="save-solvability-btn" [disabled]="savingSolvabilite || !solvabiliteDirty" (click)="saveSolvabilite()">
+                        <i
+                            [class]="
+                                savingSolvabilite
+                                    ? 'ti ti-loader-2 button-loading'
+                                    : 'ti ti-device-floppy'
+                            "
+                        ></i>
+
+                        {{
+                            savingSolvabilite
+                                ? 'Enregistrement...'
+                                : solvabiliteDirty
+                                    ? 'Enregistrer l’analyse'
+                                    : 'Analyse à jour'
+                        }}
+                    </button>
+
+                </div>
+
             </div>
         </div>
 
@@ -124,8 +273,8 @@
                 <div class="section-left">
                     <span class="section-icon">☆</span>
                     <div>
-                        <h2>Pièces générales</h2>
-                        <small>Documents administratifs déposés par le candidat.</small>
+                        <h2>Contrôle de conformité administrative</h2>
+                        <small>Vérification des pièces réglementaires et justificatives du dossier.</small>
                     </div>
                 </div>
             </div>
@@ -133,41 +282,41 @@
             <div class="document-evaluation-grid">
 
                 <div class="document-evaluation-card">
-                    <button type="button" class="document-card" [disabled]="!detail.rnePdfUrl" (click)="openPdfModal(detail.rnePdfUrl, 'Registre National des Entreprises / RNE')">
+                    <button type="button" class="document-card" [disabled]="!detail.rnePdfUrl" (click)="openPdfModal(detail.rnePdfUrl, 'Extrait du Registre National des Entreprises (RNE)')">
                         <span class="doc-icon">PDF</span>
                         <span>
-                            <strong>Registre National des Entreprises / RNE</strong>
+                            <strong>Extrait du Registre National des Entreprises (RNE)</strong>
                             <small>{{ detail.rneNomFichier || 'Non déposé' }}</small>
                         </span>
                     </button>
 
-                    <select class="form-control status-select" [ngModel]="detail.rneStatut || 'A_VERIFIER'" [ngClass]="getStatusClass(detail.rneStatut || 'A_VERIFIER')" (ngModelChange)="onDocumentGeneralStatutChange('RNE', $event)">
-                        <option value="A_VERIFIER">À vérifier</option>
-                        <option value="CONFORME">Conforme</option>
-                        <option value="NON_CONFORME">Non conforme</option>
-                    </select>
+                    <select class="form-control status-select" [ngModel]="detail.rneStatut || 'A_VERIFIER'" [ngClass]="getStatusClass(detail.rneStatut || 'A_VERIFIER')" [disabled]="savingDocuments" (ngModelChange)="onDocumentGeneralStatutChange('RNE', $event)">
+  <option value="A_VERIFIER">À vérifier</option>
+  <option value="CONFORME">Conforme</option>
+  <option value="NON_CONFORME">Non conforme</option>
+</select>
                 </div>
 
                 <div class="document-evaluation-card">
-                    <button type="button" class="document-card" [disabled]="!detail.cnssPdfUrl" (click)="openPdfModal(detail.cnssPdfUrl, 'Attestation CNSS')">
+                    <button type="button" class="document-card" [disabled]="!detail.cnssPdfUrl" (click)="openPdfModal(detail.cnssPdfUrl, 'Attestation de régularité CNSS')">
                         <span class="doc-icon">PDF</span>
                         <span>
-                            <strong>Attestation CNSS</strong>
+                            <strong>Attestation de régularité CNSS</strong>
                             <small>{{ detail.cnssNomFichier || 'Non déposé' }}</small>
                         </span>
                     </button>
 
-                    <select class="form-control status-select" [ngModel]="detail.cnssStatut || 'A_VERIFIER'" [ngClass]="getStatusClass(detail.cnssStatut || 'A_VERIFIER')" (ngModelChange)="onDocumentGeneralStatutChange('CNSS', $event)">
-                        <option value="A_VERIFIER">À vérifier</option>
-                        <option value="CONFORME">Conforme</option>
-                        <option value="NON_CONFORME">Non conforme</option>
-                    </select>
+                    <select class="form-control status-select" [ngModel]="detail.cnssStatut || 'A_VERIFIER'" [ngClass]="getStatusClass(detail.cnssStatut || 'A_VERIFIER')" [disabled]="savingDocuments" (ngModelChange)="onDocumentGeneralStatutChange('CNSS', $event)">
+  <option value="A_VERIFIER">À vérifier</option>
+  <option value="CONFORME">Conforme</option>
+  <option value="NON_CONFORME">Non conforme</option>
+</select>
                 </div>
 
             </div>
 
             <div class="blocking-alert" *ngIf="isDossierNonRecevable()">
-                Dossier non recevable : RNE ou CNSS non conforme. La note globale est automatiquement égale à 0.
+                Dossier administrativement non recevable : une pièce réglementaire obligatoire a été déclarée non conforme. Le score global est neutralisé.
             </div>
         </div>
 
@@ -177,14 +326,14 @@
                 <div class="section-left">
                     <span class="section-icon">●</span>
                     <div>
-                        <h2>Lots remplis par le candidat</h2>
-                        <small>Seuls les lots choisis et remplis sont affichés.</small>
+                        <h2>Lots soumis à qualification</h2>
+                        <small>Évaluation distincte des compétences et références pour chaque lot déclaré.</small>
                     </div>
                 </div>
             </div>
 
             <div class="empty-card" *ngIf="!detail.lots || detail.lots.length === 0">
-                Aucun lot rempli pour cette candidature.
+                Aucun lot n’a été soumis à qualification pour cette entreprise.
             </div>
 
             <div class="lot-tabs" *ngIf="detail.lots && detail.lots.length > 0">
@@ -198,24 +347,24 @@
 
                 <div class="lot-summary">
                     <div>
-                        <label>Lot sélectionné</label>
+                        <label>Lot en cours d’analyse</label>
                         <strong>{{ selectedLot.nomLot }}</strong>
                     </div>
 
                     <div>
-                        <label>Statut</label>
+                        <label>État du dossier</label>
                         <strong>{{ selectedLot.statut || '-' }}</strong>
                     </div>
 
                     <div>
-                        <label>Note lot</label>
+                        <label>Score de qualification du lot</label>
                         <strong [ngClass]="getNoteClass(getDisplayedLotNote(selectedLot))">
                             {{ getDisplayedLotNote(selectedLot) | number:'1.0-2' }} %
                         </strong>
                     </div>
 
                     <div *ngIf="getClassementForLot(selectedLot) as classement">
-                        <label>Classement zone</label>
+                        <label>Catégorie de qualification territoriale</label>
                         <strong [ngClass]="getCategorieClass(classement.categorie)">
                             Catégorie {{ classement.categorie }}
                         </strong>
@@ -225,7 +374,7 @@
                 <!-- FORMULAIRE ÉVALUATION -->
                 <div class="form-evaluation-block">
                     <div class="block-title">
-                        <h3>Formulaire rempli par le candidat</h3>
+                        <h3>Grille d’évaluation technique et professionnelle</h3>
                         <span *ngIf="saving">Sauvegarde...</span>
                     </div>
 
@@ -235,12 +384,12 @@
                         <table class="evaluation-table">
                             <thead>
                                 <tr>
-                                    <th>Champ demandé</th>
-                                    <th>Réponse candidat</th>
-                                    <th>Pièces</th>
-                                    <th>Évaluation El Emar</th>
-                                    <th>Note</th>
-                                    <th>Commentaire critère</th>
+                                    <th>Critère de qualification</th>
+                                    <th>Réponse déclarée</th>
+                                    <th>Pièces justificatives</th>
+                                    <th>Avis de conformité</th>
+                                    <th>Note attribuée</th>
+                                    <th>Demande de clarification</th>
                                 </tr>
                             </thead>
 
@@ -261,7 +410,7 @@
 
                                     <td class="pieces-cell">
                                         <div *ngIf="!critere.pieces || critere.pieces.length === 0" class="no-piece">
-                                            Aucune pièce
+                                            Aucune pièce justificative
                                         </div>
 
                                         <button type="button" class="piece-btn" *ngFor="let piece of critere.pieces" [disabled]="!piece.deposee" (click)="openPdfModal(piece.pdfUrl, piece.nomPiece)">
@@ -271,11 +420,23 @@
                                     </td>
 
                                     <td class="evaluation-cell">
-                                        <select [(ngModel)]="critere.statutEvaluation" class="form-control status-select" [ngClass]="getStatusClass(critere.statutEvaluation)" [disabled]="isDossierNonRecevable()" (ngModelChange)="onStatutEvaluationChange(selectedLot, critere)">
-                                            <option value="A_VERIFIER">À vérifier</option>
-                                            <option value="CONFORME">Conforme</option>
-                                            <option value="NON_CONFORME">Non conforme</option>
-                                        </select>
+                                        <div class="critere-evaluation-control">
+                                            <select class="form-control status-select" [ngModel]="critere.statutEvaluation" [ngClass]="getStatusClass(critere.statutEvaluation)" [disabled]="isDossierNonRecevable() || isCritereSaving(critere)" (ngModelChange)="onStatutEvaluationChange(selectedLot, critere, $event)">
+                                                <option value="A_VERIFIER">À vérifier</option>
+                                                <option value="CONFORME">Conforme</option>
+                                                <option value="NON_CONFORME">Non conforme</option>
+                                            </select>
+
+                                            <span class="critere-save-status saving" *ngIf="isCritereSaving(critere)">
+                                                <i class="ti ti-loader-2 button-loading"></i>
+                                                Enregistrement...
+                                            </span>
+
+                                            <span class="critere-save-status saved" *ngIf="!isCritereSaving(critere) && isCritereSaved(critere)">
+                                                <i class="ti ti-circle-check"></i>
+                                                Enregistré
+                                            </span>
+                                        </div>
                                     </td>
 
                                     <td>
@@ -290,12 +451,12 @@
                                         <div class="field">
                                             <!-- <label>Commentaire spécifique à ce critère</label> -->
 
-                                            <textarea rows="3" class="form-control decision-textarea" [ngModel]="getCritereCommentaire(selectedLot, critere)" (ngModelChange)="setCritereCommentaire(selectedLot, critere, $event)" placeholder="Exemple : cette réponse est incomplète, merci de corriger ce point précis...">
+                                            <textarea rows="3" class="form-control decision-textarea" [ngModel]="getCritereCommentaire(selectedLot, critere)" (ngModelChange)="setCritereCommentaire(selectedLot, critere, $event)" placeholder="Précisez le complément ou la clarification attendue pour ce critère...">
         </textarea>
                                         </div>
 
                                         <button type="button" class="btn primary" [disabled]="saving || !hasCritereCommentaire(selectedLot, critere)" (click)="envoyerCommentaireCritereAuCandidat(selectedLot, critere)">
-        Notifier le candidat
+        Demander un complément
     </button>
                                     </td>
 
@@ -309,7 +470,7 @@
                 <div class="references-block" *ngIf="selectedLot.references && selectedLot.references.length > 0">
 
                     <div class="block-title">
-                        <h3>Projets de référence</h3>
+                        <h3>Références professionnelles déclarées</h3>
                         <span>{{ selectedLot.references.length }} référence(s)</span>
                     </div>
 
@@ -317,42 +478,140 @@
                         <div class="reference-card" *ngFor="let ref of selectedLot.references">
 
                             <div class="reference-header">
-                                <strong>{{ ref.nomProjet || 'Projet de référence' }}</strong>
+                                <strong>{{ ref.nomProjet || 'Référence professionnelle' }}</strong>
                                 <span>{{ ref.anneeLivraison || '-' }}</span>
                             </div>
 
-                            <div class="reference-zone-box">
-                                <label>Zone El Emar</label>
+                            <div class="reference-zone-box" [class.zone-is-saved]="ref.zoneValidee && !referenceZoneDirty[ref.id]">
 
-                                <select class="form-control zone-select" [ngModel]="referenceZoneSelection[ref.id]" (ngModelChange)="onReferenceZoneChangeLocal(ref, $event)">
-                                    <option value="">-- Choisir une zone El Emar --</option>
+                                <div class="zone-box-header">
+                                    <div>
+                                        <span class="zone-step-number">01</span>
 
-                                    <option *ngFor="let zone of  zonesUniques" [value]="zone.id">
-                                        {{ zone.nomZone }}
-                                    </option>
-                                </select>
+                                        <div>
+                                            <h4>Affectation territoriale de la référence</h4>
 
-                                <textarea rows="2" class="form-control comment-box" [(ngModel)]="referenceZoneCommentaire[ref.id]" placeholder="Commentaire El Emar sur la zone ou la référence...">
-                                </textarea>
+                                            <p>
+                                                Cette affectation est établie en interne selon le périmètre géographique de qualification.
+                                            </p>
+                                        </div>
+                                    </div>
 
-                                <small *ngIf="getReferenceZoneLabel(ref) !== '-'">
-                                    Zone sélectionnée : {{ getReferenceZoneLabel(ref) }}
-                                    <span *ngIf="getReferenceZoneAdresse(ref)">
-                                        — {{ getReferenceZoneAdresse(ref) }}
+                                    <span class="zone-save-status" [class.saved]="ref.zoneValidee && !referenceZoneDirty[ref.id]">
+                                        <i
+                                            [class]="
+                                                ref.zoneValidee && !referenceZoneDirty[ref.id]
+                                                    ? 'ti ti-circle-check'
+                                                    : 'ti ti-clock'
+                                            "
+                                        ></i>
+
+                                        {{
+                                            ref.zoneValidee && !referenceZoneDirty[ref.id]
+                                                ? 'Enregistrée'
+                                                : 'À enregistrer'
+                                        }}
                                     </span>
-                                </small>
+                                </div>
 
-                                <small *ngIf="getReferenceZoneLabel(ref) === '-'">
-                                    Aucune zone sélectionnée pour cette référence.
-                                </small>
+                                <div class="zone-form-grid">
 
-                                <button type="button" class="btn small primary" [disabled]="saving || !referenceZoneSelection[ref.id]" (click)="validerZoneReference(selectedLot, ref)">
-                                    Enregistrer cette zone
-                                </button>
+                                    <label class="zone-field">
+                                        <span>Zone d’intervention retenue *</span>
 
-                                <small class="success-text" *ngIf="ref.zoneValidee">
-                                    Zone enregistrée en base
-                                </small>
+                                       <select
+  class="form-control zone-select"
+  [ngModel]="referenceZoneSelection[ref.id]"
+  [disabled]="isReferenceZoneSaving(ref)"
+  (ngModelChange)="
+    onReferenceZoneChangeLocal(
+      ref,
+      $event
+    )
+  "
+>
+  <option [ngValue]="null">
+    -- Sélectionner une zone d’intervention --
+  </option>
+
+  <option
+    *ngFor="let zone of zonesUniques"
+    [ngValue]="zone.id"
+  >
+    {{ zone.nomZone }}
+  </option>
+</select>
+                                    </label>
+
+                                    <label class="zone-field">
+                                        <span>Observation de qualification</span>
+
+                                        <textarea
+                                            rows="3"
+                                            class="form-control comment-box"
+                                            [ngModel]="referenceZoneCommentaire[ref.id]"
+                                            [disabled]="isReferenceZoneSaving(ref)"
+                                            (ngModelChange)="onReferenceZoneCommentChange(ref, $event)"
+                                            placeholder="Motiver l’affectation territoriale ou préciser les réserves éventuelles..."
+                                        ></textarea>
+                                    </label>
+
+                                </div>
+
+                                <div class="selected-zone-preview" *ngIf="getReferenceZoneLabel(ref) !== '-'">
+                                    <span class="selected-zone-icon">
+                                        <i class="ti ti-map-pin"></i>
+                                    </span>
+
+                                    <div>
+                                        <small>Zone d’intervention retenue</small>
+
+                                        <strong>
+                                            {{ getReferenceZoneLabel(ref) }}
+                                        </strong>
+
+                                        <span *ngIf="getReferenceZoneAdresse(ref)">
+                                            {{ getReferenceZoneAdresse(ref) }}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div class="zone-actions-line">
+
+                                    <span class="zone-required-message">
+                                        <i class="ti ti-info-circle"></i>
+                                        L’affectation territoriale et son observation sont enregistrées dans le dossier.
+                                    </span>
+
+                                    <button type="button" class="save-zone-btn" [disabled]="
+                                            isReferenceZoneSaving(ref)
+                                            || !referenceZoneSelection[ref.id]
+                                            || (
+                                                ref.zoneValidee
+                                                && !referenceZoneDirty[ref.id]
+                                            )
+                                        " (click)="validerZoneReference(selectedLot, ref)">
+                                        <i
+                                            [class]="
+                                                isReferenceZoneSaving(ref)
+                                                    ? 'ti ti-loader-2 button-loading'
+                                                    : ref.zoneValidee
+                                                        ? 'ti ti-refresh'
+                                                        : 'ti ti-device-floppy'
+                                            "
+                                        ></i>
+
+                                        {{
+                                            isReferenceZoneSaving(ref)
+                                                ? 'Enregistrement...'
+                                                : ref.zoneValidee
+                                                    ? 'Mettre à jour l’affectation'
+                                                    : 'Enregistrer l’affectation'
+                                        }}
+                                    </button>
+
+                                </div>
+
                             </div>
 
                             <div class="reference-info">
@@ -362,17 +621,17 @@
                                 </p>
 
                                 <p>
-                                    <label>Adresse référence</label>
+                                    <label>Localisation du projet</label>
                                     <span>{{ ref.adresseProjet || ref.ville || '-' }}</span>
                                 </p>
 
                                 <p>
-                                    <label>Type projet</label>
+                                    <label>Typologie du projet</label>
                                     <span>{{ ref.typeProjet || '-' }}</span>
                                 </p>
 
                                 <p>
-                                    <label>Surface</label>
+                                    <label>Surface du projet</label>
                                     <span>{{ ref.surfaceM2 || '-' }} m²</span>
                                 </p>
 
@@ -382,7 +641,7 @@
                                 </p>
 
                                 <p>
-                                    <label>Sous-sols</label>
+                                    <label>Nombre de sous-sols</label>
                                     <span>{{ ref.nombreSousSols || '-' }}</span>
                                 </p>
 
@@ -392,12 +651,12 @@
                                 </p>
 
                                 <p>
-                                    <label>Seuil OK</label>
+                                    <label>Seuil d’éligibilité</label>
                                     <span>{{ formatBoolean(ref.seuilOk) }}</span>
                                 </p>
 
                                 <p class="full">
-                                    <label>Mission réalisée</label>
+                                    <label>Prestations réalisées</label>
                                     <span>{{ ref.missionRealisee || '-' }}</span>
                                 </p>
                             </div>
@@ -423,38 +682,38 @@
 
                     <div class="decision-header">
                         <div>
-                            <h3>Décision finale du lot</h3>
+                            <h3>Décision de qualification du lot</h3>
                             <p>
-                                Décision spécifique au lot
-                                <strong>{{ selectedLot.nomLot }}</strong>. Le classement par zone sera enregistré uniquement pour ce lot.
+                                Statuez sur la qualification de l’entreprise pour le lot
+                                <strong>{{ selectedLot.nomLot }}</strong>. L’affectation territoriale et la décision sont enregistrées au niveau de ce lot.
                             </p>
                         </div>
 
                         <span class="lot-decision-badge">
-                            {{ selectedLot.statut || 'EN ÉVALUATION' }}
+                            {{ selectedLot.statut || 'EN COURS D’ANALYSE' }}
                         </span>
                     </div>
 
                     <div class="decision-score">
-                        <span>Score du lot</span>
+                        <span>Score de qualification du lot</span>
 
                         <strong [ngClass]="getNoteClass(getFinalScoreForLot(selectedLot))">
                             {{ getFinalScoreForLot(selectedLot) | number:'1.0-2' }} / 100
                         </strong>
 
                         <small *ngIf="getFinalScoreForLot(selectedLot) < 80">
-                            Le seuil minimum d'admission pour ce lot est fixé à 80/100.
+                            Le seuil minimal de qualification pour ce lot est fixé à 80/100.
                         </small>
                     </div>
 
                     <div class="decision-actions-grid">
 
                         <button type="button" class="decision-choice admit" [ngClass]="getDecisionButtonClassForLot(selectedLot, 'ADMIS')" (click)="selectDecisionForLot(selectedLot, 'ADMIS')" [disabled]="!canAdmettreLot(selectedLot) || isLotValidating(selectedLot)">
-                            ✓ Admettre ce lot
+                            ✓ Qualifier pour ce lot
                         </button>
 
                         <button type="button" class="decision-choice reject" [ngClass]="getDecisionButtonClassForLot(selectedLot, 'REJETE')" (click)="selectDecisionForLot(selectedLot, 'REJETE')" [disabled]="isLotValidating(selectedLot)">
-                            ✕ Rejeter ce lot
+                            ✕ Ne pas qualifier
                         </button>
 
                     </div>
@@ -463,13 +722,13 @@
                             decisionFinaleByLot[selectedLot.applicationCandidatureId] === 'ADMIS'
                             && !hasAtLeastOneZoneSelectedForLot(selectedLot)
                         ">
-                        Pour admettre ce lot, vous devez sélectionner au moins une zone El Emar dans les projets de référence de ce lot.
+                        Pour qualifier l’entreprise sur ce lot, au moins une zone d’intervention doit être affectée à ses références professionnelles.
                     </div>
 
                     <div class="field">
-                        <label>Observations / Commentaires du lot</label>
+                        <label>Motivation de la décision de qualification</label>
 
-                        <textarea rows="4" class="form-control decision-textarea" [(ngModel)]="observationFinaleByLot[selectedLot.applicationCandidatureId]" placeholder="Motivez votre décision finale pour ce lot...">
+                        <textarea rows="4" class="form-control decision-textarea" [(ngModel)]="observationFinaleByLot[selectedLot.applicationCandidatureId]" placeholder="Précisez les éléments justifiant la qualification ou la non-qualification pour ce lot...">
                         </textarea>
                     </div>
 
@@ -482,12 +741,12 @@
                             {{
                                 isLotValidating(selectedLot)
                                     ? 'Validation...'
-                                    : 'Notifier le bureau et valider la décision du lot'
+                                    : 'Valider et notifier la décision de qualification'
                             }}
                         </button>
 
                         <span class="decision-saved" *ngIf="isLotDecisionValidated(selectedLot)">
-                            Décision du lot enregistrée
+                            Décision de qualification enregistrée
                         </span>
 
                     </div>

@@ -1,0 +1,33 @@
+== CONNEXION SSH / SFTP ==
+
+• Serveur : 10.1.1.237
+
+• Port : 22
+
+• Utilisateur : intern
+
+• Mot de passe : InterShip@@2026!!
+
+ 
+
+Outils recommandés : WinSCP pour le transfert de fichiers, PuTTY ou le terminal Windows pour le SSH.
+
+ 
+
+== RÉPERTOIRE DE TRAVAIL ==
+
+• Code de l'application : /var/www/procurement
+
+Vous disposez des droits de lecture, d'écriture et de modification dans ce répertoire uniquement.
+
+ 
+
+== BASE DE DONNÉES (lecture seule) ==
+
+• Hôte : localhost (accessible uniquement depuis le serveur)
+
+• Base :
+
+• Utilisateur : ssh intern@10.1.1.237
+
+• Mot de passe :InterShip@@2026!!

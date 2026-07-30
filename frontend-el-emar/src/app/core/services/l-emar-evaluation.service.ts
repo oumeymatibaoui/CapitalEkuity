@@ -4,6 +4,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 
 export type StatutEvaluation = 'A_VERIFIER' | 'CONFORME' | 'NON_CONFORME';
 export type DecisionFinale = 'ADMIS' | 'REJETE';
+export type SolvabiliteStatut = 'A_VERIFIER' | 'SOLVABLE' | 'NON_SOLVABLE';
 
 /* =========================================================
    DÉCISION FINALE PAR LOT
@@ -14,7 +15,19 @@ export type DecisionFinale = 'ADMIS' | 'REJETE';
      evaluateurId: number | null
    }
 ========================================================= */
+export interface SaveDocumentsStatutRequest {
+  rneStatut: StatutEvaluation;
+  cnssStatut: StatutEvaluation;
+  evaluateurId?: number | null;
+}
 
+export interface SaveDocumentsStatutResponse {
+  candidatureId: number;
+  rneStatut: StatutEvaluation;
+  cnssStatut: StatutEvaluation;
+  dossierRecevable: boolean;
+  motifNonRecevable?: string | null;
+}
 export interface SaveDecisionFinaleRequest {
   decisionFinale: DecisionFinale;
   observationFinale?: string | null;
@@ -90,6 +103,24 @@ export interface DecisionFinaleLotRequest {
 }
 
 /* =========================================================
+   SOLVABILITÉ PRIVÉE EL EMAR
+========================================================= */
+
+export interface SaveSolvabiliteRequest {
+  statut: SolvabiliteStatut;
+  commentaire?: string | null;
+  evaluateurId?: number | null;
+}
+
+export interface SaveSolvabiliteResponse {
+  candidatureId: number;
+  statut: SolvabiliteStatut;
+  commentaire?: string | null;
+  evaluateurId?: number | null;
+  dateValidation?: string | null;
+}
+
+/* =========================================================
    LISTE CANDIDATURES
 ========================================================= */
 
@@ -141,6 +172,7 @@ export interface ElEmarReferenceProjet {
 
   zoneElEmarId?: number | null;
   zoneElEmarNom?: string | null;
+  zoneElEmarCommentaire?: string | null;
   zoneValidee?: boolean | null;
 
   adresseProjet?: string | null;
@@ -228,6 +260,12 @@ export interface ElEmarCandidatureDetail {
   agrementsCertifications?: string | null;
   banquePrincipale?: string | null;
   localisation?: string | null;
+
+  solvabiliteStatut?: SolvabiliteStatut | null;
+  solvabiliteCommentaire?: string | null;
+  solvabiliteEvaluateurId?: number | null;
+  solvabiliteDateValidation?: string | null;
+
   statut?: string | null;
   dateSoumission?: string | null;
 
@@ -339,6 +377,16 @@ export class ElEmarEvaluationService {
     );
   }
 
+  saveSolvabilite(
+    candidatureId: number,
+    request: SaveSolvabiliteRequest
+  ): Observable<SaveSolvabiliteResponse> {
+    return this.http.put<SaveSolvabiliteResponse>(
+      `${this.apiUrl}/candidatures/${candidatureId}/solvabilite`,
+      request
+    );
+  }
+
   saveCritereEvaluation(
     applicationCandidatureId: number,
     reponseCritereId: number,
@@ -394,7 +442,15 @@ export class ElEmarEvaluationService {
       request
     );
   }
-
+saveDocumentsStatut(
+  candidatureId: number,
+  request: SaveDocumentsStatutRequest
+): Observable<SaveDocumentsStatutResponse> {
+  return this.http.put<SaveDocumentsStatutResponse>(
+    `${this.apiUrl}/candidatures/${candidatureId}/documents-statut`,
+    request
+  );
+}
   getClassementParZone(): Observable<ClassementParZoneGroup[]> {
     return this.http.get<ClassementParZoneGroup[]>(
       `${this.apiUrl}/zones/classement-par-zone`
@@ -424,19 +480,19 @@ export class ElEmarEvaluationService {
 
     return `${this.backendBaseUrl}/${cleanUrl}`;
   }
-getClassementCandidatsParLot(
-  minNote = 80,
-  admisOnly = false
-) {
-  const params = new HttpParams()
-    .set('minNote', String(minNote))
-    .set('admisOnly', String(admisOnly));
+  getClassementCandidatsParLot(
+    minNote = 80,
+    admisOnly = false
+  ): Observable<CandidatLotClassement[]> {
+    const params = new HttpParams()
+      .set('minNote', String(minNote))
+      .set('admisOnly', String(admisOnly));
 
-  return this.http.get<CandidatLotClassement[]>(
-    `${this.apiUrl}/classement-candidats-par-lot`,
-    { params }
-  );
-}
+    return this.http.get<CandidatLotClassement[]>(
+      `${this.apiUrl}/classement-candidats-par-lot`,
+      { params }
+    );
+  }
   getPdfBlob(url: string): Observable<Blob> {
     const fullUrl = this.buildFullFileUrl(url);
 

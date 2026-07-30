@@ -1,6 +1,10 @@
 package com.elemar.backendelemar.dto;
 
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -14,7 +18,16 @@ import java.util.List;
 @Builder
 public class CandidatureDetailResponse {
 
+    // =====================================================
+    // IDENTIFIANT
+    // =====================================================
+
     private Long candidatureId;
+
+
+    // =====================================================
+    // INFORMATIONS GÉNÉRALES
+    // =====================================================
 
     private String raisonSociale;
     private String formeJuridique;
@@ -36,14 +49,54 @@ public class CandidatureDetailResponse {
     private String banquePrincipale;
     private String localisation;
 
+
+    // =====================================================
+    // STATUT DE LA CANDIDATURE
+    // =====================================================
+
     private String statut;
     private LocalDateTime dateSoumission;
 
+
+    // =====================================================
+    // DOCUMENT RNE
+    // =====================================================
+
     private String rneNomFichier;
     private String rnePdfUrl;
+    private String rneStatut;
+
+
+    // =====================================================
+    // DOCUMENT CNSS
+    // =====================================================
 
     private String cnssNomFichier;
     private String cnssPdfUrl;
+    private String cnssStatut;
+
+
+    // =====================================================
+    // RECEVABILITÉ DU DOSSIER
+    // =====================================================
+
+    private Boolean dossierRecevable;
+    private String motifNonRecevable;
+
+
+    // =====================================================
+    // SOLVABILITÉ PRIVÉE EL EMAR
+    // =====================================================
+
+    private String solvabiliteStatut;
+    private String solvabiliteCommentaire;
+    private Long solvabiliteEvaluateurId;
+    private LocalDateTime solvabiliteDateValidation;
+
+
+    // =====================================================
+    // NOTES ET LOTS
+    // =====================================================
 
     private BigDecimal noteGlobale;
 

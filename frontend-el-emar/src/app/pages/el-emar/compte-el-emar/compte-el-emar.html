@@ -1,13 +1,14 @@
 <div class="utilisateurs-page">
 
-    <!-- =========================
+    <!-- =====================================================
        HEADER
-  ========================== -->
+  ====================================================== -->
     <div class="top-header">
         <div>
             <h1>Comptes utilisateurs</h1>
+
             <p>
-                Créez les comptes internes El Emar, attribuez les rôles et consultez la liste complète des utilisateurs.
+                Créez les comptes internes El Emar, attribuez des rôles dynamiques et consultez la liste complète des utilisateurs.
             </p>
         </div>
 
@@ -16,9 +17,9 @@
     </button>
     </div>
 
-    <!-- =========================
+    <!-- =====================================================
        MESSAGES GÉNÉRAUX
-  ========================== -->
+  ====================================================== -->
     <div *ngIf="pageError" class="alert error">
         {{ pageError }}
     </div>
@@ -27,18 +28,21 @@
         {{ successMessage }}
     </div>
 
-    <!-- =========================
+    <!-- =====================================================
        CRÉATION + RÉSUMÉ
-  ========================== -->
+  ====================================================== -->
     <div class="content-grid">
 
-        <!-- CRÉER UTILISATEUR INTERNE -->
+        <!-- =================================================
+         CRÉATION UTILISATEUR
+    ================================================== -->
         <div class="card create-card">
 
             <div class="card-header">
                 <h3>Créer un utilisateur interne</h3>
+
                 <p>
-                    Ajouter un compte interne El Emar : El Emar, Direction achat, IT ou Administrateur.
+                    Sélectionnez un rôle parmi les rôles internes actifs configurés dans la gestion des rôles et des accès.
                 </p>
             </div>
 
@@ -52,75 +56,140 @@
                 {{ createErrorMessage }}
             </div>
 
-            <form [formGroup]="createForm" class="form-grid">
+            <form [formGroup]="createForm" class="form-grid" (ngSubmit)="createUtilisateur()">
 
+                <!-- NOM -->
                 <div class="field">
-                    <label>Nom</label>
-                    <input type="text" class="form-control" formControlName="nom" placeholder="Nom complet" autocomplete="off">
+                    <label for="create-nom">
+            Nom
+          </label>
+
+                    <input id="create-nom" type="text" class="form-control" formControlName="nom" placeholder="Nom complet" autocomplete="off">
                 </div>
 
+                <!-- EMAIL -->
                 <div class="field">
-                    <label>Email</label>
-                    <input type="email" class="form-control" formControlName="email" placeholder="exemple@elemar.com" autocomplete="off">
+                    <label for="create-email">
+            Email
+          </label>
+
+                    <input id="create-email" type="email" class="form-control" formControlName="email" placeholder="exemple@elemar.com" autocomplete="off">
                 </div>
 
+                <!-- FONCTION -->
                 <div class="field">
-                    <label>Fonction</label>
-                    <input type="text" class="form-control" formControlName="fonction" placeholder="Ex : Responsable achat, IT, Direction..." autocomplete="off">
+                    <label for="create-fonction">
+            Fonction
+          </label>
+
+                    <input id="create-fonction" type="text" class="form-control" formControlName="fonction" placeholder="Ex : Évaluateur, Responsable achat..." autocomplete="off">
                 </div>
 
+                <!-- RÔLE DYNAMIQUE -->
                 <div class="field">
-                    <label>Rôle</label>
-                    <select class="form-control" formControlName="typeUtilisateur">
-            <option *ngFor="let role of roles" [value]="role">
-              {{ getRoleLabel(role) }}
+                    <label for="create-role">
+            Rôle
+          </label>
+
+                    <select id="create-role" class="form-control" formControlName="roleId" [disabled]="loadingRoles">
+            <option [ngValue]="null">
+              -- Sélectionner un rôle --
+            </option>
+
+            <option
+              *ngFor="let role of roles"
+              [ngValue]="role.id"
+            >
+              {{ role.nomRole }}
             </option>
           </select>
+
+                    <small *ngIf="loadingRoles">
+            Chargement des rôles...
+          </small>
+
+                    <small *ngIf="!loadingRoles && roles.length === 0">
+            Aucun rôle interne actif disponible.
+          </small>
                 </div>
 
+                <!-- MOT DE PASSE -->
                 <div class="field full">
-                    <label>Mot de passe temporaire</label>
-                    <input type="password" class="form-control" formControlName="motDePasse" placeholder="Minimum 6 caractères" autocomplete="new-password">
+                    <label for="create-password">
+            Mot de passe temporaire
+          </label>
+
+                    <input id="create-password" type="password" class="form-control" formControlName="motDePasse" placeholder="Minimum 6 caractères" autocomplete="new-password">
+                </div>
+
+                <!-- ACTION CRÉATION -->
+                <div class="actions full">
+                    <button type="submit" class="btn primary" [disabled]="creating || loadingRoles || roles.length === 0">
+            {{
+              creating
+                ? 'Création en cours...'
+                : 'Créer le compte'
+            }}
+          </button>
                 </div>
 
             </form>
 
-            <div class="actions">
-                <button type="button" class="btn primary" (click)="createUtilisateur()" [disabled]="creating">
-          {{ creating ? 'Création en cours...' : 'Créer le compte' }}
-        </button>
-            </div>
-
         </div>
 
-        <!-- RÉSUMÉ -->
+        <!-- =================================================
+         RÉSUMÉ
+    ================================================== -->
         <div class="card stats-card">
 
             <div class="card-header">
                 <h3>Résumé</h3>
-                <p>Vue rapide des comptes internes.</p>
+
+                <p>
+                    Vue rapide des comptes internes.
+                </p>
             </div>
 
             <div class="stats-list">
 
                 <div class="stat-item">
-                    <strong>{{ utilisateurs.length }}</strong>
-                    <span>Total utilisateurs</span>
+                    <strong>
+            {{ utilisateurs.length }}
+          </strong>
+
+                    <span>
+            Total utilisateurs
+          </span>
                 </div>
 
                 <div class="stat-item">
-                    <strong>{{ filteredUtilisateurs.length }}</strong>
-                    <span>Résultat affiché</span>
+                    <strong>
+            {{ filteredUtilisateurs.length }}
+          </strong>
+
+                    <span>
+            Résultat affiché
+          </span>
                 </div>
 
                 <div class="stat-item">
-                    <strong>{{ getActiveCount() }}</strong>
-                    <span>Comptes actifs</span>
+                    <strong>
+            {{ getActiveCount() }}
+          </strong>
+
+                    <span>
+            Comptes actifs
+          </span>
                 </div>
 
                 <div class="stat-item">
-                    <strong>{{ getInactiveCount() }}</strong>
-                    <span>Comptes inactifs</span>
+                    <strong>
+            {{ getInactiveCount() }}
+          </strong>
+
+                    <span>
+            Comptes inactifs
+          </span>
                 </div>
 
             </div>
@@ -129,15 +198,18 @@
 
     </div>
 
-    <!-- =========================
+    <!-- =====================================================
        LISTE UTILISATEURS
-  ========================== -->
+  ====================================================== -->
     <div class="card users-card">
 
         <div class="users-toolbar">
 
             <div>
-                <h3>Liste des utilisateurs internes</h3>
+                <h3>
+                    Liste des utilisateurs internes
+                </h3>
+
                 <p>
                     Tous les comptes internes enregistrés dans la plateforme.
                 </p>
@@ -145,13 +217,20 @@
 
             <div class="filters">
 
+                <!-- RECHERCHE -->
                 <input type="text" class="form-control search-input" placeholder="Rechercher nom, email, fonction..." [value]="searchTerm" (input)="onSearchChange($event)">
 
-                <select class="form-control role-filter" [value]="selectedRoleFilter" (change)="onRoleFilterChange($event)">
-          <option value="ALL">Tous les rôles</option>
+                <!-- FILTRE RÔLE -->
+                <select class="form-control" [value]="selectedRoleFilter" (change)="onRoleFilterChange($event)">
+          <option value="ALL">
+            Tous les rôles
+          </option>
 
-          <option *ngFor="let role of roles" [value]="role">
-            {{ getRoleLabel(role) }}
+          <option
+            *ngFor="let role of roles"
+            [value]="role.codeRole"
+          >
+            {{ role.nomRole }}
           </option>
         </select>
 
@@ -159,17 +238,23 @@
 
         </div>
 
-        <!-- LOADING -->
+        <!-- =================================================
+         LOADING
+    ================================================== -->
         <div *ngIf="loading" class="loading-card">
             Chargement des utilisateurs...
         </div>
 
-        <!-- EMPTY -->
+        <!-- =================================================
+         LISTE VIDE
+    ================================================== -->
         <div *ngIf="!loading && filteredUtilisateurs.length === 0" class="empty-card">
             Aucun utilisateur interne trouvé.
         </div>
 
-        <!-- TABLE -->
+        <!-- =================================================
+         TABLEAU
+    ================================================== -->
         <div class="table-wrapper" *ngIf="!loading && filteredUtilisateurs.length > 0">
 
             <table class="users-table">
@@ -187,63 +272,152 @@
 
                 <tbody>
 
-                    <tr *ngFor="let user of filteredUtilisateurs; trackBy: trackByUserId">
+                    <tr *ngFor="
+              let user of filteredUtilisateurs;
+              trackBy: trackByUserId
+            ">
 
-                        <!-- UTILISATEUR -->
+                        <!-- =========================================
+                 UTILISATEUR
+            ========================================== -->
                         <td>
                             <div class="user-cell">
 
                                 <div class="avatar">
-                                    {{ (user.nom || user.email || 'U').charAt(0).toUpperCase() }}
+                                    {{ (user.nom || user.email || 'U') .charAt(0) .toUpperCase() }}
                                 </div>
 
                                 <div>
-                                    <strong>{{ user.nom || '-' }}</strong>
-                                    <small>{{ user.email || '-' }}</small>
+                                    <strong>
+                    {{ user.nom || '-' }}
+                  </strong>
+
+                                    <small>
+                    {{ user.email || '-' }}
+                  </small>
                                 </div>
 
                             </div>
                         </td>
 
-                        <!-- FONCTION -->
+                        <!-- =========================================
+                 FONCTION
+            ========================================== -->
                         <td>
                             {{ user.fonction || '-' }}
                         </td>
 
-                        <!-- RÔLE -->
+                        <!-- =========================================
+                 RÔLE
+            ========================================== -->
                         <td>
                             <div class="role-control">
 
-                                <span class="role-badge" [ngClass]="getRoleClass(user.typeUtilisateur)">
-                  {{ getRoleLabel(user.typeUtilisateur) }}
+                                <!-- LIBELLÉ DU RÔLE ACTUEL -->
+                                <span class="role-badge" [ngClass]="getRoleClass(
+                    user.roleCode || user.typeUtilisateur
+                  )">
+                  {{
+                    user.roleNom
+                    ||
+                    getRoleLabel(
+                      user.roleCode || user.typeUtilisateur
+                    )
+                  }}
                 </span>
 
-                                <select class="role-select" [value]="user.typeUtilisateur || ''" (change)="updateRole(user, $event)">
-                  <option *ngFor="let role of roles" [value]="role">
-                    {{ getRoleLabel(role) }}
+                                <!-- MODIFICATION DU RÔLE -->
+                                <select class="role-select" [value]="getRoleSelectionValue(user) ?? ''" (change)="updateRole(user, $event)">
+                  <option
+                    value=""
+                    disabled
+                  >
+                    -- Sélectionner un rôle --
+                  </option>
+
+                  <option
+                    *ngFor="let role of roles"
+                    [value]="role.id"
+                  >
+                    {{ role.nomRole }}
                   </option>
                 </select>
 
                             </div>
                         </td>
 
-                        <!-- STATUT -->
+                        <!-- =========================================
+                 STATUT
+            ========================================== -->
                         <td>
-                            <span class="status-badge" [class.active]="user.actif">
-                {{ user.actif ? 'Actif' : 'Inactif' }}
+                            <span class="status-badge" [class.active]="user.actif === true">
+                {{
+                  user.actif === true
+                    ? 'Actif'
+                    : 'Inactif'
+                }}
               </span>
                         </td>
 
-                        <!-- DATE -->
+                        <!-- =========================================
+                 DATE
+            ========================================== -->
                         <td>
                             {{ formatDate(user.createdAt) }}
                         </td>
 
-                        <!-- ACTIONS -->
+                        <!-- =========================================
+                 ACTIONS
+            ========================================== -->
                         <td>
-                            <button type="button" class="btn small" [class.danger]="user.actif" [class.success]="!user.actif" (click)="toggleActif(user)">
-                {{ user.actif ? 'Désactiver' : 'Activer' }}
-              </button>
+                            <div class="user-actions">
+
+                                <button type="button" class="user-action-btn edit" title="Modifier le compte" (click)="openEditUser(user)">
+      <i class="ti ti-pencil"></i>
+      <span>Modifier</span>
+    </button>
+
+                                <button type="button" class="user-action-btn status" [class.deactivate]="user.actif === true" [class.activate]="user.actif !== true" [title]="
+        user.actif === true
+          ? 'Désactiver le compte'
+          : 'Activer le compte'
+      " (click)="toggleActif(user)">
+      <i
+        [class]="
+          user.actif === true
+            ? 'ti ti-user-off'
+            : 'ti ti-user-check'
+        "
+      ></i>
+
+      <span>
+        {{
+          user.actif === true
+            ? 'Désactiver'
+            : 'Activer'
+        }}
+      </span>
+    </button>
+
+                                <button type="button" class="user-action-btn delete" title="Supprimer définitivement le compte" [disabled]="isCurrentUser(user)" (click)="openDeleteUser(user)">
+      <i
+        [class]="
+          isCurrentUser(user)
+            ? 'ti ti-lock'
+            : 'ti ti-trash'
+        "
+      ></i>
+
+      <span>
+        {{
+          isCurrentUser(user)
+            ? 'Compte actuel'
+            : 'Supprimer'
+        }}
+      </span>
+    </button>
+
+                            </div>
                         </td>
 
                     </tr>
@@ -256,4 +430,247 @@
 
     </div>
 
+</div>
+<!-- =====================================================
+     MODAL MODIFICATION UTILISATEUR
+====================================================== -->
+<div class="user-modal-overlay" *ngIf="showEditModal">
+    <div class="user-modal-card">
+
+        <div class="user-modal-header">
+
+            <div>
+                <span class="modal-label">
+          Gestion du compte
+        </span>
+
+                <h3>
+                    Modifier l’utilisateur
+                </h3>
+
+                <p>
+                    Modifiez les informations, le rôle et le statut du compte.
+                </p>
+            </div>
+
+            <button type="button" class="modal-close" [disabled]="savingEdit" (click)="closeEditModal()">
+        <i class="ti ti-x"></i>
+      </button>
+
+        </div>
+
+        <form [formGroup]="editForm" (ngSubmit)="saveEditedUser()">
+
+            <div class="user-modal-body">
+
+                <div class="modal-user-preview" *ngIf="editingUser">
+                    <div class="avatar">
+                        {{ ( editingUser.nom || editingUser.email || 'U' ).charAt(0).toUpperCase() }}
+                    </div>
+
+                    <div>
+                        <strong>
+              {{ editingUser.nom || '-' }}
+            </strong>
+
+                        <span>
+              {{ editingUser.email || '-' }}
+            </span>
+                    </div>
+                </div>
+
+                <div class="modal-form-grid">
+
+                    <div class="field">
+                        <label for="edit-user-nom">
+              Nom
+            </label>
+
+                        <input id="edit-user-nom" type="text" class="form-control" formControlName="nom">
+                    </div>
+
+                    <div class="field">
+                        <label for="edit-user-email">
+              Email
+            </label>
+
+                        <input id="edit-user-email" type="email" class="form-control" formControlName="email">
+                    </div>
+
+                    <div class="field">
+                        <label for="edit-user-fonction">
+              Fonction
+            </label>
+
+                        <input id="edit-user-fonction" type="text" class="form-control" formControlName="fonction">
+                    </div>
+
+                    <div class="field">
+                        <label for="edit-user-role">
+              Rôle
+            </label>
+
+                        <select id="edit-user-role" class="form-control" formControlName="roleId" [disabled]="loadingRoles">
+              <option [ngValue]="null">
+                -- Sélectionner un rôle --
+              </option>
+
+              <option
+                *ngFor="let role of roles"
+                [ngValue]="role.id"
+              >
+                {{ role.nomRole }}
+              </option>
+            </select>
+                    </div>
+
+                    <div class="field full">
+                        <label class="status-switch-row">
+
+              <span>
+                <strong>
+                  Compte actif
+                </strong>
+
+                <small>
+                  L’utilisateur peut se connecter lorsque
+                  cette option est activée.
+                </small>
+              </span>
+
+              <input
+                type="checkbox"
+                formControlName="actif"
+              >
+
+            </label>
+                    </div>
+
+                </div>
+
+            </div>
+
+            <div class="user-modal-actions">
+
+                <button type="button" class="btn secondary" [disabled]="savingEdit" (click)="closeEditModal()">
+          Annuler
+        </button>
+
+                <button type="submit" class="btn primary" [disabled]="savingEdit || loadingRoles">
+          <i
+            [class]="
+              savingEdit
+                ? 'ti ti-loader-2 loading-icon'
+                : 'ti ti-device-floppy'
+            "
+          ></i>
+
+          {{
+            savingEdit
+              ? 'Enregistrement...'
+              : 'Enregistrer les modifications'
+          }}
+        </button>
+
+            </div>
+
+        </form>
+
+    </div>
+</div>
+<!-- =====================================================
+     MODAL SUPPRESSION UTILISATEUR
+====================================================== -->
+<div class="user-delete-overlay" *ngIf="showDeleteModal" (click)="closeDeleteModal()">
+    <div class="user-delete-card" (click)="$event.stopPropagation()">
+
+        <div class="user-delete-icon">
+            <i class="ti ti-trash"></i>
+        </div>
+
+        <span class="delete-label">
+      Suppression définitive
+    </span>
+
+        <h3>
+            Supprimer le compte
+        </h3>
+
+        <p>
+            Voulez-vous vraiment supprimer le compte de
+
+            <strong>
+        {{
+          userToDelete?.nom
+          || userToDelete?.email
+          || 'cet utilisateur'
+        }}
+      </strong> ?
+        </p>
+
+        <div class="user-delete-details" *ngIf="userToDelete">
+            <div>
+                <span>Email</span>
+                <strong>
+          {{ userToDelete.email || '-' }}
+        </strong>
+            </div>
+
+            <div>
+                <span>Fonction</span>
+                <strong>
+          {{ userToDelete.fonction || '-' }}
+        </strong>
+            </div>
+
+            <div>
+                <span>Rôle</span>
+                <strong>
+          {{
+            userToDelete.roleNom
+            || getRoleLabel(
+              userToDelete.roleCode
+              || userToDelete.typeUtilisateur
+            )
+          }}
+        </strong>
+            </div>
+        </div>
+
+        <div class="user-delete-warning">
+            <i class="ti ti-alert-triangle"></i>
+
+            <span>
+        Cette action est définitive. La suppression sera
+        refusée si ce compte est lié à des candidatures,
+        des évaluations ou d’autres données de la plateforme.
+        Dans ce cas, désactivez plutôt le compte.
+      </span>
+        </div>
+
+        <div class="user-delete-actions">
+
+            <button type="button" class="btn secondary" [disabled]="deletingUser" (click)="closeDeleteModal()">
+        Annuler
+      </button>
+
+            <button type="button" class="btn delete-confirm" [disabled]="deletingUser" (click)="confirmDeleteUser()">
+        <i
+          [class]="
+            deletingUser
+              ? 'ti ti-loader-2 loading-icon'
+              : 'ti ti-trash'
+          "
+        ></i>
+
+        {{
+          deletingUser
+            ? 'Suppression...'
+            : 'Supprimer définitivement'
+        }}
+      </button>
+
+        </div>
+
+    </div>
 </div>

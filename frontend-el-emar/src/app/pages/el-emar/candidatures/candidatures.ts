@@ -6,9 +6,10 @@ import {
   CandidatureAccessResponse,
   CandidatureAccessService,
   CreateCandidatureAccessRequest,
-  GeneratedAccountResponse
+  GeneratedAccountResponse,
+  UpdateCandidatureAccessRequest,
+   UtilisateurCndResponse
 } from '../../../core/services/candidature-access.service';
-
 import {
   TypeIntervenant,
   TypeIntervenantService
@@ -33,9 +34,30 @@ type LotView = Lot & {
   styleUrl: './candidatures.scss',
 })
 export class Candidatures implements OnInit {
+editCandidatureModalOpen = false;
+deleteCandidatureModalOpen = false;
+userAccessModalOpen = false;
 
+userAccessToChange: UtilisateurCndResponse | null = null;
+
+userAccessCandidatureId: number | null = null;
+
+changingUserAccess = false;
+editingCandidature: CandidatureAccessResponse | null = null;
+candidatureToDelete: CandidatureAccessResponse | null = null;
+
+editLots: LotView[] = [];
+
+loadingEditLots = false;
+savingEdit = false;
+
+editForm: UpdateCandidatureAccessRequest = {
+  nomEntreprise: '',
+  typeIntervenantId: null,
+  lotIds: []
+};
   deletingCandidatureId: number | null = null;
-
+changingAccessCandidatureId: number | null = null;
   types: TypeIntervenant[] = [];
   lots: LotView[] = [];
   candidatures: CandidatureAccessResponse[] = [];
@@ -70,6 +92,333 @@ export class Candidatures implements OnInit {
     }, 0);
   }
 
+toggleCandidatureAccess(
+  candidature: CandidatureAccessResponse
+): void {
+  const candidatureId = Number(
+    candidature.candidatureId
+  );
+
+  if (!candidatureId) {
+    this.errorMessage =
+      'Identifiant candidature introuvable.';
+    return;
+  }
+
+  const isBlocked =
+    candidature.accesBloque === true;
+
+  this.errorMessage = '';
+  this.successMessage = '';
+  this.changingAccessCandidatureId =
+    candidatureId;
+
+  const request$ = isBlocked
+    ? this.candidatureService
+        .activateCandidature(candidatureId)
+    : this.candidatureService
+        .deactivateCandidature(candidatureId);
+
+  request$.subscribe({
+    next: (
+      updated: CandidatureAccessResponse
+    ) => {
+      this.changingAccessCandidatureId =
+        null;
+
+      this.candidatures =
+        this.candidatures.map(item => {
+          if (
+            Number(item.candidatureId) ===
+            candidatureId
+          ) {
+            return {
+              ...item,
+              ...updated,
+
+              // Sécurité si le backend ne renvoie pas encore
+              // correctement accesBloque.
+              accesBloque: !isBlocked
+            };
+          }
+
+          return item;
+        });
+
+      this.successMessage = isBlocked
+        ? `L’accès de "${candidature.nomEntreprise}" a été activé.`
+        : `L’accès de "${candidature.nomEntreprise}" a été désactivé.`;
+    },
+
+    error: (error: any) => {
+      console.error(
+        'CHANGE CANDIDATURE ACCESS ERROR',
+        error
+      );
+
+      this.changingAccessCandidatureId =
+        null;
+
+      this.errorMessage =
+        error?.error?.message ||
+        error?.error?.detail ||
+        (
+          isBlocked
+            ? 'Erreur lors de l’activation de la candidature.'
+            : 'Erreur lors de la désactivation de la candidature.'
+        );
+    }
+  });
+}
+deactivateUser(user: any): void {
+  const confirmed = confirm(
+    `Désactiver l’utilisateur ${user.email} ?`
+  );
+
+  if (!confirmed) return;
+
+  this.candidatureService.deactivateUser(user.id).subscribe({
+    next: () => {
+      this.successMessage = 'Utilisateur désactivé avec succès.';
+      this.loadCandidatures();
+    },
+    error: (error: any) => {
+      console.error('DEACTIVATE USER ERROR', error);
+      this.errorMessage =
+        error?.error?.message ||
+        error?.error?.detail ||
+        'Erreur lors de la désactivation de l’utilisateur.';
+    }
+  });
+}
+openEditCandidatureModal(
+  candidature: CandidatureAccessResponse
+): void {
+  const candidatureId =
+    Number(candidature.candidatureId);
+
+  if (!candidatureId) {
+    this.errorMessage =
+      'Identifiant candidature introuvable.';
+    return;
+  }
+
+  this.errorMessage = '';
+  this.successMessage = '';
+
+  this.editingCandidature = candidature;
+
+  this.editForm = {
+    nomEntreprise:
+      candidature.nomEntreprise || '',
+
+    typeIntervenantId:
+      candidature.typeIntervenantId
+        ? Number(candidature.typeIntervenantId)
+        : null,
+
+    lotIds: (candidature.lots || [])
+      .map(lot => Number(lot.id))
+      .filter(id => Number.isFinite(id))
+  };
+
+  this.editCandidatureModalOpen = true;
+  this.loadEditLots();
+}
+closeEditCandidatureModal(): void {
+  if (this.savingEdit) {
+    return;
+  }
+
+  this.editCandidatureModalOpen = false;
+  this.editingCandidature = null;
+  this.editLots = [];
+
+  this.editForm = {
+    nomEntreprise: '',
+    typeIntervenantId: null,
+    lotIds: []
+  };
+}
+loadEditLots(): void {
+  const typeId =
+    Number(this.editForm.typeIntervenantId);
+
+  this.editLots = [];
+
+  if (!typeId) {
+    return;
+  }
+
+  this.loadingEditLots = true;
+
+  this.lotService.getAll(typeId).subscribe({
+    next: (lots: Lot[]) => {
+      this.editLots = (lots || [])
+        .filter(lot => this.isActive(lot.actif))
+        .map(lot => ({
+          ...lot,
+          id: Number(lot.id),
+          nomLot:
+            lot.nomLot || 'Lot sans nom',
+          codeLot:
+            lot.codeLot || ''
+        }));
+
+      this.loadingEditLots = false;
+    },
+
+    error: (error: any) => {
+      console.error(
+        'LOAD EDIT LOTS ERROR',
+        error
+      );
+
+      this.loadingEditLots = false;
+
+      this.errorMessage =
+        'Erreur lors du chargement des lots.';
+    }
+  });
+}
+toggleEditLot(lotId: number): void {
+  const id = Number(lotId);
+
+  if (this.editForm.lotIds.includes(id)) {
+    this.editForm.lotIds =
+      this.editForm.lotIds.filter(
+        item => item !== id
+      );
+
+    return;
+  }
+
+  this.editForm.lotIds = [
+    ...this.editForm.lotIds,
+    id
+  ];
+}
+saveCandidatureChanges(): void {
+  if (!this.editingCandidature) {
+    this.errorMessage =
+      'Candidature à modifier introuvable.';
+    return;
+  }
+
+  const candidatureId =
+    Number(
+      this.editingCandidature.candidatureId
+    );
+
+  const nomEntreprise =
+    String(
+      this.editForm.nomEntreprise || ''
+    ).trim();
+
+  const typeIntervenantId =
+    Number(
+      this.editForm.typeIntervenantId
+    );
+
+  const lotIds =
+    (this.editForm.lotIds || [])
+      .map(id => Number(id))
+      .filter(id => Number.isFinite(id));
+
+  if (!candidatureId) {
+    this.errorMessage =
+      'Identifiant candidature introuvable.';
+    return;
+  }
+
+  if (!nomEntreprise) {
+    this.errorMessage =
+      'Le nom de la société est obligatoire.';
+    return;
+  }
+
+  if (!typeIntervenantId) {
+    this.errorMessage =
+      'Le type d’intervenant est obligatoire.';
+    return;
+  }
+
+  if (lotIds.length === 0) {
+    this.errorMessage =
+      'Veuillez sélectionner au moins un lot.';
+    return;
+  }
+
+  const request: UpdateCandidatureAccessRequest = {
+    nomEntreprise,
+    typeIntervenantId,
+    lotIds
+  };
+
+  this.errorMessage = '';
+  this.successMessage = '';
+  this.savingEdit = true;
+
+  this.candidatureService
+    .updateCandidature(
+      candidatureId,
+      request
+    )
+    .subscribe({
+      next: (
+        updated: CandidatureAccessResponse
+      ) => {
+        this.savingEdit = false;
+        this.editCandidatureModalOpen = false;
+        this.editingCandidature = null;
+        this.editLots = [];
+
+        const index =
+          this.candidatures.findIndex(
+            item =>
+              Number(item.candidatureId) ===
+              candidatureId
+          );
+
+        if (index >= 0) {
+          this.candidatures[index] = updated;
+          this.candidatures = [
+            ...this.candidatures
+          ];
+        } else {
+          this.loadCandidatures();
+        }
+
+        this.successMessage =
+          'Candidature modifiée avec succès.';
+      },
+
+      error: (error: any) => {
+        console.error(
+          'UPDATE CANDIDATURE ERROR',
+          error
+        );
+
+        this.savingEdit = false;
+
+        this.errorMessage =
+          error?.error?.message ||
+          error?.error?.detail ||
+          'Erreur lors de la modification de la candidature.';
+      }
+    });
+}
+isEditLotSelected(lotId: number): boolean {
+  return this.editForm.lotIds.includes(
+    Number(lotId)
+  );
+}
+onEditTypeChange(): void {
+  this.editForm.lotIds = [];
+  this.editLots = [];
+
+  this.loadEditLots();
+}
   loadTypes(): void {
     this.loadingTypes = true;
 
@@ -102,7 +451,130 @@ export class Candidatures implements OnInit {
       }
     });
   }
+openDeleteCandidatureModal(
+  candidature: CandidatureAccessResponse
+): void {
+  const candidatureId =
+    Number(candidature.candidatureId);
 
+  if (!candidatureId) {
+    this.errorMessage =
+      'Identifiant candidature introuvable.';
+    return;
+  }
+
+  this.errorMessage = '';
+  this.successMessage = '';
+
+  this.candidatureToDelete = candidature;
+  this.deleteCandidatureModalOpen = true;
+}
+closeDeleteCandidatureModal(): void {
+  if (this.deletingCandidatureId !== null) {
+    return;
+  }
+
+  this.deleteCandidatureModalOpen = false;
+  this.candidatureToDelete = null;
+}
+confirmDeleteCandidature(): void {
+  if (!this.candidatureToDelete) {
+    this.errorMessage =
+      'Candidature introuvable.';
+    return;
+  }
+
+  const candidatureId =
+    Number(
+      this.candidatureToDelete.candidatureId
+    );
+
+  const nomEntreprise =
+    this.candidatureToDelete.nomEntreprise ||
+    'Candidature';
+
+  if (!candidatureId) {
+    this.errorMessage =
+      'Identifiant candidature introuvable.';
+    return;
+  }
+
+  this.errorMessage = '';
+  this.successMessage = '';
+  this.deletingCandidatureId = candidatureId;
+
+  this.candidatureService
+    .deleteCandidature(candidatureId)
+    .subscribe({
+      next: () => {
+        this.candidatures =
+          this.candidatures.filter(
+            item =>
+              Number(item.candidatureId) !==
+              candidatureId
+          );
+
+        this.deletingCandidatureId = null;
+        this.deleteCandidatureModalOpen = false;
+        this.candidatureToDelete = null;
+
+        this.successMessage =
+          `La candidature "${nomEntreprise}" a été supprimée avec succès.`;
+      },
+
+      error: (error: any) => {
+        console.error(
+          'DELETE CANDIDATURE ERROR',
+          error
+        );
+
+        this.deletingCandidatureId = null;
+
+        this.errorMessage =
+          error?.error?.message ||
+          error?.error?.detail ||
+          'Erreur lors de la suppression de la candidature.';
+      }
+    });
+}
+// deactivateCandidature(
+//   candidature: CandidatureAccessResponse
+// ): void {
+//   const candidatureId =
+//     Number(candidature.candidatureId);
+
+//   if (!candidatureId) {
+//     this.errorMessage =
+//       'Identifiant candidature introuvable.';
+//     return;
+//   }
+
+//   this.errorMessage = '';
+//   this.successMessage = '';
+
+//   this.candidatureService
+//     .deactivateCandidature(candidatureId)
+//     .subscribe({
+//       next: () => {
+//         this.successMessage =
+//           `L’accès de "${candidature.nomEntreprise}" a été désactivé.`;
+
+//         this.loadCandidatures();
+//       },
+
+//       error: (error: any) => {
+//         console.error(
+//           'DEACTIVATE CANDIDATURE ERROR',
+//           error
+//         );
+
+//         this.errorMessage =
+//           error?.error?.message ||
+//           error?.error?.detail ||
+//           'Erreur lors de la désactivation de la candidature.';
+//       }
+//     });
+// }
   deleteCandidature(candidature: CandidatureAccessResponse): void {
     const candidatureId = Number(candidature.candidatureId);
 
@@ -331,28 +803,171 @@ export class Candidatures implements OnInit {
       }
     });
   }
+openUserAccessModal(
+  user: UtilisateurCndResponse,
+  candidatureId: number
+): void {
+  const userId = Number(user.id);
+  const parentId = Number(candidatureId);
 
-  deactivateUser(user: any): void {
-    const confirmed = confirm(
-      `Désactiver l’utilisateur ${user.email} ?`
-    );
-
-    if (!confirmed) return;
-
-    this.candidatureService.deactivateUser(user.id).subscribe({
-      next: () => {
-        this.successMessage = 'Utilisateur désactivé avec succès.';
-        this.loadCandidatures();
-      },
-      error: (error: any) => {
-        console.error('DEACTIVATE USER ERROR', error);
-        this.errorMessage =
-          error?.error?.message ||
-          error?.error?.detail ||
-          'Erreur lors de la désactivation de l’utilisateur.';
-      }
-    });
+  if (!userId) {
+    this.errorMessage =
+      'Identifiant utilisateur introuvable.';
+    return;
   }
+
+  if (!parentId) {
+    this.errorMessage =
+      'Identifiant intervenant introuvable.';
+    return;
+  }
+
+  this.errorMessage = '';
+  this.successMessage = '';
+
+  this.userAccessToChange = user;
+  this.userAccessCandidatureId = parentId;
+  this.userAccessModalOpen = true;
+}
+closeUserAccessModal(): void {
+  if (this.changingUserAccess) {
+    return;
+  }
+
+  this.userAccessModalOpen = false;
+  this.userAccessToChange = null;
+  this.userAccessCandidatureId = null;
+}
+confirmUserAccessChange(): void {
+  if (
+    !this.userAccessToChange ||
+    !this.userAccessCandidatureId
+  ) {
+    this.errorMessage =
+      'Utilisateur introuvable.';
+    return;
+  }
+
+  const userId = Number(
+    this.userAccessToChange.id
+  );
+
+  const candidatureId = Number(
+    this.userAccessCandidatureId
+  );
+
+  if (!userId || !candidatureId) {
+    this.errorMessage =
+      'Identifiant utilisateur introuvable.';
+    return;
+  }
+
+  const userWasDisabled =
+    this.userAccessToChange.actif === false;
+
+  const newActiveValue =
+    userWasDisabled;
+
+  this.errorMessage = '';
+  this.successMessage = '';
+  this.changingUserAccess = true;
+
+  const request$ = userWasDisabled
+    ? this.candidatureService.activateUser(userId)
+    : this.candidatureService.deactivateUser(userId);
+
+  request$.subscribe({
+    next: () => {
+      const userName =
+        this.userAccessToChange?.nomComplet ||
+        this.userAccessToChange?.email ||
+        'Utilisateur';
+
+      /*
+       * Mise à jour immédiate du frontend.
+       */
+      this.candidatures =
+        this.candidatures.map(candidature => {
+
+          if (
+            Number(candidature.candidatureId) !==
+            candidatureId
+          ) {
+            return candidature;
+          }
+
+          return {
+            ...candidature,
+
+            utilisateurs:
+              (candidature.utilisateurs || [])
+                .map(user => {
+
+                  if (
+                    Number(user.id) !== userId
+                  ) {
+                    return user;
+                  }
+
+                  return {
+                    ...user,
+                    actif: newActiveValue
+                  };
+                })
+          };
+        });
+
+      this.changingUserAccess = false;
+      this.userAccessModalOpen = false;
+      this.userAccessToChange = null;
+      this.userAccessCandidatureId = null;
+
+      this.successMessage =
+        userWasDisabled
+          ? `L’utilisateur "${userName}" a été activé.`
+          : `L’utilisateur "${userName}" a été désactivé.`;
+    },
+
+    error: (error: any) => {
+      console.error(
+        'CHANGE USER ACCESS ERROR',
+        error
+      );
+
+      this.changingUserAccess = false;
+
+      this.errorMessage =
+        error?.error?.message ||
+        error?.error?.detail ||
+        (
+          userWasDisabled
+            ? 'Erreur lors de l’activation de l’utilisateur.'
+            : 'Erreur lors de la désactivation de l’utilisateur.'
+        );
+    }
+  });
+}
+  // deactivateUser(user: any): void {
+  //   const confirmed = confirm(
+  //     `Désactiver l’utilisateur ${user.email} ?`
+  //   );
+
+  //   if (!confirmed) return;
+
+  //   this.candidatureService.deactivateUser(user.id).subscribe({
+  //     next: () => {
+  //       this.successMessage = 'Utilisateur désactivé avec succès.';
+  //       this.loadCandidatures();
+  //     },
+  //     error: (error: any) => {
+  //       console.error('DEACTIVATE USER ERROR', error);
+  //       this.errorMessage =
+  //         error?.error?.message ||
+  //         error?.error?.detail ||
+  //         'Erreur lors de la désactivation de l’utilisateur.';
+  //     }
+  //   });
+  // }
 
   closeGeneratedAccountsModal(): void {
     this.generatedAccountsModalOpen = false;

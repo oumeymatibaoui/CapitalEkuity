@@ -24,7 +24,16 @@ public class ElEmarEvaluationController {
     ) {
         return elEmarEvaluationService.getClassementCandidatsParLot(minNote, admisOnly);
     }
-
+    @PutMapping("/candidatures/{candidatureId}/solvabilite")
+    public SaveSolvabiliteResponse saveSolvabilite(
+            @PathVariable Long candidatureId,
+            @RequestBody SaveSolvabiliteRequest request
+    ) {
+        return elEmarEvaluationService.saveSolvabilite(
+                candidatureId,
+                request
+        );
+    }
     @GetMapping("/candidatures")
     public List<ElEmarCandidatureListItemResponse> getCandidaturesSoumises(
             @RequestParam(required = false) Long typeIntervenantId
@@ -103,5 +112,18 @@ public class ElEmarEvaluationController {
                 projetReferenceId,
                 typeFichier
         );
+    }
+    @PutMapping(
+            "/candidatures/{candidatureId}/documents-statut"
+    )
+    public SaveDocumentsStatutResponse saveDocumentsStatut(
+            @PathVariable Long candidatureId,
+            @RequestBody SaveDocumentsStatutRequest request
+    ) {
+        return elEmarEvaluationService
+                .saveDocumentsStatut(
+                        candidatureId,
+                        request
+                );
     }
 }

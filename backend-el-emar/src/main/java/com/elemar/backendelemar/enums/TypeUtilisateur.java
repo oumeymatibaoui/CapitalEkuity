@@ -4,5 +4,6 @@ public enum TypeUtilisateur {
     EL_EMAR,
     CND,
     IT,
-    DA
+    DA,
+    ADMIN
 }

@@ -1,10 +1,12 @@
 package com.elemar.backendelemar.controller;
 
 import com.elemar.backendelemar.dto.CreateUtilisateurRequest;
+import com.elemar.backendelemar.dto.UpdateUtilisateurAdminRequest;
 import com.elemar.backendelemar.dto.UpdateUtilisateurRoleRequest;
 import com.elemar.backendelemar.dto.UtilisateurAdminResponse;
 import com.elemar.backendelemar.service.UtilisateurAdminService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -47,5 +49,28 @@ public class UtilisateurAdminController {
             @PathVariable Long utilisateurId
     ) {
         return utilisateurAdminService.toggleActif(utilisateurId);
+    }
+    @PutMapping("/{utilisateurId}")
+    public UtilisateurAdminResponse updateUtilisateur(
+            @PathVariable Long utilisateurId,
+            @RequestBody UpdateUtilisateurAdminRequest request
+    ) {
+        return utilisateurAdminService.updateUtilisateur(
+                utilisateurId,
+                request
+        );
+    }
+
+    @DeleteMapping("/{utilisateurId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteUtilisateur(
+            @PathVariable Long utilisateurId,
+            @RequestParam(required = false)
+            Long demandeurId
+    ) {
+        utilisateurAdminService.deleteUtilisateur(
+                utilisateurId,
+                demandeurId
+        );
     }
 }

@@ -22,6 +22,8 @@ import {
   ElEmarReferenceProjet,
   SaveEvaluationRequest,
   SaveEvaluationResponse,
+  SaveSolvabiliteResponse,
+  SolvabiliteStatut,
   StatutEvaluation
 } from '../../../core/services/l-emar-evaluation.service';
 
@@ -42,7 +44,7 @@ import {
   styleUrl: './evaluation-candidatures.scss'
 })
 export class EvaluationCandidatures implements OnInit, OnDestroy {
-
+savingDocuments = false;
   candidatureId: number | null = null;
 
   detail: ElEmarCandidatureDetail | null = null;
@@ -50,8 +52,24 @@ export class EvaluationCandidatures implements OnInit, OnDestroy {
 
   zones: Zone[] = [];
 
-  referenceZoneSelection: Record<string, string> = {};
-  referenceZoneCommentaire: Record<string, string> = {};
+  // Contrôle privé de solvabilité El Emar
+  solvabiliteStatut: SolvabiliteStatut = 'A_VERIFIER';
+  solvabiliteCommentaire = '';
+  savingSolvabilite = false;
+  solvabiliteSaved = false;
+  solvabiliteDirty = false;
+
+  // Classement interne des références par zone.
+  // La clé est toujours referenceProjetId et la valeur est zoneId.
+  referenceZoneSelection: Record<number, number | null> = {};
+  referenceZoneCommentaire: Record<number, string> = {};
+  referenceZoneDirty: Record<number, boolean> = {};
+  savingZoneReferenceId: number | null = null;
+
+  // État de sauvegarde de chaque évaluation.
+  // La clé est toujours reponseCritereId.
+  savingCritereById: Record<number, boolean> = {};
+  savedCritereById: Record<number, boolean> = {};
 
   classementsByApplicationId: Record<number, ClassementZoneResponse> = {};
 
@@ -100,7 +118,7 @@ export class EvaluationCandidatures implements OnInit, OnDestroy {
       const id = Number(params.get('candidatureId'));
 
       if (!id || isNaN(id)) {
-        this.pageError = 'Identifiant candidature invalide.';
+        this.pageError = 'Identifiant intervenant invalide.';
         this.loading = false;
         this.loadFinished = true;
         return;
@@ -122,7 +140,7 @@ export class EvaluationCandidatures implements OnInit, OnDestroy {
 
   loadDetail(): void {
     if (!this.candidatureId) {
-      this.pageError = "Aucun identifiant candidature trouvé dans l'URL.";
+      this.pageError = "Aucun identifiant intervenant trouvé dans l’URL.";
       this.loading = false;
       this.loadFinished = true;
       return;
@@ -156,7 +174,45 @@ export class EvaluationCandidatures implements OnInit, OnDestroy {
           return;
         }
 
+        // Réinitialiser tous les états locaux avant de reconstruire
+        // l'écran avec les identifiants et valeurs renvoyés par le backend.
+        this.referenceZoneSelection = {};
+        this.referenceZoneCommentaire = {};
+        this.referenceZoneDirty = {};
+        this.savingCritereById = {};
+        this.savedCritereById = {};
+        this.classementsByApplicationId = {};
+
         this.detail = data;
+
+        // Une évaluation est considérée comme enregistrée lorsqu'une valeur
+        // persistée est renvoyée pour la réponse critère correspondante.
+        for (const lot of data.lots || []) {
+          for (const critere of lot.criteres || []) {
+            const reponseCritereId = Number(critere.reponseCritereId);
+
+            if (!reponseCritereId) {
+              continue;
+            }
+
+            this.savingCritereById[reponseCritereId] = false;
+            this.savedCritereById[reponseCritereId] =
+              critere.statutEvaluation !== 'A_VERIFIER' ||
+              Number(critere.noteObtenue || 0) > 0 ||
+              Boolean(critere.commentaireEvaluateur?.trim());
+          }
+        }
+
+        this.solvabiliteStatut =
+          data.solvabiliteStatut || 'A_VERIFIER';
+
+        this.solvabiliteCommentaire =
+          data.solvabiliteCommentaire || '';
+
+        this.solvabiliteSaved =
+          Boolean(data.solvabiliteDateValidation);
+
+        this.solvabiliteDirty = false;
 
         for (const lot of this.detail.lots || []) {
           this.initDecisionStateForLot(lot);
@@ -167,7 +223,7 @@ export class EvaluationCandidatures implements OnInit, OnDestroy {
           this.initDecisionStateForLot(this.selectedLot);
         } else {
           this.selectedLot = null;
-          this.debugMessage = 'Candidature chargée, mais aucun lot rempli trouvé.';
+          this.debugMessage = 'Intervenant chargé, mais aucun lot rempli trouvé.';
         }
 
         this.initReferenceZoneSelection();
@@ -202,45 +258,77 @@ export class EvaluationCandidatures implements OnInit, OnDestroy {
   // ZONES RÉFÉRENCES
   // =====================================================
 
- initReferenceZoneSelection(): void {
-  if (!this.detail?.lots) return;
 
-  for (const lot of this.detail.lots) {
-    for (const ref of lot.references || []) {
-      const key = String(ref.id);
+  initReferenceZoneSelection(): void {
+    if (!this.detail?.lots) {
+      return;
+    }
 
-      // Ne jamais écraser une sélection déjà faite localement
-      if (this.referenceZoneSelection[key]) {
-        continue;
-      }
+    for (const lot of this.detail.lots) {
+      for (const ref of lot.references || []) {
+        const referenceProjetId = Number(ref.id);
 
-      // On ne se fie qu'à l'ID, jamais au nom (source de doublons)
-      if (ref.zoneElEmarId) {
-        this.referenceZoneSelection[key] = String(ref.zoneElEmarId);
-      } else {
-        this.referenceZoneSelection[key] = '';
+        if (!referenceProjetId) {
+          continue;
+        }
+
+        // Valeur relue directement depuis projet_reference.zone_el_emar_id.
+        this.referenceZoneSelection[referenceProjetId] =
+          ref.zoneElEmarId !== null && ref.zoneElEmarId !== undefined
+            ? Number(ref.zoneElEmarId)
+            : null;
+
+        this.referenceZoneCommentaire[referenceProjetId] =
+          ref.zoneElEmarCommentaire || '';
+
+        this.referenceZoneDirty[referenceProjetId] = false;
       }
     }
   }
-}
 
-  onReferenceZoneChangeLocal(ref: ElEmarReferenceProjet, zoneId: string): void {
-    const key = String(ref.id);
-    this.referenceZoneSelection[key] = zoneId;
+  onReferenceZoneChangeLocal(
+    ref: ElEmarReferenceProjet,
+    zoneId: number | null
+  ): void {
+    const referenceProjetId = Number(ref.id);
 
-    const selectedZone = this.zones.find(
-      zone => String(zone.id) === String(zoneId)
-    );
+    if (!referenceProjetId) {
+      this.pageError = 'Référence projet introuvable.';
+      return;
+    }
 
-    ref.zoneElEmarId = selectedZone?.id || null;
-    ref.zoneElEmarNom = selectedZone?.nomZone || null;
-    ref.zoneValidee = false;
-    ref.zone = selectedZone?.nomZone || null;
+    this.referenceZoneSelection[referenceProjetId] =
+      zoneId !== null && zoneId !== undefined
+        ? Number(zoneId)
+        : null;
 
+    this.referenceZoneDirty[referenceProjetId] = true;
+
+    // Ne pas modifier ref.zoneElEmarId ici : ce champ représente
+    // uniquement la valeur réellement enregistrée en base.
+    this.pageError = '';
     this.successMessage =
-      'Zone El Emar sélectionnée localement. Elle sera enregistrée lors de la validation du lot.';
+      'Zone sélectionnée. Cliquez sur « Enregistrer la zone ».';
 
     this.cdr.detectChanges();
+  }
+
+  onReferenceZoneCommentChange(
+    ref: ElEmarReferenceProjet,
+    value: string
+  ): void {
+    const referenceProjetId = Number(ref.id);
+
+    if (!referenceProjetId) {
+      return;
+    }
+
+    this.referenceZoneCommentaire[referenceProjetId] = value || '';
+    this.referenceZoneDirty[referenceProjetId] = true;
+  }
+
+  isReferenceZoneSaving(ref: ElEmarReferenceProjet): boolean {
+    return this.savingZoneReferenceId === Number(ref.id);
   }
 
   validerZoneReference(
@@ -252,132 +340,362 @@ export class EvaluationCandidatures implements OnInit, OnDestroy {
       return;
     }
 
-    if (!ref?.id) {
-      this.pageError = 'Référence projet introuvable.';
+    const applicationCandidatureId = Number(lot.applicationCandidatureId);
+    const referenceProjetId = Number(ref.id);
+    const zoneId = this.referenceZoneSelection[referenceProjetId];
+
+    if (!applicationCandidatureId) {
+      this.pageError = 'Identifiant du lot introuvable.';
       return;
     }
 
-    const selectedZoneId = this.referenceZoneSelection[String(ref.id)];
+    if (!referenceProjetId) {
+      this.pageError = 'Identifiant de la référence introuvable.';
+      return;
+    }
 
-    if (!selectedZoneId) {
-      this.pageError = 'Veuillez choisir une zone El Emar avant validation.';
+    if (!zoneId) {
+      this.pageError = 'Veuillez choisir une zone El Emar.';
       return;
     }
 
     const request: SaveReferenceZoneRequest = {
-      referenceProjetId: Number(ref.id),
-      applicationCandidatureId: Number(lot.applicationCandidatureId),
-      zoneId: Number(selectedZoneId),
-      commentaire: this.referenceZoneCommentaire[String(ref.id)] || null
+      referenceProjetId,
+      applicationCandidatureId,
+      zoneId,
+      commentaire:
+        this.referenceZoneCommentaire[referenceProjetId]?.trim() || null
     };
 
-    this.saving = true;
+    this.savingZoneReferenceId = referenceProjetId;
     this.pageError = '';
     this.successMessage = '';
 
-    this.classementZoneService.validerReferenceZone(request).subscribe({
-      next: (classement: ClassementZoneResponse) => {
-        this.saving = false;
+    this.classementZoneService
+      .validerReferenceZone(request)
+      .subscribe({
+        next: (response: ClassementZoneResponse) => {
+          this.savingZoneReferenceId = null;
 
-        const selectedZone = this.zones.find(
-          zone => Number(zone.id) === Number(selectedZoneId)
-        );
+          // Mettre à jour uniquement la référence exacte enregistrée.
+          const savedReference = (lot.references || []).find(
+            item => Number(item.id) === referenceProjetId
+          );
 
-        ref.zoneElEmarId = Number(selectedZoneId);
-        ref.zoneElEmarNom = selectedZone?.nomZone || classement.nomZone || null;
-        ref.zone = selectedZone?.nomZone || classement.nomZone || null;
-        ref.zoneValidee = true;
+          if (!savedReference) {
+            this.pageError =
+              'La référence enregistrée est introuvable dans la liste.';
+            this.cdr.detectChanges();
+            return;
+          }
 
-        this.classementsByApplicationId[
-          Number(lot.applicationCandidatureId)
-        ] = classement;
+          const selectedZone = this.zones.find(
+            zone => Number(zone.id) === Number(zoneId)
+          );
 
-        this.successMessage =
-          `Zone enregistrée pour la référence "${ref.nomProjet || 'Projet'}". Catégorie : ${classement.categorie}.`;
+          savedReference.zoneElEmarId = zoneId;
+          savedReference.zoneElEmarNom =
+            response.nomZone || selectedZone?.nomZone || null;
+          savedReference.zoneElEmarCommentaire = request.commentaire || null;
+          savedReference.zoneValidee = true;
 
-        this.cdr.detectChanges();
-      },
-      error: (error: any) => {
-        console.error('ERROR VALIDATION ZONE REFERENCE', error);
+          this.referenceZoneDirty[referenceProjetId] = false;
+          this.classementsByApplicationId[applicationCandidatureId] = response;
 
-        this.saving = false;
+          this.successMessage =
+            `La zone de « ${savedReference.nomProjet || 'la référence'} » est enregistrée.`;
 
-        this.pageError =
-          error?.error?.message ||
-          error?.error?.detail ||
-          'Erreur lors de la validation de la zone.';
+          this.cdr.detectChanges();
+        },
+        error: (error: any) => {
+          console.error('ERROR SAVE REFERENCE ZONE', error);
 
-        this.cdr.detectChanges();
-      }
-    });
+          this.savingZoneReferenceId = null;
+          this.pageError =
+            error?.error?.message ||
+            error?.error?.detail ||
+            'Erreur lors de l’enregistrement de la zone.';
+
+          this.cdr.detectChanges();
+        }
+      });
   }
 
   getReferenceZoneLabel(ref: ElEmarReferenceProjet): string {
-    const selectedId = this.referenceZoneSelection[String(ref.id)];
+    const referenceProjetId = Number(ref.id);
+    const selectedZoneId = this.referenceZoneSelection[referenceProjetId];
 
-    if (selectedId) {
+    if (selectedZoneId) {
       const selectedZone = this.zones.find(
-        zone => String(zone.id) === String(selectedId)
+        zone => Number(zone.id) === Number(selectedZoneId)
       );
 
-      if (selectedZone) return selectedZone.nomZone;
+      if (selectedZone) {
+        return selectedZone.nomZone;
+      }
     }
 
-    const rawZone = String(ref.zoneElEmarNom || ref.zone || '').trim();
-
-    if (!rawZone) return '-';
-
-    const zoneByName = this.zones.find(zone =>
-      String(zone.nomZone || '').trim().toLowerCase() === rawZone.toLowerCase()
-    );
-
-    if (zoneByName) return zoneByName.nomZone;
-
-    const zoneById = this.zones.find(zone => String(zone.id) === rawZone);
-
-    if (zoneById) return zoneById.nomZone;
-
-    return rawZone;
+    return String(ref.zoneElEmarNom || ref.zone || '').trim() || '-';
   }
 
   getReferenceZoneAdresse(ref: ElEmarReferenceProjet): string {
-    const selectedId = this.referenceZoneSelection[String(ref.id)];
+    const referenceProjetId = Number(ref.id);
+    const selectedZoneId = this.referenceZoneSelection[referenceProjetId];
 
-    if (selectedId) {
-      const selectedZone = this.zones.find(
-        zone => String(zone.id) === String(selectedId)
-      );
-
-      return selectedZone?.adresse || '';
+    if (!selectedZoneId) {
+      return '';
     }
 
-    return '';
+    const selectedZone = this.zones.find(
+      zone => Number(zone.id) === Number(selectedZoneId)
+    );
+
+    return selectedZone?.adresse || '';
+  }
+
+  // =====================================================
+  // SOLVABILITÉ PRIVÉE EL EMAR
+  // =====================================================
+
+  setSolvabiliteStatut(
+    statut: SolvabiliteStatut
+  ): void {
+    this.solvabiliteStatut = statut;
+    this.solvabiliteDirty = true;
+    this.solvabiliteSaved = false;
+    this.pageError = '';
+    this.successMessage = '';
+  }
+
+  onSolvabiliteCommentChange(
+    value: string
+  ): void {
+    this.solvabiliteCommentaire = value || '';
+    this.solvabiliteDirty = true;
+    this.solvabiliteSaved = false;
+  }
+
+  saveSolvabilite(): void {
+    if (!this.candidatureId || !this.detail) {
+      this.pageError =
+        'Intervenant introuvable.';
+      return;
+    }
+
+    const evaluateurId =
+      this.getCurrentUserId();
+
+    if (!evaluateurId) {
+      this.pageError =
+        'Utilisateur El Emar connecté introuvable.';
+      return;
+    }
+
+    this.savingSolvabilite = true;
+    this.pageError = '';
+    this.successMessage = '';
+
+    this.evaluationService
+      .saveSolvabilite(
+        this.candidatureId,
+        {
+          statut: this.solvabiliteStatut,
+          commentaire:
+            this.solvabiliteCommentaire.trim() || null,
+          evaluateurId
+        }
+      )
+      .subscribe({
+        next: (
+          response: SaveSolvabiliteResponse
+        ) => {
+          this.savingSolvabilite = false;
+          this.solvabiliteSaved = true;
+          this.solvabiliteDirty = false;
+
+          this.solvabiliteStatut =
+            response.statut;
+
+          this.solvabiliteCommentaire =
+            response.commentaire || '';
+
+          this.detail!.solvabiliteStatut =
+            response.statut;
+
+          this.detail!.solvabiliteCommentaire =
+            response.commentaire || null;
+
+          this.detail!.solvabiliteEvaluateurId =
+            response.evaluateurId || null;
+
+          this.detail!.solvabiliteDateValidation =
+            response.dateValidation || null;
+
+          this.successMessage =
+            'Le contrôle privé de solvabilité a été enregistré.';
+
+          this.cdr.detectChanges();
+        },
+        error: (error: any) => {
+          console.error(
+            'ERROR SAVE SOLVABILITE',
+            error
+          );
+
+          this.savingSolvabilite = false;
+
+          this.pageError =
+            error?.error?.message ||
+            error?.error?.detail ||
+            'Erreur lors de l’enregistrement de la solvabilité.';
+
+          this.cdr.detectChanges();
+        }
+      });
   }
 
   // =====================================================
   // DOCUMENTS GÉNÉRAUX
   // =====================================================
+get zonesUniques(): Zone[] {
+  const zonesParNom = new Map<string, Zone>();
 
-  onDocumentGeneralStatutChange(
-    typeDocument: 'RNE' | 'CNSS',
-    statut: StatutEvaluation
-  ): void {
-    if (!this.detail) return;
+  for (const zone of this.zones || []) {
+    const nomOriginal = String(
+      zone.nomZone || ''
+    ).trim();
 
-    if (typeDocument === 'RNE') this.detail.rneStatut = statut;
-    if (typeDocument === 'CNSS') this.detail.cnssStatut = statut;
-
-    if (this.isDossierNonRecevable()) {
-      this.detail.dossierRecevable = false;
-      this.detail.motifNonRecevable = 'RNE ou CNSS non conforme.';
-    } else {
-      this.detail.dossierRecevable = true;
-      this.detail.motifNonRecevable = null;
+    if (!nomOriginal) {
+      continue;
     }
 
-    this.successMessage = 'Contrôle du document mis à jour localement.';
-    this.cdr.detectChanges();
+    if ((zone as any).actif === false) {
+      continue;
+    }
+
+    /*
+     * La clé normalisée évite les doublons :
+     * "Zone 1", "zone 1" et " Zone 1 "
+     * sont considérés comme le même nom.
+     *
+     * Mais l'affichage garde le nom original reçu du backend.
+     */
+    const cleNom = nomOriginal.toLowerCase();
+
+    if (!zonesParNom.has(cleNom)) {
+      zonesParNom.set(
+        cleNom,
+        zone
+      );
+    }
   }
+
+  return Array
+    .from(zonesParNom.values())
+    .sort((zoneA, zoneB) =>
+      String(zoneA.nomZone || '')
+        .localeCompare(
+          String(zoneB.nomZone || ''),
+          'fr',
+          {
+            numeric: true,
+            sensitivity: 'base'
+          }
+        )
+    );
+}
+onDocumentGeneralStatutChange(
+  typeDocument: 'RNE' | 'CNSS',
+  statut: StatutEvaluation
+): void {
+  if (!this.detail || !this.candidatureId) {
+    return;
+  }
+
+  const ancienRneStatut =
+    this.detail.rneStatut ||
+    'A_VERIFIER';
+
+  const ancienCnssStatut =
+    this.detail.cnssStatut ||
+    'A_VERIFIER';
+
+  if (typeDocument === 'RNE') {
+    this.detail.rneStatut =
+      statut;
+  }
+
+  if (typeDocument === 'CNSS') {
+    this.detail.cnssStatut =
+      statut;
+  }
+
+  this.savingDocuments = true;
+  this.pageError = '';
+  this.successMessage = '';
+
+  this.evaluationService
+    .saveDocumentsStatut(
+      this.candidatureId,
+      {
+        rneStatut:
+          this.detail.rneStatut ||
+          'A_VERIFIER',
+
+        cnssStatut:
+          this.detail.cnssStatut ||
+          'A_VERIFIER',
+
+        evaluateurId:
+          this.getCurrentUserId()
+      }
+    )
+    .subscribe({
+      next: response => {
+        this.savingDocuments = false;
+
+        this.detail!.rneStatut =
+          response.rneStatut;
+
+        this.detail!.cnssStatut =
+          response.cnssStatut;
+
+        this.detail!.dossierRecevable =
+          response.dossierRecevable;
+
+        this.detail!.motifNonRecevable =
+          response.motifNonRecevable ||
+          null;
+
+        this.successMessage =
+          'Les statuts RNE et CNSS sont enregistrés.';
+
+        this.cdr.detectChanges();
+      },
+
+      error: (error: any) => {
+        console.error(
+          'ERROR SAVE DOCUMENT STATUS',
+          error
+        );
+
+        this.savingDocuments = false;
+
+        this.detail!.rneStatut =
+          ancienRneStatut;
+
+        this.detail!.cnssStatut =
+          ancienCnssStatut;
+
+        this.pageError =
+          error?.error?.message ||
+          error?.error?.detail ||
+          'Erreur lors de la sauvegarde des statuts RNE/CNSS.';
+
+        this.cdr.detectChanges();
+      }
+    });
+}
 
   isDossierNonRecevable(): boolean {
     const rne = this.detail?.rneStatut || 'A_VERIFIER';
@@ -446,69 +764,135 @@ export class EvaluationCandidatures implements OnInit, OnDestroy {
     );
   }
 
+  isCritereSaving(critere: ElEmarCritereEvaluation): boolean {
+    return this.savingCritereById[
+      Number(critere.reponseCritereId)
+    ] === true;
+  }
+
+  isCritereSaved(critere: ElEmarCritereEvaluation): boolean {
+    return this.savedCritereById[
+      Number(critere.reponseCritereId)
+    ] === true;
+  }
+
   onStatutEvaluationChange(
-    lot: ElEmarLotEvaluation,
-    critere: ElEmarCritereEvaluation
+    lot: ElEmarLotEvaluation | null,
+    critere: ElEmarCritereEvaluation,
+    nouveauStatut: StatutEvaluation
   ): void {
-    if (this.isDossierNonRecevable()) {
-      this.pageError = 'Le dossier est non recevable : RNE ou CNSS non conforme.';
+    if (!lot) {
+      this.pageError = 'Lot introuvable.';
       return;
     }
 
-    critere.conforme = critere.statutEvaluation === 'CONFORME';
-
-    if (critere.statutEvaluation === 'CONFORME') {
-      critere.noteObtenue = Number(critere.noteMax || 0);
-    } else {
-      critere.noteObtenue = 0;
+    if (this.isDossierNonRecevable()) {
+      this.pageError =
+        'Le dossier est non recevable : RNE ou CNSS non conforme.';
+      return;
     }
 
-    this.recalculateLotLocal(lot);
-    this.saveCritereEvaluation(lot, critere);
-  }
+    const applicationCandidatureId = Number(lot.applicationCandidatureId);
+    const reponseCritereId = Number(critere.reponseCritereId);
 
-  saveCritereEvaluation(
-    lot: ElEmarLotEvaluation,
-    critere: ElEmarCritereEvaluation
-  ): void {
+    if (!applicationCandidatureId) {
+      this.pageError = 'Identifiant du lot introuvable.';
+      return;
+    }
+
+    if (!reponseCritereId) {
+      this.pageError = 'Identifiant de la réponse critère introuvable.';
+      return;
+    }
+
+    const ancienStatut = critere.statutEvaluation;
+    const ancienneNote = Number(critere.noteObtenue || 0);
+    const ancienConforme = Boolean(critere.conforme);
+
+    // Mise à jour visuelle immédiate. Elle sera annulée en cas d'erreur API.
+    critere.statutEvaluation = nouveauStatut;
+    critere.conforme = nouveauStatut === 'CONFORME';
+    critere.noteObtenue =
+      nouveauStatut === 'CONFORME'
+        ? Number(critere.noteMax || 0)
+        : 0;
+
+    this.recalculateLotLocal(lot);
+
     const request: SaveEvaluationRequest = {
-      statut: critere.statutEvaluation,
-      commentaireEvaluateur: critere.commentaireEvaluateur || null,
+      statut: nouveauStatut,
+      commentaireEvaluateur:
+        critere.commentaireEvaluateur?.trim() || null,
       evaluateurId: this.getCurrentUserId()
     };
 
-    this.saving = true;
+    this.savingCritereById[reponseCritereId] = true;
+    this.savedCritereById[reponseCritereId] = false;
     this.pageError = '';
     this.successMessage = '';
 
     this.evaluationService
       .saveCritereEvaluation(
-        lot.applicationCandidatureId,
-        critere.reponseCritereId,
+        applicationCandidatureId,
+        reponseCritereId,
         request
       )
       .subscribe({
         next: (response: SaveEvaluationResponse) => {
-          critere.statutEvaluation = response.statutEvaluation;
-          critere.conforme = response.conforme;
-          critere.noteObtenue = response.noteObtenue;
-          critere.commentaireEvaluateur = response.commentaireEvaluateur;
+          if (
+            Number(response.reponseCritereId) !== reponseCritereId ||
+            Number(response.applicationCandidatureId) !==
+              applicationCandidatureId
+          ) {
+            critere.statutEvaluation = ancienStatut;
+            critere.noteObtenue = ancienneNote;
+            critere.conforme = ancienConforme;
+            this.recalculateLotLocal(lot);
 
-          lot.noteLot = response.noteLot;
-
-          if (this.detail) {
-            this.detail.noteGlobale = response.noteGlobale;
+            this.savingCritereById[reponseCritereId] = false;
+            this.savedCritereById[reponseCritereId] = false;
+            this.pageError =
+              'Le backend a retourné des identifiants différents de ceux envoyés.';
+            this.cdr.detectChanges();
+            return;
           }
 
-          this.saving = false;
-          this.successMessage = 'Évaluation sauvegardée.';
+          // Utiliser uniquement les valeurs réellement enregistrées
+          // et retournées pour cette réponse critère.
+          critere.statutEvaluation = response.statutEvaluation;
+          critere.conforme = response.conforme;
+          critere.noteObtenue = Number(response.noteObtenue || 0);
+          critere.commentaireEvaluateur =
+            response.commentaireEvaluateur || null;
+
+          lot.noteLot = Number(response.noteLot || 0);
+
+          if (this.detail) {
+            this.detail.noteGlobale = Number(response.noteGlobale || 0);
+          }
+
+          this.savingCritereById[reponseCritereId] = false;
+          this.savedCritereById[reponseCritereId] = true;
+          this.successMessage =
+            `Le critère « ${critere.libelle} » est enregistré.`;
+
           this.cdr.detectChanges();
         },
-        error: (error: unknown) => {
-          console.error('ERROR SAVE CRITERE EVALUATION', error);
+        error: (error: any) => {
+          console.error('ERROR SAVE CRITERE', error);
 
-          this.saving = false;
-          this.pageError = "Erreur lors de la sauvegarde de l'évaluation.";
+          critere.statutEvaluation = ancienStatut;
+          critere.noteObtenue = ancienneNote;
+          critere.conforme = ancienConforme;
+          this.recalculateLotLocal(lot);
+
+          this.savingCritereById[reponseCritereId] = false;
+          this.savedCritereById[reponseCritereId] = false;
+          this.pageError =
+            error?.error?.message ||
+            error?.error?.detail ||
+            error?.message ||
+            `Erreur lors de l’enregistrement du critère « ${critere.libelle} ».`;
 
           this.cdr.detectChanges();
         }
@@ -561,9 +945,6 @@ export class EvaluationCandidatures implements OnInit, OnDestroy {
   // =====================================================
   // NOTIFICATION PAR CRITÈRE
   // =====================================================
-// =====================================================
-// NOTIFICATION PAR CRITÈRE
-// =====================================================
 
 getCritereNotificationKey(
   lot: ElEmarLotEvaluation | null,
@@ -720,40 +1101,30 @@ envoyerCommentaireCritereAuCandidat(
     }
   });
 }
-get zonesUniques(): Zone[] {
-  const seen = new Map<string, Zone>();
+get zonesAffichees(): Zone[] {
+  const zonesById = new Map<number, Zone>();
 
-  for (const zone of this.zones) {
-    const key = (zone.nomZone || '').trim().toLowerCase();
+  for (const zone of this.zones || []) {
+    const zoneId = Number(zone.id);
 
-    if (!seen.has(key)) {
-      seen.set(key, zone);
+    if (!zoneId || (zone as any).actif === false) {
+      continue;
     }
+
+    zonesById.set(zoneId, zone);
   }
 
-  return Array.from(seen.values());
+  return Array.from(zonesById.values()).sort((zoneA, zoneB) =>
+    String(zoneA.nomZone || '').localeCompare(
+      String(zoneB.nomZone || ''),
+      'fr',
+      {
+        numeric: true,
+        sensitivity: 'base'
+      }
+    )
+  );
 }
-// initReferenceZoneSelection(): void {
-//   if (!this.detail?.lots) return;
-
-//   for (const lot of this.detail.lots) {
-//     for (const ref of lot.references || []) {
-//       const key = String(ref.id);
-
-//       // Ne jamais écraser une sélection déjà faite localement
-//       if (this.referenceZoneSelection[key]) {
-//         continue;
-//       }
-
-//       // On ne se fie qu'à l'ID, jamais au nom (source de doublons)
-//       if (ref.zoneElEmarId) {
-//         this.referenceZoneSelection[key] = String(ref.zoneElEmarId);
-//       } else {
-//         this.referenceZoneSelection[key] = '';
-//       }
-//     }
-//   }
-// }
   // =====================================================
   // DÉCISION FINALE PAR LOT
   // =====================================================
@@ -879,33 +1250,50 @@ get zonesUniques(): Zone[] {
   getSelectedZoneRequestsForLot(
     lot: ElEmarLotEvaluation | null
   ): SaveReferenceZoneRequest[] {
-    if (!lot) return [];
+    if (!lot) {
+      return [];
+    }
 
     const requests: SaveReferenceZoneRequest[] = [];
 
     for (const ref of lot.references || []) {
-      const selectedZoneId = this.referenceZoneSelection[String(ref.id)];
+      const referenceProjetId = Number(ref.id);
+      const selectedZoneId =
+        this.referenceZoneSelection[referenceProjetId];
 
-      if (!selectedZoneId) continue;
+      if (!selectedZoneId) {
+        continue;
+      }
+
+      const mustSave =
+        this.referenceZoneDirty[referenceProjetId] === true ||
+        ref.zoneValidee !== true;
+
+      if (!mustSave) {
+        continue;
+      }
 
       requests.push({
-        referenceProjetId: Number(ref.id),
-        applicationCandidatureId: Number(lot.applicationCandidatureId),
+        referenceProjetId,
+        applicationCandidatureId:
+          Number(lot.applicationCandidatureId),
         zoneId: Number(selectedZoneId),
-        commentaire: this.referenceZoneCommentaire[String(ref.id)] || null
+        commentaire:
+          this.referenceZoneCommentaire[referenceProjetId]?.trim() || null
       });
     }
 
     return requests;
   }
 
-hasAtLeastOneZoneSelectedForLot(
+  hasAtLeastOneZoneSelectedForLot(
   lot: ElEmarLotEvaluation | null
 ): boolean {
   if (!lot) return false;
 
   return (lot.references || []).some(ref => {
-    const selectedZoneId = this.referenceZoneSelection[String(ref.id)];
+    const selectedZoneId =
+      this.referenceZoneSelection[Number(ref.id)];
 
     return !!selectedZoneId || ref.zoneValidee === true;
   });
@@ -956,50 +1344,106 @@ hasAtLeastOneZoneSelectedForLot(
       return;
     }
 
-  const zoneRequests = this.getSelectedZoneRequestsForLot(lot);
+    const zoneRequests =
+      this.getSelectedZoneRequestsForLot(lot);
 
-if (zoneRequests.length === 0) {
-  this.saveFinalDecisionLotOnly(lot, decisionRequest);
-  return;
-}
-
-forkJoin(
-  zoneRequests.map(request =>
-    this.classementZoneService.validerReferenceZone(request)
-  )
-).subscribe({
-  next: (classements: ClassementZoneResponse[]) => {
-    for (const classement of classements || []) {
-      if (classement.applicationCandidatureId) {
-        this.classementsByApplicationId[
-          Number(classement.applicationCandidatureId)
-        ] = classement;
-      }
-    }
-
-    this.saveFinalDecisionLotOnly(lot, decisionRequest);
-  },
-  error: (error: any) => {
-    console.error('ERROR SAVE ZONE BEFORE LOT DECISION', error);
-
-    if (error?.status === 409) {
-      this.debugMessage =
-        'La zone est déjà enregistrée. Validation de la décision finale en cours...';
-
-      this.saveFinalDecisionLotOnly(lot, decisionRequest);
+    if (zoneRequests.length === 0) {
+      this.saveFinalDecisionLotOnly(
+        lot,
+        decisionRequest
+      );
       return;
     }
 
-    this.validatingDecisionByLot[lotKey] = false;
+    forkJoin(
+      zoneRequests.map(request =>
+        this.classementZoneService
+          .validerReferenceZone(request)
+      )
+    ).subscribe({
+      next: (
+        classements: ClassementZoneResponse[]
+      ) => {
+        (classements || []).forEach(
+          (classement, index) => {
+            const request =
+              zoneRequests[index];
 
-    this.pageError =
-      error?.error?.message ||
-      error?.error?.detail ||
-      'Erreur lors de l’enregistrement du classement par zone pour ce lot.';
+            if (
+              classement.applicationCandidatureId
+            ) {
+              this.classementsByApplicationId[
+                Number(
+                  classement.applicationCandidatureId
+                )
+              ] = classement;
+            }
 
-    this.cdr.detectChanges();
-  }
-});
+            const ref =
+              (lot.references || []).find(
+                item =>
+                  Number(item.id) ===
+                  Number(
+                    request?.referenceProjetId
+                  )
+              );
+
+            if (ref && request) {
+              const referenceProjetId = Number(ref.id);
+
+              ref.zoneElEmarId =
+                request.zoneId;
+
+              ref.zoneElEmarNom =
+                classement.nomZone ||
+                ref.zoneElEmarNom ||
+                null;
+
+              ref.zoneElEmarCommentaire =
+                request.commentaire || null;
+
+              ref.zoneValidee = true;
+              this.referenceZoneDirty[referenceProjetId] =
+                false;
+            }
+          }
+        );
+
+        this.saveFinalDecisionLotOnly(
+          lot,
+          decisionRequest
+        );
+      },
+
+      error: (error: any) => {
+        console.error(
+          'ERROR SAVE ZONE BEFORE LOT DECISION',
+          error
+        );
+
+        if (error?.status === 409) {
+          this.debugMessage =
+            'La zone est déjà enregistrée. Validation de la décision finale en cours...';
+
+          this.saveFinalDecisionLotOnly(
+            lot,
+            decisionRequest
+          );
+          return;
+        }
+
+        this.validatingDecisionByLot[
+          lotKey
+        ] = false;
+
+        this.pageError =
+          error?.error?.message ||
+          error?.error?.detail ||
+          'Erreur lors de l’enregistrement du classement par zone pour ce lot.';
+
+        this.cdr.detectChanges();
+      }
+    });
   }
 
   private saveFinalDecisionLotOnly(

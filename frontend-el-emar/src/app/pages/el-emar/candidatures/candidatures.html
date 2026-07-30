@@ -1,18 +1,25 @@
 <div class="candidatures-page">
 
-    <!-- HEADER -->
+    <!-- =====================================================
+       HEADER
+  ====================================================== -->
     <div class="page-header">
         <div>
-            <h1>Gestion des candidatures</h1>
-            <p>Créer les accès des sociétés candidates, affecter les lots et générer les comptes CND.</p>
+            <h1>Gestion des intervenants</h1>
+
+            <p>
+                Créer les accès des sociétés intervenantes, affecter les lots et générer les comptes utilisateurs.
+            </p>
         </div>
 
         <button type="button" class="primary-btn" (click)="openCreateModal()">
-      + Nouvelle candidature
+      + Nouvel intervenant
     </button>
     </div>
 
-    <!-- ALERTS -->
+    <!-- =====================================================
+       ALERTES
+  ====================================================== -->
     <div *ngIf="errorMessage" class="alert error">
         {{ errorMessage }}
     </div>
@@ -21,13 +28,19 @@
         {{ successMessage }}
     </div>
 
-    <!-- FILTER -->
+    <!-- =====================================================
+       FILTRE
+  ====================================================== -->
     <div class="filter-card">
         <div>
-            <label>Filtrer par type d’intervenant</label>
+            <label>
+        Filtrer par type d’intervenant
+      </label>
 
             <select [(ngModel)]="selectedTypeFilterId">
-        <option [ngValue]="null">Tous les types</option>
+        <option [ngValue]="null">
+          Tous les types
+        </option>
 
         <option
           *ngFor="let type of types"
@@ -39,58 +52,145 @@
         </div>
 
         <div class="filter-stats">
-            <span>Total candidatures</span>
-            <strong>{{ getFilteredCandidatures().length }}</strong>
+            <span>Total intervenants</span>
+
+            <strong>
+        {{ getFilteredCandidatures().length }}
+      </strong>
         </div>
     </div>
 
-    <!-- LOADING -->
+    <!-- =====================================================
+       CHARGEMENT
+  ====================================================== -->
     <div *ngIf="loading" class="loading-card">
-        Chargement des candidatures...
+        Chargement des intervenants...
     </div>
 
-    <!-- EMPTY -->
-    <div *ngIf="!loading && getFilteredCandidatures().length === 0" class="empty-card">
-        Aucune candidature trouvée.
+    <!-- =====================================================
+       LISTE VIDE
+  ====================================================== -->
+    <div *ngIf="
+      !loading &&
+      getFilteredCandidatures().length === 0
+    " class="empty-card">
+        Aucun intervenant trouvé.
     </div>
 
-    <!-- LIST -->
+    <!-- =====================================================
+       LISTE DES INTERVENANTS
+  ====================================================== -->
     <div class="cards-grid" *ngIf="!loading">
+        <div class="candidature-card" *ngFor="
+        let candidature of getFilteredCandidatures();
+        trackBy: trackByCandidatureId
+      ">
 
-        <div class="candidature-card" *ngFor="let candidature of getFilteredCandidatures(); trackBy: trackByCandidatureId">
-
+            <!-- EN-TÊTE CARTE -->
             <div class="card-header">
 
                 <div class="card-title-area">
-                    <h3>{{ candidature.nomEntreprise }}</h3>
-                    <p>{{ candidature.typeIntervenantLibelle || getTypeName(candidature.typeIntervenantId) }}</p>
+                    <h3>
+                        {{ candidature.nomEntreprise }}
+                    </h3>
+
+                    <p>
+                        {{ candidature.typeIntervenantLibelle || getTypeName(candidature.typeIntervenantId) }}
+                    </p>
                 </div>
 
                 <div class="card-header-actions">
 
                     <span class="status-chip" [class.complete]="candidature.profilComplete" [class.incomplete]="!candidature.profilComplete">
-      {{ candidature.profilComplete ? 'Profil complété' : 'À compléter' }}
-    </span>
+            {{
+              candidature.profilComplete
+                ? 'Profil complété'
+                : 'À compléter'
+            }}
+          </span>
 
-                    <button type="button" class="delete-candidature-btn" title="Supprimer cette candidature" (click)="deleteCandidature(candidature)" [disabled]="deletingCandidatureId === candidature.candidatureId">
+                    <!-- MODIFIER -->
+                    <button type="button" class="edit-candidature-btn" title="Modifier cet intervenant" (click)="openEditCandidatureModal(candidature)">
+            <i class="ti ti-pencil"></i>
+            <span>Modifier</span>
+          </button>
 
-      <i class="ti ti-trash"></i>
+                    <!-- ACTIVER / DÉSACTIVER -->
+                    <button type="button" class="access-candidature-btn" [class.activate-mode]="
+              candidature.accesBloque === true
+            " [class.deactivate-mode]="
+              candidature.accesBloque !== true
+            " [disabled]="
+              changingAccessCandidatureId ===
+              candidature.candidatureId
+            " [title]="
+              candidature.accesBloque
+                ? 'Activer cet intervenant'
+                : 'Désactiver cet intervenant'
+            " (click)="toggleCandidatureAccess(candidature)">
+            <i
+              [class]="
+                changingAccessCandidatureId ===
+                candidature.candidatureId
+                  ? 'ti ti-loader-2 access-loading'
+                  : candidature.accesBloque
+                    ? 'ti ti-lock-open'
+                    : 'ti ti-lock'
+              "
+            ></i>
 
-      <span>
-        {{ deletingCandidatureId === candidature.candidatureId ? 'Suppression...' : 'Supprimer' }}
-      </span>
+            <span>
+              {{
+                changingAccessCandidatureId ===
+                candidature.candidatureId
+                  ? candidature.accesBloque
+                    ? 'Activation...'
+                    : 'Désactivation...'
+                  : candidature.accesBloque
+                    ? 'Activer'
+                    : 'Désactiver'
+              }}
+            </span>
+          </button>
 
-    </button>
+                    <!-- SUPPRIMER -->
+                    <button type="button" class="delete-candidature-btn" title="Supprimer définitivement cet intervenant" [disabled]="
+              deletingCandidatureId ===
+              candidature.candidatureId
+            " (click)="openDeleteCandidatureModal(candidature)">
+            <i class="ti ti-trash"></i>
+
+            <span>
+              {{
+                deletingCandidatureId ===
+                candidature.candidatureId
+                  ? 'Suppression...'
+                  : 'Supprimer'
+              }}
+            </span>
+          </button>
 
                 </div>
-
             </div>
 
-            <div class="info-line">
-                <span>Statut</span>
-                <strong>{{ candidature.statut || 'BROUILLON' }}</strong>
+            <!-- ÉTAT DE L’ACCÈS -->
+            <div class="info-line access-status-line" [class.access-active]="
+          !candidature.accesBloque
+        " [class.access-blocked]="
+          candidature.accesBloque
+        ">
+                <span>État de l’accès</span>
+
+                <strong>
+          {{
+            candidature.accesBloque
+              ? 'DÉSACTIVÉ'
+              : 'ACTIF'
+          }}
+        </strong>
             </div>
 
+            <!-- LOTS AUTORISÉS -->
             <div class="section-mini">
                 <strong>Lots autorisés</strong>
 
@@ -99,89 +199,155 @@
             {{ lot.nomLot }}
           </span>
 
-                    <span *ngIf="!candidature.lots || candidature.lots.length === 0">
+                    <span *ngIf="
+              !candidature.lots ||
+              candidature.lots.length === 0
+            ">
             Aucun lot
           </span>
                 </div>
             </div>
 
+            <!-- UTILISATEURS -->
             <div class="section-mini">
-                <strong>Utilisateurs CND</strong>
+                <strong>
+          Utilisateurs de l’intervenant
+        </strong>
 
                 <div class="user-line" *ngFor="let user of candidature.utilisateurs">
-                    <div>
-                        <span>{{ user.nomComplet }}</span>
-                        <small>{{ user.email }}</small>
-                        <small *ngIf="user.fonction">{{ user.fonction }}</small>
+                    <div class="user-information">
+
+                        <div class="user-name-line">
+                            <span>
+        {{ user.nomComplet }}
+      </span>
+
+                            <span class="user-status-chip" [class.user-active]="user.actif !== false" [class.user-disabled]="user.actif === false">
+        {{
+          user.actif === false
+            ? 'Désactivé'
+            : 'Actif'
+        }}
+      </span>
+                        </div>
+
+                        <small>
+      {{ user.email }}
+    </small>
+
+                        <small *ngIf="user.fonction">
+      {{ user.fonction }}
+    </small>
                     </div>
 
                     <div class="user-actions">
-                        <button type="button" class="small-btn" (click)="resetPassword(user)">
-              Reset MDP
-            </button>
 
-                        <button type="button" class="small-btn danger" (click)="deactivateUser(user)" [disabled]="user.actif === false">
-              Désactiver
-            </button>
+                        <button type="button" class="small-btn" [disabled]="user.actif === false" (click)="resetPassword(user)">
+      Réinitialiser le mot de passe
+    </button>
+
+                        <button type="button" class="user-access-btn" [class.activate-user]="user.actif === false" [class.deactivate-user]="user.actif !== false" [title]="
+        user.actif === false
+          ? 'Activer cet utilisateur'
+          : 'Désactiver cet utilisateur'
+      " (click)="
+        openUserAccessModal(
+          user,
+          candidature.candidatureId
+        )
+      ">
+      <i
+        [class]="
+          user.actif === false
+            ? 'ti ti-user-check'
+            : 'ti ti-user-off'
+        "
+      ></i>
+
+      <span>
+        {{
+          user.actif === false
+            ? 'Activer'
+            : 'Désactiver'
+        }}
+      </span>
+    </button>
+
                     </div>
+                </div>
+
+                <div class="empty-mini" *ngIf="
+            !candidature.utilisateurs ||
+            candidature.utilisateurs.length === 0
+          ">
+                    Aucun utilisateur associé.
                 </div>
             </div>
 
         </div>
     </div>
 
-    <!-- MODAL CREATE -->
+    <!-- =====================================================
+       MODAL CRÉATION INTERVENANT
+  ====================================================== -->
     <div class="modal-backdrop" *ngIf="modalOpen">
         <div class="modal-card">
 
             <div class="modal-header">
                 <div>
-                    <h2>Nouvelle candidature / société</h2>
-                    <p>Créer l’accès candidat, affecter les lots et générer les mots de passe.</p>
+                    <h2>
+                        Nouvel intervenant
+                    </h2>
+
+                    <p>
+                        Créer l’accès de la société intervenante, affecter les lots et générer les comptes utilisateurs.
+                    </p>
                 </div>
 
-                <button type="button" class="close-btn" (click)="closeModal()">
+                <button type="button" class="close-btn" [disabled]="saving" (click)="closeModal()">
           ×
         </button>
             </div>
 
             <div class="modal-body">
 
-                <!-- STEP 1 -->
+                <!-- ÉTAPE 1 -->
                 <div class="form-block">
                     <div class="block-title">
                         <span>1</span>
+
                         <div>
-                            <h3>Informations société</h3>
-                            <p>El Emar crée l’accès initial. Le candidat complètera ensuite le dossier.</p>
+                            <h3>
+                                Informations de la société
+                            </h3>
+
+                            <p>
+                                El Emar crée l’accès initial. L’intervenant complètera ensuite son dossier.
+                            </p>
                         </div>
                     </div>
 
                     <div class="form-grid two">
                         <label>
-              Nom société *
+              Nom de la société *
+
               <input
                 [(ngModel)]="form.nomEntreprise"
-                placeholder="Ex: Bureau Atlas Engineering"
+                placeholder="Ex : Bureau Atlas Engineering"
               >
             </label>
-                        <!-- 
-                        <label>
-              Email principal société *
-              <input
-                [(ngModel)]="form.emailPrincipal"
-                placeholder="Ex: contact@societe.com"
-              >
-            </label> -->
                     </div>
 
                     <label>
             Type d’intervenant *
+
             <select
               [(ngModel)]="form.typeIntervenantId"
               (ngModelChange)="onTypeChange()"
             >
-              <option [ngValue]="null">-- Choisir un type --</option>
+              <option [ngValue]="null">
+                -- Choisir un type --
+              </option>
 
               <option
                 *ngFor="let type of types"
@@ -193,13 +359,17 @@
           </label>
                 </div>
 
-                <!-- STEP 2 -->
+                <!-- ÉTAPE 2 -->
                 <div class="form-block">
                     <div class="block-title">
                         <span>2</span>
+
                         <div>
                             <h3>Lots autorisés</h3>
-                            <p>Le candidat verra uniquement ces lots dans son interface.</p>
+
+                            <p>
+                                L’intervenant verra uniquement les lots sélectionnés dans son interface.
+                            </p>
                         </div>
                     </div>
 
@@ -207,39 +377,65 @@
                         Chargement des lots...
                     </div>
 
-                    <div *ngIf="!loadingLots && form.typeIntervenantId && lots.length === 0" class="empty-mini">
+                    <div *ngIf="
+              !loadingLots &&
+              form.typeIntervenantId &&
+              lots.length === 0
+            " class="empty-mini">
                         Aucun lot actif trouvé pour ce type.
                     </div>
 
                     <div class="lots-grid" *ngIf="lots.length > 0">
-                        <button type="button" class="lot-option" *ngFor="let lot of lots; trackBy: trackByLotId" [class.selected]="isLotSelected(lot.id)" (click)="toggleLot(lot.id)">
-              <span>{{ lot.nomLot }}</span>
-              <small>{{ lot.codeLot || 'LOT' }}</small>
+                        <button type="button" class="lot-option" *ngFor="
+                let lot of lots;
+                trackBy: trackByLotId
+              " [class.selected]="isLotSelected(lot.id)" (click)="toggleLot(lot.id)">
+              <span>
+                {{ lot.nomLot }}
+              </span>
+
+              <small>
+                {{ lot.codeLot || 'LOT' }}
+              </small>
             </button>
                     </div>
                 </div>
 
-                <!-- STEP 3 -->
+                <!-- ÉTAPE 3 -->
                 <div class="form-block">
                     <div class="block-title">
                         <span>3</span>
+
                         <div>
-                            <h3>Utilisateurs CND</h3>
-                            <p>Ajouter les personnes qui pourront se connecter pour cette société.</p>
+                            <h3>
+                                Utilisateurs de l’intervenant
+                            </h3>
+
+                            <p>
+                                Ajouter les personnes autorisées à se connecter pour cette société.
+                            </p>
                         </div>
                     </div>
 
                     <div class="users-title-line">
-                        <strong>Comptes utilisateurs</strong>
+                        <strong>
+              Comptes utilisateurs
+            </strong>
 
                         <button type="button" class="secondary-btn" (click)="addUserRow()">
-              + Ajouter utilisateur
+              + Ajouter un utilisateur
             </button>
                     </div>
 
-                    <div class="user-form-card" *ngFor="let user of form.users; let i = index; trackBy: trackByUserIndex">
+                    <div class="user-form-card" *ngFor="
+              let user of form.users;
+              let i = index;
+              trackBy: trackByUserIndex
+            ">
                         <div class="user-form-header">
-                            <strong>Utilisateur {{ i + 1 }}</strong>
+                            <strong>
+                Utilisateur {{ i + 1 }}
+              </strong>
 
                             <button type="button" class="remove-btn" (click)="removeUserRow(i)">
                 Supprimer
@@ -249,17 +445,19 @@
                         <div class="form-grid two">
                             <label>
                 Nom complet
+
                 <input
                   [(ngModel)]="user.nomComplet"
-                  placeholder="Ex: Ahmed Ben Ali"
+                  placeholder="Ex : Ahmed Ben Ali"
                 >
               </label>
 
                             <label>
-                Email utilisateur *
+                Adresse email *
+
                 <input
                   [(ngModel)]="user.email"
-                  placeholder="Ex: ahmed@societe.com"
+                  placeholder="Ex : ahmed@societe.com"
                 >
               </label>
                         </div>
@@ -267,6 +465,7 @@
                         <div class="form-grid two">
                             <label>
                 Téléphone
+
                 <input
                   [(ngModel)]="user.telephone"
                   placeholder="+216 ..."
@@ -275,9 +474,10 @@
 
                             <label>
                 Fonction
+
                 <input
                   [(ngModel)]="user.fonction"
-                  placeholder="Responsable technique"
+                  placeholder="Ex : Responsable technique"
                 >
               </label>
                         </div>
@@ -287,26 +487,37 @@
             </div>
 
             <div class="modal-footer">
-                <button type="button" class="cancel-btn" (click)="closeModal()">
+                <button type="button" class="cancel-btn" [disabled]="saving" (click)="closeModal()">
           Annuler
         </button>
 
-                <button type="button" class="save-btn" (click)="save()" [disabled]="saving">
-          {{ saving ? 'Création...' : 'Créer et générer mots de passe' }}
+                <button type="button" class="save-btn" [disabled]="saving" (click)="save()">
+          {{
+            saving
+              ? 'Création...'
+              : 'Créer l’intervenant et générer les comptes'
+          }}
         </button>
             </div>
 
         </div>
     </div>
 
-    <!-- MODAL PASSWORDS -->
+    <!-- =====================================================
+       MODAL COMPTES GÉNÉRÉS
+  ====================================================== -->
     <div class="modal-backdrop" *ngIf="generatedAccountsModalOpen">
         <div class="password-modal">
 
             <div class="modal-header">
                 <div>
-                    <h2>Comptes générés</h2>
-                    <p>Copie ces mots de passe. Ils ne seront affichés qu’une seule fois.</p>
+                    <h2>
+                        Comptes utilisateurs générés
+                    </h2>
+
+                    <p>
+                        Copiez les mots de passe. Ils ne seront affichés qu’une seule fois.
+                    </p>
                 </div>
 
                 <button type="button" class="close-btn" (click)="closeGeneratedAccountsModal()">
@@ -317,11 +528,18 @@
             <div class="password-list">
                 <div class="password-card" *ngFor="let account of generatedAccounts">
                     <div>
-                        <strong>{{ account.nomComplet }}</strong>
-                        <span>{{ account.email }}</span>
+                        <strong>
+              {{ account.nomComplet }}
+            </strong>
+
+                        <span>
+              {{ account.email }}
+            </span>
                     </div>
 
-                    <code>{{ account.motDePasseTemporaire }}</code>
+                    <code>
+            {{ account.motDePasseTemporaire }}
+          </code>
                 </div>
             </div>
 
@@ -338,4 +556,388 @@
         </div>
     </div>
 
+    <!-- =====================================================
+       MODAL MODIFICATION INTERVENANT
+  ====================================================== -->
+    <div class="modal-backdrop" *ngIf="editCandidatureModalOpen">
+        <div class="modal-card edit-candidature-modal">
+
+            <div class="modal-header">
+                <div>
+                    <h2>
+                        Modifier l’intervenant
+                    </h2>
+
+                    <p>
+                        Modifier les informations de la société, son type d’intervenant et les lots autorisés.
+                    </p>
+                </div>
+
+                <button type="button" class="close-btn" [disabled]="savingEdit" (click)="closeEditCandidatureModal()">
+          ×
+        </button>
+            </div>
+
+            <div class="modal-body">
+
+                <!-- INFORMATIONS -->
+                <div class="form-block">
+                    <div class="block-title">
+                        <span>1</span>
+
+                        <div>
+                            <h3>
+                                Informations de la société
+                            </h3>
+
+                            <p>
+                                Informations principales de l’intervenant.
+                            </p>
+                        </div>
+                    </div>
+
+                    <label>
+            Nom de la société *
+
+            <input
+              [(ngModel)]="editForm.nomEntreprise"
+              placeholder="Nom de la société"
+            >
+          </label>
+
+                    <label>
+            Type d’intervenant *
+
+            <select
+              [(ngModel)]="editForm.typeIntervenantId"
+              (ngModelChange)="onEditTypeChange()"
+            >
+              <option [ngValue]="null">
+                -- Choisir un type --
+              </option>
+
+              <option
+                *ngFor="let type of types"
+                [ngValue]="type.id"
+              >
+                {{ type.libelle }}
+              </option>
+            </select>
+          </label>
+                </div>
+
+                <!-- LOTS -->
+                <div class="form-block">
+                    <div class="block-title">
+                        <span>2</span>
+
+                        <div>
+                            <h3>Lots autorisés</h3>
+
+                            <p>
+                                Sélectionner les lots visibles par cet intervenant.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="loading-mini" *ngIf="loadingEditLots">
+                        Chargement des lots...
+                    </div>
+
+                    <div class="empty-mini" *ngIf="
+              !loadingEditLots &&
+              editForm.typeIntervenantId &&
+              editLots.length === 0
+            ">
+                        Aucun lot actif trouvé pour ce type.
+                    </div>
+
+                    <div class="lots-grid" *ngIf="editLots.length > 0">
+                        <button type="button" class="lot-option" *ngFor="
+                let lot of editLots;
+                trackBy: trackByLotId
+              " [class.selected]="
+                isEditLotSelected(lot.id)
+              " (click)="toggleEditLot(lot.id)">
+              <span>
+                {{ lot.nomLot }}
+              </span>
+
+              <small>
+                {{ lot.codeLot || 'LOT' }}
+              </small>
+            </button>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="cancel-btn" [disabled]="savingEdit" (click)="closeEditCandidatureModal()">
+          Annuler
+        </button>
+
+                <button type="button" class="save-btn" [disabled]="
+            savingEdit ||
+            loadingEditLots
+          " (click)="saveCandidatureChanges()">
+          {{
+            savingEdit
+              ? 'Enregistrement...'
+              : 'Enregistrer les modifications'
+          }}
+        </button>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- =====================================================
+       MODAL SUPPRESSION INTERVENANT
+  ====================================================== -->
+    <div class="delete-modal-backdrop" *ngIf="deleteCandidatureModalOpen" (click)="closeDeleteCandidatureModal()">
+        <div class="delete-modal-card" (click)="$event.stopPropagation()">
+
+            <div class="delete-modal-icon">
+                <i class="ti ti-trash"></i>
+            </div>
+
+            <span class="delete-modal-label">
+        Suppression de l’intervenant
+      </span>
+
+            <h3>
+                Supprimer définitivement l’intervenant
+            </h3>
+
+            <p class="delete-modal-question">
+                Voulez-vous vraiment supprimer définitivement
+
+                <strong>
+          {{
+            candidatureToDelete?.nomEntreprise ||
+            'cet intervenant'
+          }}
+        </strong> ?
+            </p>
+
+            <div class="delete-modal-details" *ngIf="candidatureToDelete">
+                <div>
+                    <span>
+            Type d’intervenant
+          </span>
+
+                    <strong>
+            {{
+              candidatureToDelete.typeIntervenantLibelle ||
+              getTypeName(
+                candidatureToDelete.typeIntervenantId
+              )
+            }}
+          </strong>
+                </div>
+
+                <div>
+                    <span>
+            Nombre de lots
+          </span>
+
+                    <strong>
+            {{
+              candidatureToDelete.lots?.length || 0
+            }}
+          </strong>
+                </div>
+
+                <div>
+                    <span>
+            Nombre d’utilisateurs
+          </span>
+
+                    <strong>
+            {{
+              candidatureToDelete.utilisateurs?.length || 0
+            }}
+          </strong>
+                </div>
+            </div>
+
+            <div class="delete-modal-warning">
+                <i class="ti ti-alert-triangle"></i>
+
+                <span>
+          Cette action supprimera définitivement
+          l’intervenant, ses affectations de lots
+          et les comptes utilisateurs associés.
+          Cette opération est irréversible.
+        </span>
+            </div>
+
+            <div class="delete-modal-actions">
+                <button type="button" class="cancel-btn" [disabled]="
+            deletingCandidatureId !== null
+          " (click)="closeDeleteCandidatureModal()">
+          Annuler
+        </button>
+
+                <button type="button" class="confirm-delete-btn" [disabled]="
+            deletingCandidatureId !== null
+          " (click)="confirmDeleteCandidature()">
+          <i
+            [class]="
+              deletingCandidatureId !== null
+                ? 'ti ti-loader-2 delete-loading'
+                : 'ti ti-trash'
+            "
+          ></i>
+
+          {{
+            deletingCandidatureId !== null
+              ? 'Suppression...'
+              : 'Supprimer définitivement'
+          }}
+        </button>
+            </div>
+
+        </div>
+    </div>
+
+</div>
+<!-- =====================================================
+     MODAL ACTIVATION / DÉSACTIVATION UTILISATEUR
+====================================================== -->
+<div class="user-access-modal-backdrop" *ngIf="userAccessModalOpen" (click)="closeUserAccessModal()">
+    <div class="user-access-modal-card" (click)="$event.stopPropagation()">
+
+        <div class="user-access-modal-icon" [class.activate-icon]="
+        userAccessToChange?.actif === false
+      " [class.deactivate-icon]="
+        userAccessToChange?.actif !== false
+      ">
+            <i [class]="
+          userAccessToChange?.actif === false
+            ? 'ti ti-user-check'
+            : 'ti ti-user-off'
+        "></i>
+        </div>
+
+        <span class="user-access-modal-label" [class.activate-label]="
+        userAccessToChange?.actif === false
+      " [class.deactivate-label]="
+        userAccessToChange?.actif !== false
+      ">
+      {{
+        userAccessToChange?.actif === false
+          ? 'Activation utilisateur'
+          : 'Désactivation utilisateur'
+      }}
+    </span>
+
+        <h3>
+            {{ userAccessToChange?.actif === false ? 'Activer cet utilisateur' : 'Désactiver cet utilisateur' }}
+        </h3>
+
+        <p>
+            Voulez-vous vraiment
+
+            <strong>
+        {{
+          userAccessToChange?.actif === false
+            ? 'activer'
+            : 'désactiver'
+        }}
+      </strong> l’utilisateur
+
+            <strong>
+        {{
+          userAccessToChange?.nomComplet ||
+          userAccessToChange?.email
+        }}
+      </strong> ?
+        </p>
+
+        <div class="user-access-details" *ngIf="userAccessToChange">
+            <div>
+                <span>Nom</span>
+
+                <strong>
+          {{
+            userAccessToChange.nomComplet ||
+            '-'
+          }}
+        </strong>
+            </div>
+
+            <div>
+                <span>Email</span>
+
+                <strong>
+          {{ userAccessToChange.email }}
+        </strong>
+            </div>
+
+            <div *ngIf="userAccessToChange.fonction">
+                <span>Fonction</span>
+
+                <strong>
+          {{ userAccessToChange.fonction }}
+        </strong>
+            </div>
+        </div>
+
+        <div class="user-access-warning" [class.activate-warning]="
+        userAccessToChange?.actif === false
+      " [class.deactivate-warning]="
+        userAccessToChange?.actif !== false
+      ">
+            <i [class]="
+          userAccessToChange?.actif === false
+            ? 'ti ti-info-circle'
+            : 'ti ti-alert-triangle'
+        "></i>
+
+            <span>
+        {{
+          userAccessToChange?.actif === false
+            ? 'L’utilisateur pourra de nouveau se connecter à la plateforme.'
+            : 'L’utilisateur ne pourra plus se connecter jusqu’à sa réactivation.'
+        }}
+      </span>
+        </div>
+
+        <div class="user-access-modal-actions">
+
+            <button type="button" class="cancel-btn" [disabled]="changingUserAccess" (click)="closeUserAccessModal()">
+        Annuler
+      </button>
+
+            <button type="button" class="confirm-user-access-btn" [class.confirm-activate]="
+          userAccessToChange?.actif === false
+        " [class.confirm-deactivate]="
+          userAccessToChange?.actif !== false
+        " [disabled]="changingUserAccess" (click)="confirmUserAccessChange()">
+        <i
+          [class]="
+            changingUserAccess
+              ? 'ti ti-loader-2 user-access-loading'
+              : userAccessToChange?.actif === false
+                ? 'ti ti-user-check'
+                : 'ti ti-user-off'
+          "
+        ></i>
+
+        {{
+          changingUserAccess
+            ? userAccessToChange?.actif === false
+              ? 'Activation...'
+              : 'Désactivation...'
+            : userAccessToChange?.actif === false
+              ? 'Activer l’utilisateur'
+              : 'Désactiver l’utilisateur'
+        }}
+      </button>
+
+        </div>
+
+    </div>
 </div>
