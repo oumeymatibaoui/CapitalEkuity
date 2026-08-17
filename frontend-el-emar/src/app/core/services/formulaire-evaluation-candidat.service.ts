@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { environment } from '../../../environments/environment.development';
 
 export interface PieceFormulaireCandidat {
   id: number;
@@ -47,7 +48,7 @@ export type FormulaireEvaluationCandidat = FormulaireLotCandidat;
 })
 export class FormulaireEvaluationCandidatService {
 
-  private apiUrl = 'http://localhost:8089/api/cnd/formulaire-evaluation';
+  private apiUrl = `${environment.apiBaseUrl}/api/cnd/formulaire-evaluation`;
 
   constructor(private http: HttpClient) {}
 

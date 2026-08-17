@@ -23,7 +23,7 @@ public class CandidatureDetailResponse {
     // =====================================================
 
     private Long candidatureId;
-
+    private String candidatureRef;
 
     // =====================================================
     // INFORMATIONS GÉNÉRALES

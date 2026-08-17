@@ -1,5 +1,9 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit } from '@angular/core';
+import {
+  Component,
+  OnInit
+} from '@angular/core';
+
 import {
   FormBuilder,
   FormGroup,
@@ -25,12 +29,24 @@ import {
   templateUrl: './compte-utilisateur.html',
   styleUrl: './compte-utilisateur.scss',
 })
-export class CompteUtilisateur implements OnInit {
+export class CompteUtilisateur
+  implements OnInit {
 
-  utilisateurId: number | null = null;
+  /*
+   * IMPORTANT :
+   * plus de utilisateurId dans ce composant.
+   *
+   * La page appelle uniquement :
+   * /api/el-emar/compte/me
+   *
+   * Le backend déduit l'identité depuis le JWT.
+   */
 
-  compte: CompteUtilisateurResponse | null = null;
-  historique: HistoriqueActionResponse[] = [];
+  compte:
+    CompteUtilisateurResponse | null = null;
+
+  historique:
+    HistoriqueActionResponse[] = [];
 
   compteForm: FormGroup;
   passwordForm: FormGroup;
@@ -48,115 +64,192 @@ export class CompteUtilisateur implements OnInit {
   passwordSuccessMessage = '';
 
   constructor(
-    private fb: FormBuilder,
-    private compteUtilisateurService: CompteUtilisateurService
+    private readonly fb: FormBuilder,
+    private readonly compteUtilisateurService:
+      CompteUtilisateurService
   ) {
-    this.compteForm = this.fb.group({
-      nom: [''],
-      email: [{ value: '', disabled: true }],
-      fonction: ['']
-    });
 
-    this.passwordForm = this.fb.group({
-      oldPassword: [''],
-      newPassword: [''],
-      confirmPassword: ['']
-    });
+    this.compteForm =
+      this.fb.group({
+        nom: [''],
+
+        email: [
+          {
+            value: '',
+            disabled: true
+          }
+        ],
+
+        fonction: ['']
+      });
+
+    this.passwordForm =
+      this.fb.group({
+        oldPassword: [''],
+        newPassword: [''],
+        confirmPassword: ['']
+      });
   }
 
   ngOnInit(): void {
-    this.utilisateurId = this.getCurrentUserId();
-
-    if (!this.utilisateurId) {
-      this.pageError = 'Utilisateur connecté introuvable.';
-      return;
-    }
-
     this.loadCompte();
     this.loadHistorique();
   }
 
+  // =====================================================
+  // CHARGER MON COMPTE
+  // =====================================================
+
   loadCompte(): void {
-    if (!this.utilisateurId) return;
 
     this.loading = true;
+
     this.pageError = '';
     this.successMessage = '';
 
-    this.compteUtilisateurService.getCompte(this.utilisateurId).subscribe({
-      next: (data: CompteUtilisateurResponse) => {
-        this.compte = data;
+    this.compteUtilisateurService
+      .getCompte()
+      .subscribe({
 
-        this.compteForm.patchValue({
-          nom: data.nom || '',
-          email: data.email || '',
-          fonction: data.fonction || ''
-        });
+        next: (
+          data:
+            CompteUtilisateurResponse
+        ) => {
 
-        this.updateCurrentUserInStorage(data);
+          this.compte = data;
 
-        this.loading = false;
-      },
-      error: (error: any) => {
-        console.error('ERROR LOAD COMPTE UTILISATEUR', error);
-        this.loading = false;
-        this.pageError =
-          error?.error?.message ||
-          error?.error?.detail ||
-          'Erreur lors du chargement du compte.';
-      }
-    });
+          this.compteForm.patchValue({
+            nom:
+              data.nom || '',
+
+            email:
+              data.email || '',
+
+            fonction:
+              data.fonction || ''
+          });
+
+          this.updateCurrentUserInStorage(
+            data
+          );
+
+          this.loading = false;
+        },
+
+        error: (error: any) => {
+
+          console.error(
+            'ERROR LOAD COMPTE UTILISATEUR',
+            error
+          );
+
+          this.loading = false;
+
+          this.pageError =
+            error?.error?.message ||
+            error?.error?.detail ||
+            'Erreur lors du chargement du compte.';
+        }
+      });
   }
 
+  // =====================================================
+  // SAUVEGARDER MON COMPTE
+  // =====================================================
+
   saveCompte(): void {
-    if (!this.utilisateurId) {
-      this.pageError = 'Utilisateur connecté introuvable.';
+
+    const nom =
+      String(
+        this.compteForm
+          .get('nom')
+          ?.value || ''
+      ).trim();
+
+    const fonction =
+      String(
+        this.compteForm
+          .get('fonction')
+          ?.value || ''
+      ).trim();
+
+    if (!nom) {
+      this.pageError =
+        'Le nom est obligatoire.';
       return;
     }
 
     this.savingCompte = true;
+
     this.pageError = '';
     this.successMessage = '';
 
-    const request = {
-      nom: this.compteForm.value.nom || '',
-      fonction: this.compteForm.value.fonction || ''
-    };
+    this.compteUtilisateurService
+      .updateCompte({
+        nom,
+        fonction:
+          fonction || null
+      })
+      .subscribe({
 
-    this.compteUtilisateurService.updateCompte(
-      this.utilisateurId,
-      request
-    ).subscribe({
-      next: (data: CompteUtilisateurResponse) => {
-        this.compte = data;
+        next: (
+          data:
+            CompteUtilisateurResponse
+        ) => {
 
-        this.compteForm.patchValue({
-          nom: data.nom || '',
-          email: data.email || '',
-          fonction: data.fonction || ''
-        });
+          this.compte = data;
 
-        this.updateCurrentUserInStorage(data);
+          this.compteForm.patchValue({
+            nom:
+              data.nom || '',
 
-        this.savingCompte = false;
-        this.successMessage = 'Compte mis à jour avec succès.';
-        this.pageError = '';
+            email:
+              data.email || '',
 
-        this.loadHistorique();
-      },
-      error: (error: any) => {
-        console.error('ERROR UPDATE COMPTE UTILISATEUR', error);
-        this.savingCompte = false;
-        this.pageError =
-          error?.error?.message ||
-          error?.error?.detail ||
-          'Erreur lors de la mise à jour du compte.';
-      }
-    });
+            fonction:
+              data.fonction || ''
+          });
+
+          this.updateCurrentUserInStorage(
+            data
+          );
+
+          this.savingCompte = false;
+
+          this.successMessage =
+            'Compte mis à jour avec succès.';
+
+          this.pageError = '';
+
+          this.loadHistorique();
+        },
+
+        error: (error: any) => {
+
+          console.error(
+            'ERROR UPDATE COMPTE UTILISATEUR',
+            error
+          );
+
+          this.savingCompte = false;
+
+          this.pageError =
+            error?.error?.message ||
+            error?.error?.detail ||
+            'Erreur lors de la mise à jour du compte.';
+        }
+      });
   }
 
+  // =====================================================
+  // FORMULAIRE MOT DE PASSE
+  // =====================================================
+
   togglePasswordForm(): void {
-    this.showPasswordForm = !this.showPasswordForm;
+
+    this.showPasswordForm =
+      !this.showPasswordForm;
+
     this.passwordErrorMessage = '';
     this.passwordSuccessMessage = '';
 
@@ -165,87 +258,180 @@ export class CompteUtilisateur implements OnInit {
     }
   }
 
-  changePassword(): void {
-    if (!this.utilisateurId) {
-      this.passwordErrorMessage = 'Utilisateur connecté introuvable.';
-      return;
-    }
+  // =====================================================
+  // CHANGER MON MOT DE PASSE
+  // =====================================================
 
-    const oldPassword = String(this.passwordForm.value.oldPassword || '').trim();
-    const newPassword = String(this.passwordForm.value.newPassword || '').trim();
-    const confirmPassword = String(this.passwordForm.value.confirmPassword || '').trim();
+  changePassword(): void {
+
+    const oldPassword =
+      String(
+        this.passwordForm
+          .get('oldPassword')
+          ?.value || ''
+      ).trim();
+
+    const newPassword =
+      String(
+        this.passwordForm
+          .get('newPassword')
+          ?.value || ''
+      ).trim();
+
+    const confirmPassword =
+      String(
+        this.passwordForm
+          .get('confirmPassword')
+          ?.value || ''
+      ).trim();
 
     this.passwordErrorMessage = '';
     this.passwordSuccessMessage = '';
 
-    if (!oldPassword || !newPassword || !confirmPassword) {
-      this.passwordErrorMessage = 'Veuillez remplir tous les champs.';
+    if (
+      !oldPassword ||
+      !newPassword ||
+      !confirmPassword
+    ) {
+
+      this.passwordErrorMessage =
+        'Veuillez remplir tous les champs.';
+
       return;
     }
 
-    if (newPassword.length < 6) {
-      this.passwordErrorMessage = 'Le nouveau mot de passe doit contenir au moins 6 caractères.';
+    /*
+     * Backend = minimum 8 caractères.
+     * Le frontend utilise la même règle.
+     */
+    if (newPassword.length < 8) {
+
+      this.passwordErrorMessage =
+        'Le nouveau mot de passe doit contenir au moins 8 caractères.';
+
       return;
     }
 
-    if (newPassword !== confirmPassword) {
-      this.passwordErrorMessage = 'La confirmation du mot de passe ne correspond pas.';
+    if (
+      newPassword !==
+      confirmPassword
+    ) {
+
+      this.passwordErrorMessage =
+        'La confirmation du mot de passe ne correspond pas.';
+
+      return;
+    }
+
+    if (
+      newPassword ===
+      oldPassword
+    ) {
+
+      this.passwordErrorMessage =
+        'Le nouveau mot de passe doit être différent de l’ancien.';
+
       return;
     }
 
     this.changingPassword = true;
 
-    this.compteUtilisateurService.changePassword(
-      this.utilisateurId,
-      {
+    this.compteUtilisateurService
+      .changePassword({
         oldPassword,
         newPassword,
         confirmPassword
-      }
-    ).subscribe({
-      next: () => {
-        this.changingPassword = false;
-        this.passwordSuccessMessage = 'Mot de passe modifié avec succès.';
-        this.passwordErrorMessage = '';
-        this.passwordForm.reset();
-        this.showPasswordForm = false;
+      })
+      .subscribe({
 
-        this.loadHistorique();
-      },
-      error: (error: any) => {
-        console.error('ERROR CHANGE PASSWORD UTILISATEUR', error);
-        this.changingPassword = false;
-        this.passwordErrorMessage =
-          error?.error?.message ||
-          error?.error?.detail ||
-          'Erreur lors du changement du mot de passe.';
-      }
-    });
+        next: () => {
+
+          this.changingPassword = false;
+
+          this.passwordSuccessMessage =
+            'Mot de passe modifié avec succès.';
+
+          this.passwordErrorMessage = '';
+
+          this.passwordForm.reset();
+
+          this.showPasswordForm = false;
+
+          this.loadHistorique();
+        },
+
+        error: (error: any) => {
+
+          console.error(
+            'ERROR CHANGE PASSWORD UTILISATEUR',
+            error
+          );
+
+          this.changingPassword = false;
+
+          this.passwordErrorMessage =
+            error?.error?.message ||
+            error?.error?.detail ||
+            'Erreur lors du changement du mot de passe.';
+        }
+      });
   }
+
+  // =====================================================
+  // HISTORIQUE
+  // =====================================================
 
   loadHistorique(): void {
-    if (!this.utilisateurId) return;
 
-    this.compteUtilisateurService.getHistorique(this.utilisateurId).subscribe({
-      next: (data: HistoriqueActionResponse[]) => {
-        this.historique = data || [];
-      },
-      error: (error: any) => {
-        console.error('ERROR LOAD HISTORIQUE UTILISATEUR', error);
-      }
-    });
+    this.compteUtilisateurService
+      .getHistorique()
+      .subscribe({
+
+        next: (
+          data:
+            HistoriqueActionResponse[]
+        ) => {
+
+          this.historique =
+            data || [];
+        },
+
+        error: (error: any) => {
+
+          console.error(
+            'ERROR LOAD HISTORIQUE UTILISATEUR',
+            error
+          );
+        }
+      });
   }
 
+  // =====================================================
+  // AFFICHAGE
+  // =====================================================
+
   getProfileInitial(): string {
+
     const source =
       this.compte?.nom ||
       this.compte?.email ||
       'U';
 
-    return source.trim().charAt(0).toUpperCase();
+    return source
+      .trim()
+      .charAt(0)
+      .toUpperCase();
   }
-getCompteTitle(): string {
-    const type = (this.compte?.typeUtilisateur || '').toUpperCase();
+
+  getCompteTitle(): string {
+
+    const type =
+      String(
+        this.compte
+          ?.typeUtilisateur || ''
+      )
+        .trim()
+        .toUpperCase();
 
     if (type === 'CND') {
       return 'Espace Candidat';
@@ -263,17 +449,35 @@ getCompteTitle(): string {
       return 'Administration de la Plateforme';
     }
 
+    if (type === 'ACHAT') {
+      return 'Espace Achat';
+    }
+
+    if (type === 'TECHNIQUE') {
+      return 'Espace Technique';
+    }
+
+    if (type === 'COMITE') {
+      return 'Espace Comité';
+    }
+
     return 'Mon Espace Personnel';
   }
 
-  getActionLabel(action: string): string {
+  getActionLabel(
+    action: string
+  ): string {
+
     switch (action) {
+
       case 'EL_EMAR_UPDATE_COMPTE':
       case 'CND_UPDATE_COMPTE':
+      case 'UTILISATEUR_INTERNE_UPDATE_COMPTE':
         return 'Modification compte';
 
       case 'EL_EMAR_CHANGE_PASSWORD':
       case 'CND_CHANGE_PASSWORD':
+      case 'UTILISATEUR_INTERNE_CHANGE_PASSWORD':
         return 'Changement mot de passe';
 
       case 'EL_EMAR_EVALUATION_CRITERE':
@@ -314,91 +518,118 @@ getCompteTitle(): string {
     }
   }
 
-  getActionClass(action: string): string {
-    if (!action) return 'action-default';
+  getActionClass(
+    action: string
+  ): string {
 
-    if (action.includes('COMPTE')) return 'action-account';
-    if (action.includes('PASSWORD')) return 'action-password';
-    if (action.includes('EVALUATION')) return 'action-evaluation';
-    if (action.includes('NOTIFICATION')) return 'action-notification';
-    if (action.includes('DECISION')) return 'action-decision';
-    if (action.includes('CLASSEMENT')) return 'action-zone';
-    if (action.includes('UPLOAD')) return 'action-upload';
-    if (action.includes('SOUMISSION')) return 'action-submit';
-    if (action.includes('CORRECTION')) return 'action-correction';
-    if (action.includes('MODIFICATION')) return 'action-edit';
+    if (!action) {
+      return 'action-default';
+    }
+
+    if (
+      action.includes('COMPTE')
+    ) {
+      return 'action-account';
+    }
+
+    if (
+      action.includes('PASSWORD')
+    ) {
+      return 'action-password';
+    }
+
+    if (
+      action.includes('EVALUATION')
+    ) {
+      return 'action-evaluation';
+    }
+
+    if (
+      action.includes('NOTIFICATION')
+    ) {
+      return 'action-notification';
+    }
+
+    if (
+      action.includes('DECISION')
+    ) {
+      return 'action-decision';
+    }
+
+    if (
+      action.includes('CLASSEMENT')
+    ) {
+      return 'action-zone';
+    }
+
+    if (
+      action.includes('UPLOAD')
+    ) {
+      return 'action-upload';
+    }
+
+    if (
+      action.includes('SOUMISSION')
+    ) {
+      return 'action-submit';
+    }
+
+    if (
+      action.includes('CORRECTION')
+    ) {
+      return 'action-correction';
+    }
+
+    if (
+      action.includes('MODIFICATION')
+    ) {
+      return 'action-edit';
+    }
 
     return 'action-default';
   }
 
-  formatDate(value?: string | null): string {
-    if (!value) return '-';
+  formatDate(
+    value?: string | null
+  ): string {
 
-    const date = new Date(value);
+    if (!value) {
+      return '-';
+    }
 
-    if (isNaN(date.getTime())) {
+    const date =
+      new Date(value);
+
+    if (
+      Number.isNaN(
+        date.getTime()
+      )
+    ) {
       return value;
     }
 
-    return date.toLocaleString('fr-FR', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  }
-
-  private updateCurrentUserInStorage(data: CompteUtilisateurResponse): void {
-    const possibleKeys = [
-      'connectedUser',
-      'currentUser',
-      'user',
-      'authUser',
-      'candidatUser',
-      'elEmarUser',
-      'elEmarConnectedUser'
-    ];
-
-    for (const key of possibleKeys) {
-      const value = localStorage.getItem(key);
-
-      if (!value) continue;
-
-      try {
-        const parsed = JSON.parse(value);
-
-        const parsedId =
-          parsed?.id ||
-          parsed?.userId ||
-          parsed?.utilisateurId;
-
-        if (Number(parsedId) === Number(data.id)) {
-          const updated = {
-            ...parsed,
-            id: data.id,
-            nom: data.nom,
-            email: data.email,
-            fonction: data.fonction,
-            typeUtilisateur: data.typeUtilisateur
-          };
-
-          localStorage.setItem(key, JSON.stringify(updated));
-        }
-      } catch {
-        continue;
+    return date.toLocaleString(
+      'fr-FR',
+      {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
       }
-    }
-
-    localStorage.setItem('userEmail', data.email || '');
+    );
   }
 
-  private getCurrentUserId(): number | null {
-    const directUserId = localStorage.getItem('userId');
+  // =====================================================
+  // SYNCHRONISER LE NOM/FONCTION EN LOCAL
+  //
+  // Aucun ID n'est utilisé pour une requête HTTP.
+  // =====================================================
 
-    if (directUserId && !isNaN(Number(directUserId))) {
-      return Number(directUserId);
-    }
+  private updateCurrentUserInStorage(
+    data:
+      CompteUtilisateurResponse
+  ): void {
 
     const possibleKeys = [
       'connectedUser',
@@ -410,22 +641,56 @@ getCompteTitle(): string {
       'elEmarConnectedUser'
     ];
 
-    for (const key of possibleKeys) {
-      const value = localStorage.getItem(key);
+    for (
+      const key of
+        possibleKeys
+    ) {
 
-      if (!value) continue;
+      const value =
+        localStorage.getItem(
+          key
+        );
+
+      if (!value) {
+        continue;
+      }
 
       try {
-        const parsed = JSON.parse(value);
 
-        if (parsed?.id) return Number(parsed.id);
-        if (parsed?.userId) return Number(parsed.userId);
-        if (parsed?.utilisateurId) return Number(parsed.utilisateurId);
+        const parsed =
+          JSON.parse(value);
+
+        const updated = {
+          ...parsed,
+
+          nom:
+            data.nom,
+
+          email:
+            data.email,
+
+          fonction:
+            data.fonction,
+
+          typeUtilisateur:
+            data.typeUtilisateur
+        };
+
+        localStorage.setItem(
+          key,
+          JSON.stringify(
+            updated
+          )
+        );
+
       } catch {
         continue;
       }
     }
 
-    return null;
+    localStorage.setItem(
+      'userEmail',
+      data.email || ''
+    );
   }
 }

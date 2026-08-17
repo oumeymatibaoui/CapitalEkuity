@@ -29,8 +29,7 @@ public class CategorieEvaluationService {
     @Transactional(readOnly = true)
     public List<CategorieEvaluationResponse> getByScope(
             Long typeIntervenantId,
-            Long lotId,
-            boolean activeOnly
+            Long lotId
     ) {
         if (typeIntervenantId == null) {
             throw new ResponseStatusException(
@@ -40,7 +39,7 @@ public class CategorieEvaluationService {
         }
 
         return categorieRepository
-                .findByScope(typeIntervenantId, lotId, activeOnly)
+                .findByScope(typeIntervenantId, lotId)
                 .stream()
                 .map(this::toResponse)
                 .toList();

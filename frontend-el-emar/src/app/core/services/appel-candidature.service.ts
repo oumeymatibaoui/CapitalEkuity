@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { environment } from '../../../environments/environment';
 
 export type StatutRfp = 'BROUILLON' | 'PUBLIE' | 'CLOTURE';
 
@@ -41,7 +42,7 @@ export interface AppelCandidature {
 })
 export class AppelCandidatureService {
 
-  private apiUrl = 'http://localhost:8089/api/appels';
+  private apiUrl = `${environment.apiBaseUrl}/api/appels`;
 
   constructor(private http: HttpClient) {}
 

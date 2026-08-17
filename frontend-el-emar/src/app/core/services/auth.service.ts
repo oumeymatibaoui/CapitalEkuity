@@ -6,6 +6,7 @@ import {
   map,
   tap
 } from 'rxjs';
+import { environment } from '../../../environments/environment';
 
 // =====================================================
 // MOT DE PASSE
@@ -103,7 +104,7 @@ export type ConnectedUser =
 export class AuthService {
 
   private readonly apiUrl =
-    'http://localhost:8089/api/user';
+    `${environment.apiBaseUrl}/api/user`;
 
   constructor(
     private http: HttpClient
@@ -475,13 +476,19 @@ export class AuthService {
       null
     );
 
-    const typeUtilisateur = String(
-      user?.typeUtilisateur ??
-      user?.type ??
-      'EL_EMAR'
-    )
-      .trim()
-      .toUpperCase();
+const typeUtilisateur = String(
+  user?.typeUtilisateur ??
+  user?.type ??
+  ''
+)
+  .trim()
+  .toUpperCase();
+
+if (!typeUtilisateur) {
+  throw new Error(
+    'Le département de l’utilisateur est absent de la réponse de connexion.'
+  );
+}
 
     const roleCode = String(
       user?.roleCode ??

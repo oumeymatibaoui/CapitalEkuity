@@ -1,0 +1,35 @@
+<header class="topbar">
+
+    <div class="topbar-left">
+        <h1>{{ title }}</h1>
+        <p *ngIf="subtitle">{{ subtitle }}</p>
+    </div>
+
+    <div class="topbar-right">
+
+        <button *ngIf="isAdmin" type="button" class="admin-settings-btn" title="Centre d’administration" aria-label="Ouvrir le centre d’administration" (click)="goToAdministration()">
+    <i class="ti ti-settings"></i>
+  </button>
+
+        <!-- <span class="role-pill" [class.role-pill--admin]="isAdmin">
+    <i
+      class="ti"
+      [ngClass]="isAdmin ? 'ti-shield-lock' : 'ti-user'"
+    ></i>
+
+    {{ roleLabel }}
+  </span> -->
+
+        <button type="button" class="topbar-user" (click)="goToCompte()">
+    <span class="topbar-avatar">
+      {{ userInitial }}
+    </span>
+
+    <span class="topbar-username">
+      {{ userName }}
+    </span>
+  </button>
+
+    </div>
+
+</header>

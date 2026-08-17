@@ -3,6 +3,8 @@ package com.elemar.backendelemar.service;
 import com.elemar.backendelemar.dto.*;
 import com.elemar.backendelemar.entity.ApplicationCandidature;
 import com.elemar.backendelemar.repository.ApplicationCandidatureRepository;
+import com.elemar.backendelemar.security.IdCryptoService;
+import com.elemar.backendelemar.security.IdResource;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
@@ -15,7 +17,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
-
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.net.MalformedURLException;
@@ -32,10 +33,192 @@ import java.util.*;
 @RequiredArgsConstructor
 public class ElEmarEvaluationService {
 
+    private final CurrentUserService currentUserService;
     private final JdbcTemplate jdbcTemplate;
-    private final ApplicationCandidatureRepository applicationCandidatureRepository;
-    private final HistoriqueActionService historiqueActionService;
-    private static final String BASE_API = "/api/el-emar/evaluations";
+    private final IdCryptoService idCryptoService;
+    private final ApplicationCandidatureRepository
+            applicationCandidatureRepository;
+
+    private final HistoriqueActionService
+            historiqueActionService;
+
+    private final PdfFileSecurityService
+            pdfFileSecurityService;
+
+    private static final String BASE_API =
+            "/api/el-emar/evaluations";
+    // =====================================================
+    // AUTORISATIONS DE L'UTILISATEUR CONNECTÉ
+    // =====================================================
+
+    /**
+     * Vérifie l'accès à la page EVALUATIONS et à une action précise.
+     * L'identité est toujours lue depuis le JWT via CurrentUserService.
+     * L'identifiant envoyé par Angular n'est jamais utilisé comme preuve
+     * d'identité.
+     */
+    private Long requireActionPermission(
+            String sectionCode,
+            String actionCode
+    ) {
+        Long utilisateurId =
+                currentUserService.getCurrentUserId();
+
+        String normalizedSectionCode =
+                sectionCode == null
+                        ? ""
+                        : sectionCode.trim().toUpperCase(Locale.ROOT);
+
+        String normalizedActionCode =
+                actionCode == null
+                        ? ""
+                        : actionCode.trim().toUpperCase(Locale.ROOT);
+
+        if (normalizedActionCode.isBlank()) {
+            throw new ResponseStatusException(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "Code d'action manquant."
+            );
+        }
+
+        Boolean autorise = jdbcTemplate.queryForObject(
+                """
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM utilisateur u
+                    JOIN role_acces r
+                        ON r.id = u.role_id
+                    WHERE u.id = ?
+                      AND COALESCE(u.actif, FALSE) = TRUE
+                      AND COALESCE(r.actif, FALSE) = TRUE
+                      AND (
+                            UPPER(TRIM(COALESCE(r.code_role, ''))) IN (
+                                'ADMIN',
+                                'ROLE_ADMIN'
+                            )
+                            OR (
+                                EXISTS (
+                                    SELECT 1
+                                    FROM role_module_acces rma_page
+                                    JOIN module_navbar m_page
+                                        ON m_page.id = rma_page.module_id
+                                    WHERE rma_page.role_id = r.id
+                                      AND COALESCE(rma_page.autorise, FALSE) = TRUE
+                                      AND COALESCE(m_page.actif, FALSE) = TRUE
+                                      AND UPPER(TRIM(m_page.code_module)) = 'EVALUATIONS'
+                                )
+                                AND (
+                                    ? = ''
+                                    OR EXISTS (
+                                        SELECT 1
+                                        FROM role_module_acces rma_section
+                                        JOIN module_navbar m_section
+                                            ON m_section.id = rma_section.module_id
+                                        WHERE rma_section.role_id = r.id
+                                          AND COALESCE(rma_section.autorise, FALSE) = TRUE
+                                          AND COALESCE(m_section.actif, FALSE) = TRUE
+                                          AND UPPER(TRIM(m_section.code_module)) = ?
+                                    )
+                                )
+                                AND EXISTS (
+                                    SELECT 1
+                                    FROM role_module_acces rma_action
+                                    JOIN module_navbar m_action
+                                        ON m_action.id = rma_action.module_id
+                                    WHERE rma_action.role_id = r.id
+                                      AND COALESCE(rma_action.autorise, FALSE) = TRUE
+                                      AND COALESCE(m_action.actif, FALSE) = TRUE
+                                      AND UPPER(TRIM(m_action.code_module)) = ?
+                                )
+                            )
+                      )
+                )
+                """,
+                Boolean.class,
+                utilisateurId,
+                normalizedSectionCode,
+                normalizedSectionCode,
+                normalizedActionCode
+        );
+
+        if (!Boolean.TRUE.equals(autorise)) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "Cette action n'est pas autorisée pour votre rôle : "
+                            + normalizedActionCode
+            );
+        }
+
+        return utilisateurId;
+    }
+
+    /**
+     * Vérifie que la catégorie du critère est autorisée pour le rôle courant.
+     * ADMIN conserve l'accès global. Les autres rôles doivent posséder une
+     * ligne dans role_categorie_evaluation_acces.
+     */
+    private void requireCategoryPermission(
+            Long utilisateurId,
+            Long categorieEvaluationId
+    ) {
+        if (categorieEvaluationId == null || categorieEvaluationId <= 0) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Le critère n'est rattaché à aucune catégorie d'évaluation."
+            );
+        }
+
+        Boolean autorise = jdbcTemplate.queryForObject(
+                """
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM utilisateur u
+                    JOIN role_acces r
+                        ON r.id = u.role_id
+                    WHERE u.id = ?
+                      AND COALESCE(u.actif, FALSE) = TRUE
+                      AND COALESCE(r.actif, FALSE) = TRUE
+                      AND (
+                            UPPER(TRIM(COALESCE(r.code_role, ''))) IN (
+                                'ADMIN',
+                                'ROLE_ADMIN'
+                            )
+                            OR EXISTS (
+                                SELECT 1
+                                FROM role_categorie_evaluation_acces rca
+                                JOIN categorie_evaluation ce
+                                    ON ce.id = rca.categorie_evaluation_id
+                                LEFT JOIN type_intervenant ti
+                                    ON ti.id = ce.type_intervenant_id
+                                LEFT JOIN lot l
+                                    ON l.id = ce.lot_id
+                                WHERE rca.role_id = r.id
+                                  AND rca.categorie_evaluation_id = ?
+                                  AND COALESCE(ce.actif, FALSE) = TRUE
+                                  AND (
+                                        ti.id IS NULL
+                                        OR COALESCE(ti.actif, FALSE) = TRUE
+                                  )
+                                  AND (
+                                        l.id IS NULL
+                                        OR COALESCE(l.actif, FALSE) = TRUE
+                                  )
+                            )
+                      )
+                )
+                """,
+                Boolean.class,
+                utilisateurId,
+                categorieEvaluationId
+        );
+
+        if (!Boolean.TRUE.equals(autorise)) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "La catégorie de ce critère n'est pas autorisée pour votre rôle."
+            );
+        }
+    }
 
     // =====================================================
     // LISTE DES CANDIDATURES SOUMISES
@@ -82,6 +265,11 @@ public class ElEmarEvaluationService {
             );
         }
 
+        Long evaluateurId = requireActionPermission(
+                "EVAL_SECTION_DOCUMENTS_ADMIN",
+                "EVAL_ACTION_MODIFIER_RNE_CNSS"
+        );
+
         String rneStatut =
                 normalizeStatut(
                         request.getRneStatut()
@@ -124,7 +312,7 @@ public class ElEmarEvaluationService {
         }
 
         historiqueActionService.enregistrerAction(
-                request.getEvaluateurId(),
+                evaluateurId,
                 candidatureId,
                 null,
                 "EL_EMAR_CONTROLE_DOCUMENTS",
@@ -137,21 +325,13 @@ public class ElEmarEvaluationService {
 
         return SaveDocumentsStatutResponse
                 .builder()
-                .candidatureId(
-                        candidatureId
-                )
-                .rneStatut(
-                        rneStatut
-                )
-                .cnssStatut(
-                        cnssStatut
-                )
+                .candidatureId(candidatureId)
+                .rneStatut(rneStatut)
+                .cnssStatut(cnssStatut)
                 .dossierRecevable(
                         dossierRecevable
                 )
-                .motifNonRecevable(
-                        motif
-                )
+                .motifNonRecevable(motif)
                 .build();
     }
     @Transactional
@@ -173,18 +353,25 @@ public class ElEmarEvaluationService {
             );
         }
 
-        String statut = normalizeSolvabiliteStatut(
-                request.getStatut()
+        Long evaluateurId = requireActionPermission(
+                "EVAL_SECTION_SOLVABILITE",
+                "EVAL_ACTION_VALIDER_SOLVABILITE"
         );
+
+        String statut =
+                normalizeSolvabiliteStatut(
+                        request.getStatut()
+                );
 
         String commentaire =
                 request.getCommentaire() == null
                         ? null
-                        : request.getCommentaire().trim();
+                        : request.getCommentaire()
+                        .trim();
 
         if (
-                commentaire != null &&
-                        commentaire.isEmpty()
+                commentaire != null
+                        && commentaire.isEmpty()
         ) {
             commentaire = null;
         }
@@ -192,21 +379,23 @@ public class ElEmarEvaluationService {
         LocalDateTime dateValidation =
                 LocalDateTime.now();
 
-        int updated = jdbcTemplate.update(
-                """
-                UPDATE candidature
-                SET solvabilite_statut = ?,
-                    solvabilite_commentaire = ?,
-                    solvabilite_evaluateur_id = ?,
-                    solvabilite_date_validation = ?
-                WHERE id = ?
-                """,
-                statut,
-                commentaire,
-                request.getEvaluateurId(),
-                dateValidation,
-                candidatureId
-        );
+        int updated =
+                jdbcTemplate.update(
+                        """
+                        UPDATE candidature
+                        SET solvabilite_statut = ?,
+                            solvabilite_commentaire = ?,
+                            solvabilite_evaluateur_id = ?,
+                            solvabilite_date_validation = ?,
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE id = ?
+                        """,
+                        statut,
+                        commentaire,
+                        evaluateurId,
+                        dateValidation,
+                        candidatureId
+                );
 
         if (updated == 0) {
             throw new ResponseStatusException(
@@ -216,22 +405,24 @@ public class ElEmarEvaluationService {
         }
 
         historiqueActionService.enregistrerAction(
-                request.getEvaluateurId(),
+                evaluateurId,
                 candidatureId,
                 null,
                 "EL_EMAR_SOLVABILITE",
-                "El Emar a mis à jour la solvabilité. Statut : "
+                "El Emar a mis à jour la solvabilité."
+                        + " | Statut : "
                         + statut
                         + " | Commentaire : "
                         + safe(commentaire)
         );
 
-        return SaveSolvabiliteResponse.builder()
+        return SaveSolvabiliteResponse
+                .builder()
                 .candidatureId(candidatureId)
                 .statut(statut)
                 .commentaire(commentaire)
                 .evaluateurId(
-                        request.getEvaluateurId()
+                        evaluateurId
                 )
                 .dateValidation(dateValidation)
                 .build();
@@ -296,12 +487,19 @@ public class ElEmarEvaluationService {
                 params.toArray(),
                 rs -> {
                     Long candidatureId = rs.getLong("candidature_id");
-
+                    String candidatureRef =
+                            idCryptoService.encryptId(
+                                    candidatureId,
+                                    IdResource.CANDIDATURE
+                            );
                     ElEmarCandidatureListItemResponse item = map.get(candidatureId);
 
                     if (item == null) {
                         item = ElEmarCandidatureListItemResponse.builder()
                                 .candidatureId(candidatureId)
+                                .candidatureRef(
+                                        candidatureRef
+                                )
                                 .raisonSociale(rs.getString("raison_sociale"))
                                 .emailPrincipal(rs.getString("email_principal"))
                                 .telephone(rs.getString("telephone"))
@@ -589,6 +787,15 @@ public class ElEmarEvaluationService {
                 jdbcTemplate.query(
                         sql,
                         (rs, rowNum) -> {
+                            Long candidatureInternalId =
+                                    rs.getLong("id");
+
+                            String candidatureRef =
+                                    idCryptoService.encryptId(
+                                            candidatureInternalId,
+                                            IdResource.CANDIDATURE
+                                    );
+
                             String rneStatut =
                                     rs.getString(
                                             "rne_statut"
@@ -614,7 +821,11 @@ public class ElEmarEvaluationService {
                                     .builder()
 
                                     .candidatureId(
-                                            rs.getLong("id")
+                                            candidatureInternalId
+                                    )
+
+                                    .candidatureRef(
+                                            candidatureRef
                                     )
 
                                     .raisonSociale(
@@ -745,7 +956,7 @@ public class ElEmarEvaluationService {
                                             )
                                                     ? BASE_API
                                                     + "/candidatures/"
-                                                    + rs.getLong("id")
+                                                    + candidatureRef
                                                     + "/rne/pdf"
                                                     : null
                                     )
@@ -772,7 +983,7 @@ public class ElEmarEvaluationService {
                                             )
                                                     ? BASE_API
                                                     + "/candidatures/"
-                                                    + rs.getLong("id")
+                                                    + candidatureRef
                                                     + "/cnss/pdf"
                                                     : null
                                     )
@@ -887,68 +1098,69 @@ public class ElEmarEvaluationService {
             Long applicationCandidatureId
     ) {
         String sql = """
-        SELECT
-            rc.id AS reponse_critere_id,
-            rc.critere_evaluation_id,
+    SELECT
+        rc.id AS reponse_critere_id,
+        rc.critere_evaluation_id,
+        ce.categorie_evaluation_id,
 
-            ce.code_critere,
-            ce.section,
+        ce.code_critere,
+        ce.section,
 
-            COALESCE(
-                NULLIF(ce.label_candidat, ''),
-                ce.libelle_critere
-            ) AS libelle,
+        COALESCE(
+            NULLIF(ce.label_candidat, ''),
+            ce.libelle_critere
+        ) AS libelle,
 
-            ce.aide_candidat,
-            ce.note_evaluateur,
-            ce.type_champ,
-            ce.points_max,
+        ce.aide_candidat,
+        ce.note_evaluateur,
+        ce.type_champ,
+        ce.points_max,
 
-            COALESCE(
-                NULLIF(rc.valeur_text, ''),
-                rc.valeur_number::text,
+        COALESCE(
+            NULLIF(rc.valeur_text, ''),
+            rc.valeur_number::text,
 
-                CASE
-                    WHEN rc.valeur_boolean IS TRUE
-                        THEN 'Oui'
+            CASE
+                WHEN rc.valeur_boolean IS TRUE
+                    THEN 'Oui'
 
-                    WHEN rc.valeur_boolean IS FALSE
-                        THEN 'Non'
+                WHEN rc.valeur_boolean IS FALSE
+                    THEN 'Non'
 
-                    ELSE NULL
-                END,
+                ELSE NULL
+            END,
 
-                rc.valeur_date::text,
-                ''
-            ) AS reponse,
+            rc.valeur_date::text,
+            ''
+        ) AS reponse,
 
-            COALESCE(
-                CAST(ec.statut AS TEXT),
-                'A_VERIFIER'
-            ) AS statut_evaluation,
+        COALESCE(
+            CAST(ec.statut AS TEXT),
+            'A_VERIFIER'
+        ) AS statut_evaluation,
 
-            COALESCE(
-                ec.note_obtenue,
-                0
-            ) AS note_obtenue,
+        COALESCE(
+            ec.note_obtenue,
+            0
+        ) AS note_obtenue,
 
-            ec.commentaire_evaluateur
+        ec.commentaire_evaluateur
 
-        FROM reponse_critere rc
+    FROM reponse_critere rc
 
-        JOIN critere_evaluation ce
-            ON ce.id = rc.critere_evaluation_id
+    JOIN critere_evaluation ce
+        ON ce.id = rc.critere_evaluation_id
 
-        LEFT JOIN evaluation_critere ec
-            ON ec.reponse_critere_id = rc.id
+    LEFT JOIN evaluation_critere ec
+        ON ec.reponse_critere_id = rc.id
 
-        WHERE rc.application_candidature_id = ?
+    WHERE rc.application_candidature_id = ?
 
-        ORDER BY
-            ce.section,
-            ce.ordre_affichage,
-            ce.id
-        """;
+    ORDER BY
+        ce.section,
+        ce.ordre_affichage,
+        ce.id
+    """;
 
         return jdbcTemplate.query(
                 sql,
@@ -985,7 +1197,15 @@ public class ElEmarEvaluationService {
                                             "critere_evaluation_id"
                                     )
                             )
-
+                            .categorieEvaluationId(
+                                    rs.getObject(
+                                            "categorie_evaluation_id"
+                                    ) != null
+                                            ? rs.getLong(
+                                            "categorie_evaluation_id"
+                                    )
+                                            : null
+                            )
                             .codeCritere(
                                     rs.getString(
                                             "code_critere"
@@ -1102,7 +1322,11 @@ public class ElEmarEvaluationService {
                             .codePiece(rs.getString("code_piece"))
                             .nomPiece(rs.getString("nom_piece"))
                             .nomFichier(rs.getString("nom_fichier"))
-                            .typeContenu(rs.getString("type_contenu"))
+                            .typeContenu(
+                                    pieceDeposeeId != null
+                                            ? PdfFileSecurityService.PDF_CONTENT_TYPE
+                                            : null
+                            )
                             .deposee(pieceDeposeeId != null)
                             .pdfUrl(
                                     pieceDeposeeId != null
@@ -1174,15 +1398,7 @@ public class ElEmarEvaluationService {
                                 ? rs.getLong("zone_el_emar_id")
                                 : null
                 )
-                .zoneElEmarId(
-                        rs.getObject(
-                                "zone_el_emar_id"
-                        ) != null
-                                ? rs.getLong(
-                                "zone_el_emar_id"
-                        )
-                                : null
-                )
+
 
                 .zoneElEmarNom(
                         rs.getString(
@@ -1280,10 +1496,11 @@ public class ElEmarEvaluationService {
             );
         }
 
-        /*
-         * Vérifier que la réponse appartient bien
-         * au lot/application envoyé dans l’URL.
-         */
+        Long evaluateurId = requireActionPermission(
+                null,
+                "EVAL_ACTION_NOTER_CRITERE"
+        );
+
         List<Map<String, Object>> responseRows =
                 jdbcTemplate.queryForList(
                         """
@@ -1291,16 +1508,19 @@ public class ElEmarEvaluationService {
                             rc.id AS reponse_critere_id,
                             rc.application_candidature_id,
                             rc.critere_evaluation_id,
+                            ce.categorie_evaluation_id,
                             ce.points_max,
                             ac.candidature_id
     
                         FROM reponse_critere rc
     
                         JOIN critere_evaluation ce
-                            ON ce.id = rc.critere_evaluation_id
+                            ON ce.id =
+                               rc.critere_evaluation_id
     
                         JOIN application_candidature ac
-                            ON ac.id = rc.application_candidature_id
+                            ON ac.id =
+                               rc.application_candidature_id
     
                         WHERE rc.id = ?
                           AND rc.application_candidature_id = ?
@@ -1319,15 +1539,43 @@ public class ElEmarEvaluationService {
         Map<String, Object> responseRow =
                 responseRows.get(0);
 
+        Object rawCandidatureId =
+                responseRow.get("candidature_id");
+
+        if (!(rawCandidatureId instanceof Number)) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "La candidature liée au critère est introuvable."
+            );
+        }
+
+        Long candidatureId =
+                ((Number) rawCandidatureId)
+                        .longValue();
+
+        Object rawCategorieEvaluationId =
+                responseRow.get("categorie_evaluation_id");
+
+        if (!(rawCategorieEvaluationId instanceof Number)) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Le critère n'est rattaché à aucune catégorie d'évaluation."
+            );
+        }
+
+        Long categorieEvaluationId =
+                ((Number) rawCategorieEvaluationId)
+                        .longValue();
+
+        requireCategoryPermission(
+                evaluateurId,
+                categorieEvaluationId
+        );
+
         BigDecimal pointsMax =
                 asBigDecimal(
                         responseRow.get("points_max")
                 );
-
-        Long candidatureId =
-                ((Number) responseRow.get(
-                        "candidature_id"
-                )).longValue();
 
         String statut =
                 normalizeStatut(
@@ -1338,9 +1586,6 @@ public class ElEmarEvaluationService {
                 "CONFORME".equals(statut)
                         ? pointsMax
                         : BigDecimal.ZERO;
-
-        Long evaluateurId =
-                request.getEvaluateurId();
 
         String commentaire =
                 request.getCommentaireEvaluateur();
@@ -1353,36 +1598,26 @@ public class ElEmarEvaluationService {
             }
         }
 
-        /*
-         * Mise à jour directe par reponse_critere_id.
-         *
-         * Aucun ORDER BY.
-         * Aucun LIMIT.
-         * Aucune recherche de dernière modification.
-         */
-        int updated = jdbcTemplate.update(
-                """
-                UPDATE evaluation_critere
+        int updated =
+                jdbcTemplate.update(
+                        """
+                        UPDATE evaluation_critere
     
-                SET evaluateur_id = ?,
-                    note_obtenue = ?,
-                    commentaire_evaluateur = ?,
-                    statut = ?,
-                    updated_at = CURRENT_TIMESTAMP
+                        SET evaluateur_id = ?,
+                            note_obtenue = ?,
+                            commentaire_evaluateur = ?,
+                            statut = ?,
+                            updated_at = CURRENT_TIMESTAMP
     
-                WHERE reponse_critere_id = ?
-                """,
-                evaluateurId,
-                noteObtenue,
-                commentaire,
-                statut,
-                reponseCritereId
-        );
+                        WHERE reponse_critere_id = ?
+                        """,
+                        evaluateurId,
+                        noteObtenue,
+                        commentaire,
+                        statut,
+                        reponseCritereId
+                );
 
-        /*
-         * Première évaluation de cette réponse :
-         * aucune ligne n’existe encore, donc INSERT.
-         */
         if (updated == 0) {
             jdbcTemplate.update(
                     """
@@ -1410,17 +1645,11 @@ public class ElEmarEvaluationService {
             );
         }
 
-        /*
-         * Recalcul et sauvegarde de la note du lot.
-         */
         BigDecimal noteLot =
                 recalculateAndSaveApplicationNote(
                         applicationCandidatureId
                 );
 
-        /*
-         * Recalcul de la note globale de l’intervenant.
-         */
         BigDecimal noteGlobale =
                 recalculateGlobalNote(
                         candidatureId
@@ -1442,16 +1671,15 @@ public class ElEmarEvaluationService {
                         + safe(commentaire)
         );
 
-        return SaveCritereEvaluationResponse.builder()
+        return SaveCritereEvaluationResponse
+                .builder()
                 .reponseCritereId(
                         reponseCritereId
                 )
                 .applicationCandidatureId(
                         applicationCandidatureId
                 )
-                .statutEvaluation(
-                        statut
-                )
+                .statutEvaluation(statut)
                 .conforme(
                         "CONFORME".equals(statut)
                 )
@@ -1595,62 +1823,137 @@ public class ElEmarEvaluationService {
             Long applicationCandidatureId,
             SaveDecisionFinaleRequest request
     ) {
-        ApplicationCandidature application =
-                applicationCandidatureRepository.findById(applicationCandidatureId)
-                        .orElseThrow(() -> new RuntimeException(
-                                "Application candidature introuvable : " + applicationCandidatureId
-                        ));
-
-        if (request.getDecisionFinale() == null) {
-            throw new RuntimeException("La décision finale est obligatoire.");
+        if (applicationCandidatureId == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Identifiant du lot obligatoire."
+            );
         }
 
-        application.setDecisionFinale(request.getDecisionFinale());
-        application.setObservationFinale(request.getObservationFinale());
-        application.setDateDecision(LocalDateTime.now());
-        application.setEvaluateurDecisionId(request.getEvaluateurId());
+        if (request == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "La décision finale est obligatoire."
+            );
+        }
 
-        applicationCandidatureRepository.save(application);
+        if (request.getDecisionFinale() == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "La décision finale est obligatoire."
+            );
+        }
 
-        Long candidatureId = application.getCandidature() != null
-                ? application.getCandidature().getId()
-                : null;
+        Long evaluateurId = requireActionPermission(
+                "EVAL_SECTION_DECISION_FINALE",
+                "EVAL_ACTION_VALIDER_DECISION"
+        );
 
-        String raisonSociale = application.getCandidature() != null
-                ? application.getCandidature().getRaisonSociale()
-                : "-";
+        ApplicationCandidature application =
+                applicationCandidatureRepository
+                        .findById(applicationCandidatureId)
+                        .orElseThrow(() ->
+                                new ResponseStatusException(
+                                        HttpStatus.NOT_FOUND,
+                                        "Application candidature introuvable."
+                                )
+                        );
 
-        String nomLot = application.getLot() != null
-                ? application.getLot().getNomLot()
-                : "-";
+        if (
+                application.getCandidature() == null
+                        || application
+                        .getCandidature()
+                        .getId() == null
+        ) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "La candidature liée au lot est introuvable."
+            );
+        }
+
+        Long candidatureId =
+                application
+                        .getCandidature()
+                        .getId();
+
+        application.setDecisionFinale(
+                request.getDecisionFinale()
+        );
+
+        application.setObservationFinale(
+                request.getObservationFinale()
+        );
+
+        application.setDateDecision(
+                LocalDateTime.now()
+        );
+
+        application.setEvaluateurDecisionId(
+                evaluateurId
+        );
+
+        applicationCandidatureRepository.save(
+                application
+        );
+
+        String raisonSociale =
+                application.getCandidature()
+                        .getRaisonSociale();
+
+        String nomLot =
+                application.getLot() != null
+                        ? application
+                        .getLot()
+                        .getNomLot()
+                        : "-";
 
         historiqueActionService.enregistrerAction(
-                request.getEvaluateurId(),
+                evaluateurId,
                 candidatureId,
                 application.getId(),
                 "EL_EMAR_DECISION_FINALE_LOT",
-                "El Emar a enregistré la décision finale du lot. Candidature: "
+                "El Emar a enregistré la décision finale du lot."
+                        + " | Candidature : "
                         + safe(raisonSociale)
-                        + " | Lot: "
+                        + " | Lot : "
                         + safe(nomLot)
-                        + " | Décision: "
+                        + " | Décision : "
                         + application.getDecisionFinale()
-                        + " | Observation: "
-                        + safe(application.getObservationFinale())
+                        + " | Observation : "
+                        + safe(
+                        application
+                                .getObservationFinale()
+                )
         );
 
-        CandidatureDetailResponse detail = getCandidatureDetail(candidatureId);
+        CandidatureDetailResponse detail =
+                getCandidatureDetail(
+                        candidatureId
+                );
 
-        return SaveDecisionFinaleResponse.builder()
+        return SaveDecisionFinaleResponse
+                .builder()
                 .candidatureId(candidatureId)
-                .applicationCandidatureId(application.getId())
-                .decisionFinale(application.getDecisionFinale())
-                .observationFinale(application.getObservationFinale())
-                .noteLot(application.getNoteFinale())
-                .noteGlobale(detail.getNoteGlobale())
+                .applicationCandidatureId(
+                        application.getId()
+                )
+                .decisionFinale(
+                        application.getDecisionFinale()
+                )
+                .observationFinale(
+                        application.getObservationFinale()
+                )
+                .noteLot(
+                        application.getNoteFinale()
+                )
+                .noteGlobale(
+                        detail.getNoteGlobale()
+                )
                 .statutLot(
                         application.getStatut() != null
-                                ? application.getStatut().name()
+                                ? application
+                                .getStatut()
+                                .name()
                                 : null
                 )
                 .build();

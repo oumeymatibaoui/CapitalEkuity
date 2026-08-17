@@ -8,32 +8,28 @@ import org.springframework.data.repository.query.Param;
 import java.util.List;
 import java.util.Optional;
 
-public interface CategorieEvaluationRepository extends JpaRepository<CategorieEvaluation, Long> {
+public interface CategorieEvaluationRepository
+        extends JpaRepository<CategorieEvaluation, Long> {
 
     @Query("""
-        SELECT c
-        FROM CategorieEvaluation c
-        LEFT JOIN FETCH c.typeIntervenant ti
-        LEFT JOIN FETCH c.lot l
-        WHERE ti.id = :typeIntervenantId
-        AND (
-            :lotId IS NULL
-            OR c.lot IS NULL
-            OR l.id = :lotId
-        )
-        AND (
-            :activeOnly = false
-            OR c.actif = true
-        )
-        ORDER BY
-            CASE WHEN c.lot IS NULL THEN 0 ELSE 1 END,
-            c.ordreAffichage ASC,
-            c.libelle ASC
-        """)
+    SELECT c
+    FROM CategorieEvaluation c
+    LEFT JOIN FETCH c.typeIntervenant ti
+    LEFT JOIN FETCH c.lot l
+    WHERE ti.id = :typeIntervenantId
+    AND (
+        (:lotId IS NULL AND c.lot IS NULL)
+        OR
+        (:lotId IS NOT NULL AND (c.lot IS NULL OR l.id = :lotId))
+    )
+    ORDER BY
+        CASE WHEN c.lot IS NULL THEN 0 ELSE 1 END,
+        c.ordreAffichage ASC,
+        c.libelle ASC
+    """)
     List<CategorieEvaluation> findByScope(
             @Param("typeIntervenantId") Long typeIntervenantId,
-            @Param("lotId") Long lotId,
-            @Param("activeOnly") boolean activeOnly
+            @Param("lotId") Long lotId
     );
 
     @Query("""

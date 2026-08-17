@@ -55,17 +55,17 @@ public class Candidature {
     /**
      * Compte utilisateur principal lié à la candidature.
      */
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "utilisateur_id")
-    private Utilisateur utilisateur;
+//    @ManyToOne(fetch = FetchType.LAZY)
+//    @JoinColumn(name = "utilisateur_id")
+//    private Utilisateur utilisateur;
 
 
     /**
      * Appel à candidature associé.
      */
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "appel_candidature_id")
-    private AppelCandidature appelCandidature;
+//    @ManyToOne(fetch = FetchType.LAZY)
+//    @JoinColumn(name = "appel_candidature_id")
+//    private AppelCandidature appelCandidature;
 
 
     /**

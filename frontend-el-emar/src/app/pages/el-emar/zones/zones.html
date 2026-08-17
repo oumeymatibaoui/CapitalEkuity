@@ -3,82 +3,108 @@
     <div class="page-header">
         <div>
             <h2>Zones géographiques</h2>
-            <p>Gestion des zones géographiques concernées par les appels à candidature</p>
+            <p>Gestion des zones géographiques et des lieux associés aux appels à candidature</p>
         </div>
 
         <button class="primary-btn" type="button" (click)="openCreateModal()">
       <i class="ti ti-plus"></i>
-      Nouvelle zone
+      Nouvelle zone / lieu
     </button>
     </div>
 
-    <div class="table-card">
-        <table>
-            <thead>
-                <tr>
-                    <th>Zone</th>
-                    <th>Adresse</th>
-                    <th>Description</th>
-                    <th>Créée par</th>
-                    <th>Date création</th>
-                    <th class="text-right">Actions</th>
-                </tr>
-            </thead>
+    <!-- Affichage groupé -->
+    <div class="zone-groups" *ngIf="zoneGroups.length > 0; else noZones">
 
-            <tbody>
-                <tr *ngFor="let zone of zones">
-                    <td>
-                        <strong>{{ zone.nomZone }}</strong>
-                    </td>
+        <section class="zone-group-card" *ngFor="let group of zoneGroups; trackBy: trackByZoneGroup">
 
-                    <td class="address-cell">
-                        {{ zone.adresse || 'Adresse non définie' }}
-                    </td>
+            <div class="zone-group-header">
 
-                    <td>
-                        {{ zone.description || '-' }}
-                    </td>
+                <div class="zone-group-identity">
+                    <div class="zone-group-icon">
+                        <i class="ti ti-map-2"></i>
+                    </div>
 
-                    <td>
-                        {{ zone.utilisateurNom || 'Utilisateur' }}
-                    </td>
+                    <div>
+                        <h3>{{ group.nomZone }}</h3>
+                        <span>{{ group.zones.length }} {{ group.zones.length === 1 ? 'lieu' : 'lieux' }}</span>
+                    </div>
+                </div>
 
-                    <td>
-                        {{ zone.createdAt | date:'yyyy-MM-dd' }}
-                    </td>
+                <button class="add-place-btn" type="button" (click)="openCreateModal(group.nomZone)">
+          <i class="ti ti-plus"></i>
+          Ajouter un lieu
+        </button>
 
-                    <td class="actions">
-                        <button class="icon-btn edit" type="button" title="Modifier" (click)="openEditModal(zone)">
-              <i class="ti ti-pencil"></i>
-            </button>
+            </div>
 
-                        <button class="icon-btn delete" type="button" title="Supprimer" (click)="openDeleteModal(zone)">
-              <i class="ti ti-trash"></i>
-            </button>
-                    </td>
-                </tr>
+            <div class="places-grid">
 
-                <tr *ngIf="zones.length === 0">
-                    <td colspan="6" class="empty">
-                        Aucune zone trouvée.
-                    </td>
-                </tr>
-            </tbody>
-        </table>
+                <article class="place-card" *ngFor="let zone of group.zones; trackBy: trackByZone">
+
+                    <div class="place-card-top">
+                        <span class="place-pin"><i class="ti ti-map-pin"></i></span>
+
+                        <div class="place-card-actions">
+                            <button class="icon-btn edit" type="button" title="Modifier ce lieu" (click)="openEditModal(zone)">
+                <i class="ti ti-pencil"></i>
+              </button>
+                            <button class="icon-btn delete" type="button" title="Supprimer ce lieu" (click)="openDeleteModal(zone)">
+                <i class="ti ti-trash"></i>
+              </button>
+                        </div>
+                    </div>
+
+                    <h4 class="place-address">{{ zone.adresse || 'Adresse non définie' }}</h4>
+
+                    <p class="place-description" *ngIf="zone.description">{{ zone.description }}</p>
+                    <p class="place-description place-description--empty" *ngIf="!zone.description">Aucune description renseignée.</p>
+
+                    <div class="place-card-footer">
+                        <span class="place-coords" *ngIf="zone.latitude !== null && zone.latitude !== undefined && zone.longitude !== null && zone.longitude !== undefined">
+              <i class="ti ti-current-location"></i>
+              {{ zone.latitude }}, {{ zone.longitude }}
+            </span>
+
+                        <span class="place-meta">
+              <i class="ti ti-user"></i>
+              {{ zone.utilisateurNom || 'Utilisateur' }}
+              <span class="dot">•</span> {{ zone.createdAt | date:'dd/MM/yyyy' }}
+                        </span>
+                    </div>
+
+                </article>
+
+            </div>
+
+        </section>
+
     </div>
+
+    <!-- État vide -->
+    <ng-template #noZones>
+        <div class="empty-zones">
+            <div class="empty-zones-icon">
+                <i class="ti ti-map-off"></i>
+            </div>
+            <h3>Aucune zone trouvée</h3>
+            <p>Créez une première zone géographique et ajoutez son lieu.</p>
+            <button class="primary-btn" type="button" (click)="openCreateModal()">
+        <i class="ti ti-plus"></i>
+        Créer une zone
+      </button>
+        </div>
+    </ng-template>
 
 </div>
 
-<!-- Modal création / modification -->
+<!-- Modal création / modification (inchangé) -->
 <div class="modal-overlay" *ngIf="showModal">
+
     <div class="modal-card large-modal">
 
         <div class="modal-header">
-            <h3>
-                {{ isEditMode ? 'Modifier la zone' : 'Nouvelle zone géographique' }}
-            </h3>
-
-            <button type="button" (click)="closeModal()">
+            <h3>{{ isEditMode ? 'Modifier le lieu' : 'Ajouter une zone ou un lieu' }}</h3>
+            <button type="button" title="Fermer" (click)="closeModal()">
         <i class="ti ti-x"></i>
       </button>
         </div>
@@ -90,52 +116,39 @@
 
                 <div class="zone-name-row" *ngIf="!showCustomZoneNameInput">
                     <select [(ngModel)]="form.nomZone" (ngModelChange)="onZoneNameSelected($event)" [class.input-error]="fieldErrors['nomZone']">
-      <option value="">Choisir une zone</option>
+            <option value="">Choisir une zone</option>
+            <option *ngFor="let option of getZoneNameOptions()" [value]="option.nomZone">
+              {{ option.nomZone }}
+            </option>
+          </select>
 
-      <option
-        *ngFor="let option of getZoneNameOptions()"
-        [value]="option.nomZone"
-      >
-        {{ option.nomZone }}
-      </option>
-    </select>
-
-                    <button class="add-zone-name-btn" type="button" title="Ajouter un autre nom" (click)="enableCustomZoneName()">
-      <i class="ti ti-plus"></i>
-    </button>
+                    <button class="add-zone-name-btn" type="button" title="Créer un nouveau groupe de zone" (click)="enableCustomZoneName()">
+            <i class="ti ti-plus"></i>
+          </button>
                 </div>
 
                 <div class="zone-name-row" *ngIf="showCustomZoneNameInput">
-                    <input type="text" [(ngModel)]="form.nomZone" placeholder="Ex : Zone 4, Grand Tunis, Zone spéciale..." [class.input-error]="fieldErrors['nomZone']" />
-
+                    <input type="text" [(ngModel)]="form.nomZone" placeholder="Ex : Zone 4, Grand Tunis..." [class.input-error]="fieldErrors['nomZone']" />
                     <button class="cancel-zone-name-btn" type="button" title="Revenir à la liste" (click)="disableCustomZoneName()">
-      <i class="ti ti-x"></i>
-    </button>
+            <i class="ti ti-x"></i>
+          </button>
                 </div>
 
-                <small class="field-help">
-    Choisissez Zone 1, Zone 2 ou Zone 3, ou cliquez sur + pour ajouter un autre nom.
-  </small>
-
-                <small class="field-error" *ngIf="fieldErrors['nomZone']">
-    {{ fieldErrors['nomZone'] }}
-  </small>
+                <small class="field-help">Choisissez un groupe existant ou cliquez sur + pour créer un nouveau groupe.</small>
+                <small class="field-error" *ngIf="fieldErrors['nomZone']">{{ fieldErrors['nomZone'] }}</small>
             </div>
 
             <div class="form-group">
-                <label>Adresse *</label>
+                <label>Lieu / Adresse *</label>
 
                 <div class="address-row">
                     <input type="text" [(ngModel)]="form.adresse" placeholder="Ex : Les Berges du Lac, Tunis" [class.input-error]="fieldErrors['adresse']" />
-
-                    <button class="search-btn" type="button" title="Rechercher l’adresse" (click)="searchAddress()">
+                    <button class="search-btn" type="button" title="Rechercher l'adresse" (click)="searchAddress()">
             <i class="ti ti-search"></i>
           </button>
                 </div>
 
-                <small class="field-error" *ngIf="fieldErrors['adresse']">
-          {{ fieldErrors['adresse'] }}
-        </small>
+                <small class="field-error" *ngIf="fieldErrors['adresse']">{{ fieldErrors['adresse'] }}</small>
             </div>
 
         </div>
@@ -144,18 +157,13 @@
             <div #zoneMapContainer class="zone-map"></div>
         </div>
 
-        <p class="map-hint">
-            Cliquez sur la carte ou recherchez une adresse. Les coordonnées seront enregistrées automatiquement.
-        </p>
-
-        <small class="field-error map-error" *ngIf="fieldErrors['localisation']">
-      {{ fieldErrors['localisation'] }}
-    </small>
+        <p class="map-hint">Cliquez sur la carte ou recherchez une adresse. Les coordonnées seront enregistrées automatiquement.</p>
+        <small class="field-error map-error" *ngIf="fieldErrors['localisation']">{{ fieldErrors['localisation'] }}</small>
 
         <div class="form-group">
-            <label>Description</label>
-
-            <textarea [(ngModel)]="form.description" placeholder="Ex : Zone concernée par les projets immobiliers du Grand Tunis"></textarea>
+            <label>Description / critères de la zone</label>
+            <textarea [(ngModel)]="form.description" placeholder="Ex : Très haut standing, forte complexité technique, seuil minimum 80/100..."></textarea>
+            <small class="field-help">Cette description est commune à tous les lieux portant le même nom de zone et sera affichée pendant le classement.</small>
         </div>
 
         <div class="form-error" *ngIf="formError">
@@ -164,19 +172,17 @@
         </div>
 
         <div class="modal-actions">
-            <button class="secondary-btn" type="button" (click)="closeModal()">
-        Annuler
-      </button>
-
+            <button class="secondary-btn" type="button" (click)="closeModal()">Annuler</button>
             <button class="primary-btn" type="button" (click)="saveZone()">
-        {{ isEditMode ? 'Modifier la zone' : 'Créer la zone' }}
+        {{ isEditMode ? 'Modifier le lieu' : 'Enregistrer le lieu' }}
       </button>
         </div>
 
     </div>
+
 </div>
 
-<!-- Delete Confirmation Modal -->
+<!-- Modal suppression (inchangé) -->
 <div class="delete-overlay" *ngIf="showDeleteModal" (click)="closeDeleteModal()">
     <div class="delete-card" (click)="$event.stopPropagation()">
 
@@ -184,10 +190,11 @@
             <i class="ti ti-trash"></i>
         </div>
 
-        <h3>Supprimer la zone ?</h3>
+        <h3>Supprimer ce lieu ?</h3>
 
         <p>
-            Cette action supprimera définitivement la zone
+            Cette action supprimera définitivement le lieu
+            <strong>{{ zoneToDelete?.adresse || 'sans adresse' }}</strong> du groupe
             <strong>{{ zoneToDelete?.nomZone }}</strong>.
         </p>
 
@@ -197,13 +204,8 @@
         </div>
 
         <div class="delete-actions">
-            <button class="secondary-btn" type="button" (click)="closeDeleteModal()">
-        Annuler
-      </button>
-
-            <button class="danger-btn" type="button" (click)="confirmDeleteZone()">
-        Supprimer
-      </button>
+            <button class="secondary-btn" type="button" (click)="closeDeleteModal()">Annuler</button>
+            <button class="danger-btn" type="button" (click)="confirmDeleteZone()">Supprimer</button>
         </div>
 
     </div>

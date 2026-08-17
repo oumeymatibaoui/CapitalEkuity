@@ -1,61 +1,197 @@
-<aside class="sidebar">
+<aside class="sidebar" [class.sidebar--collapsed]="sidebarCollapsed">
+
+    <!-- =====================================================
+       MARQUE
+  ====================================================== -->
 
     <div class="sidebar-brand">
 
         <div class="brand-main">
+
             <div class="brand-icon">
                 <i class="ti ti-building-bank"></i>
             </div>
 
-            <div class="brand-text">
+            <div class="brand-text" *ngIf="!sidebarCollapsed">
                 <h2>El Emar</h2>
+
+                <span class="role-badge" [class.role-badge--admin]="isAdmin">
+          <i
+            class="ti"
+            [ngClass]="roleBadgeIcon"
+          ></i>
+
+          {{ roleLabel }}
+        </span>
             </div>
+
+            <button type="button" class="sidebar-collapse-btn" [title]="
+          sidebarCollapsed
+            ? 'Ouvrir la navigation'
+            : 'Réduire la navigation'
+        " (click)="toggleSidebar()">
+        <i
+          class="ti"
+          [ngClass]="
+            sidebarCollapsed
+              ? 'ti-layout-sidebar-left-expand'
+              : 'ti-layout-sidebar-left-collapse'
+          "
+        ></i>
+      </button>
+
         </div>
 
-        <button type="button" class="account-button" [class.active]="isActive(getCompteRoute())" (click)="goTo(getCompteRoute())">
+        <!-- =====================================================
+         COMPTE
+    ====================================================== -->
+
+        <button type="button" class="account-button" [class.active]="isActive(getCompteRoute())" [title]="
+        sidebarCollapsed
+          ? 'Mon compte'
+          : 'Ouvrir mon compte'
+      " (click)="goTo(getCompteRoute())">
 
       <span class="account-avatar">
         {{ getConnectedUserInitial() }}
       </span>
 
-      <span class="account-info">
-        <strong>{{ getConnectedUserEmail() }}</strong>
-        <small>{{ getConnectedUserRole() }}</small>
+      <span
+        class="account-info"
+        *ngIf="!sidebarCollapsed"
+      >
+        <strong>
+          {{ userName || getConnectedUserEmail() }}
+        </strong>
+
+        <small>
+          {{ getConnectedUserRole() }}
+        </small>
       </span>
 
-      <i class="ti ti-chevron-right account-arrow"></i>
+      <i
+        *ngIf="!sidebarCollapsed"
+        class="ti ti-chevron-right account-arrow"
+      ></i>
+
     </button>
 
     </div>
 
+    <!-- =====================================================
+       NAVIGATION
+  ====================================================== -->
+
     <nav class="sidebar-nav">
 
-        <div class="nav-group" *ngFor="let group of getGroups()">
+        <!-- CHARGEMENT -->
 
-            <button type="button" class="nav-group-toggle" [class.open]="isGroupOpen(group)" [class.active]="isGroupActive(group)" (click)="toggleGroup(group)">
+        <div *ngIf="loadingNavigation" class="sidebar-state">
+            <i class="ti ti-loader-2 rotating"></i>
 
-        <div class="group-left">
-          <i
-            class="ti group-chevron"
-            [ngClass]="isGroupOpen(group) ? 'ti-chevron-down' : 'ti-chevron-right'">
-          </i>
-
-          <span>{{ group }}</span>
+            <span *ngIf="!sidebarCollapsed">
+        Chargement...
+      </span>
         </div>
 
-        <span class="group-count">
-          {{ getGroupCount(group) }}
-        </span>
+        <!-- ERREUR -->
+
+        <div *ngIf="navigationError" class="sidebar-state sidebar-state--error" [title]="navigationError">
+            <i class="ti ti-alert-circle"></i>
+
+            <span *ngIf="!sidebarCollapsed">
+        {{ navigationError }}
+      </span>
+        </div>
+
+        <!-- =====================================================
+         TABLEAU DE BORD
+    ====================================================== -->
+
+        <button *ngIf="getDashboardItem() as dashboard" type="button" class="nav-link nav-link--dashboard" [class.active]="isActive(dashboard.route)" [title]="dashboard.label" (click)="goTo(dashboard.route)">
+      <i [class]="dashboard.icon"></i>
+
+      <span *ngIf="!sidebarCollapsed">
+        {{ dashboard.label }}
+      </span>
+    </button>
+
+        <div class="nav-separator" *ngIf="
+        getDashboardItem()
+        && getGroups().length > 0
+      "></div>
+
+        <!-- =====================================================
+         GROUPES PRINCIPAUX
+    ====================================================== -->
+
+        <div class="nav-group" *ngFor="
+        let group of getGroups();
+        trackBy: trackByGroup
+      ">
+
+            <!-- Un seul bouton par groupe -->
+
+            <button type="button" class="nav-group-toggle" [class.open]="isGroupOpen(group)" [class.active]="isGroupActive(group)" [class.collapsed-active]="
+          sidebarCollapsed
+          && isGroupActive(group)
+        " [title]="group" (click)="toggleGroup(group)">
+
+        <div class="group-left">
+
+          <i
+            class="ti group-main-icon"
+            [ngClass]="getGroupIcon(group)"
+          ></i>
+
+          <span *ngIf="!sidebarCollapsed">
+            {{ group }}
+          </span>
+
+        </div>
+
+        <div
+          class="group-right"
+          *ngIf="!sidebarCollapsed"
+        >
+
+          <span class="group-count">
+            {{ getGroupCount(group) }}
+          </span>
+
+          <i
+            class="ti group-chevron"
+            [ngClass]="
+              isGroupOpen(group)
+                ? 'ti-chevron-down'
+                : 'ti-chevron-right'
+            "
+          ></i>
+
+        </div>
 
       </button>
 
-            <div class="nav-items" *ngIf="isGroupOpen(group)">
+            <!--
+        IMPORTANT :
+        Les sous-pages sont affichées uniquement
+        lorsque la sidebar est ouverte.
+      -->
 
-                <button type="button" class="nav-link" *ngFor="let item of getItemsByGroup(group)" [class.active]="isActive(item.route)" (click)="goTo(item.route)">
+            <div class="nav-items" *ngIf="
+          !sidebarCollapsed
+          && isGroupOpen(group)
+        ">
 
+                <button type="button" class="nav-link" *ngFor="
+            let item of getItemsByGroup(group);
+            trackBy: trackByItem
+          " [class.active]="isActive(item.route)" [title]="item.description || item.label" (click)="goTo(item.route)">
           <i [class]="item.icon"></i>
-          <span>{{ item.label }}</span>
 
+          <span>
+            {{ item.label }}
+          </span>
         </button>
 
             </div>
@@ -64,11 +200,18 @@
 
     </nav>
 
+    <!-- =====================================================
+       DÉCONNEXION
+  ====================================================== -->
+
     <div class="sidebar-footer">
 
-        <button type="button" class="logout-btn" (click)="logout()">
+        <button type="button" class="logout-btn" title="Déconnexion" (click)="logout()">
       <i class="ti ti-logout"></i>
-      <span>Déconnexion</span>
+
+      <span *ngIf="!sidebarCollapsed">
+        Déconnexion
+      </span>
     </button>
 
     </div>

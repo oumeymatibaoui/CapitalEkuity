@@ -4,6 +4,7 @@ import com.elemar.backendelemar.dto.CreateUtilisateurRequest;
 import com.elemar.backendelemar.dto.UpdateUtilisateurAdminRequest;
 import com.elemar.backendelemar.dto.UpdateUtilisateurRoleRequest;
 import com.elemar.backendelemar.dto.UtilisateurAdminResponse;
+import com.elemar.backendelemar.enums.TypeUtilisateur;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.DuplicateKeyException;
@@ -19,7 +20,7 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map;
+import java.util.Locale;
 import java.util.Objects;
 
 @Service
@@ -29,6 +30,12 @@ public class UtilisateurAdminService {
     private final JdbcTemplate jdbcTemplate;
     private final PasswordEncoder passwordEncoder;
     private final HistoriqueActionService historiqueActionService;
+
+    /*
+     * ============================================================
+     * LISTE DES UTILISATEURS INTERNES
+     * ============================================================
+     */
 
     @Transactional(readOnly = true)
     public List<UtilisateurAdminResponse> getAllUsers() {
@@ -49,17 +56,35 @@ public class UtilisateurAdminService {
                     u.created_at,
                     u.updated_at
                 FROM utilisateur u
-                LEFT JOIN role_acces r ON r.id = u.role_id
+                LEFT JOIN role_acces r
+                    ON r.id = u.role_id
                 WHERE CAST(u.type_utilisateur AS TEXT) <> 'CND'
                   AND (
                         r.id IS NULL
-                        OR UPPER(COALESCE(r.type_role, 'INTERNE')) = 'INTERNE'
+                        OR UPPER(
+                            COALESCE(r.type_role, 'INTERNE')
+                        ) = 'INTERNE'
                   )
                 ORDER BY u.id DESC
                 """;
 
-        return jdbcTemplate.query(sql, this::mapUser);
+        return jdbcTemplate.query(
+                sql,
+                this::mapUser
+        );
     }
+
+    /*
+     * ============================================================
+     * CRÉER UN UTILISATEUR INTERNE
+     *
+     * typeUtilisateur représente le département :
+     * IT, ACHAT, COMITE ou TECHNIQUE.
+     *
+     * roleId représente le rôle dynamique :
+     * ADMIN, EVALUATEUR, DECIDEUR, etc.
+     * ============================================================
+     */
 
     @Transactional
     public UtilisateurAdminResponse createUser(
@@ -67,24 +92,24 @@ public class UtilisateurAdminService {
     ) {
         validateCreateRequest(request);
 
-        String email = clean(request.getEmail()).toLowerCase();
+        String nom = clean(request.getNom());
 
-        RoleInfo role = resolveInternalRole(
-                request.getRoleId(),
+        String email = clean(request.getEmail())
+                .toLowerCase(Locale.ROOT);
+
+        String fonction = clean(
+                request.getFonction()
+        );
+
+        String typeUtilisateur = normalizeInternalType(
                 request.getTypeUtilisateur()
         );
 
-        /*
-         * Compatibilité avec l'ancien ENUM.
-         *
-         * Pour un rôle dynamique comme EVALUATEUR_JUNIOR,
-         * type_utilisateur reste EL_EMAR.
-         *
-         * Le véritable rôle est enregistré dans role_id.
-         */
-        String legacyType = resolveLegacyType(role.codeRole());
+        RoleInfo role = resolveInternalRole(
+                request.getRoleId()
+        );
 
-        Integer count = jdbcTemplate.queryForObject(
+        Integer emailCount = jdbcTemplate.queryForObject(
                 """
                 SELECT COUNT(*)
                 FROM utilisateur
@@ -94,15 +119,16 @@ public class UtilisateurAdminService {
                 email
         );
 
-        if (count != null && count > 0) {
+        if (emailCount != null && emailCount > 0) {
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT,
                     "Un compte avec cet email existe déjà."
             );
         }
 
-        String encodedPassword =
-                passwordEncoder.encode(request.getMotDePasse());
+        String encodedPassword = passwordEncoder.encode(
+                request.getMotDePasse()
+        );
 
         Long utilisateurId;
 
@@ -132,42 +158,60 @@ public class UtilisateurAdminService {
                         ?,
                         CAST(? AS type_utilisateur),
                         ?,
-                        true,
+                        TRUE,
                         CAST('ACTIF' AS statut_compte),
-                        true,
-                        true,
+                        TRUE,
+                        TRUE,
                         CURRENT_TIMESTAMP,
                         CURRENT_TIMESTAMP
                     )
                     RETURNING id
                     """,
                     Long.class,
-                    clean(request.getNom()),
+                    nom,
                     email,
                     encodedPassword,
-                    clean(request.getFonction()),
-                    legacyType,
+                    fonction,
+                    typeUtilisateur,
                     role.id()
             );
+
         } catch (DuplicateKeyException exception) {
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT,
                     "Un compte avec cet email existe déjà."
             );
+
+        } catch (DataIntegrityViolationException exception) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Impossible de créer l'utilisateur. "
+                            + "Vérifiez le département et le rôle sélectionnés."
+            );
         }
 
-        Long createurId =
-                getValidUtilisateurIdOrNull(request.getCreateurId());
+        if (utilisateurId == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "La création de l'utilisateur a échoué."
+            );
+        }
+
+        Long createurId = getValidUtilisateurIdOrNull(
+                request.getCreateurId()
+        );
 
         historiqueActionService.enregistrerAction(
                 createurId,
                 null,
                 null,
-                "EL_EMAR_CREATE_UTILISATEUR",
+                "UTILISATEUR_INTERNE_CREATE",
                 "Création du compte interne : "
                         + safe(email)
                         + " | Nom : "
-                        + safe(request.getNom())
+                        + safe(nom)
+                        + " | Département : "
+                        + safe(typeUtilisateur)
                         + " | Rôle : "
                         + safe(role.nomRole())
                         + " (" + safe(role.codeRole()) + ")"
@@ -178,6 +222,12 @@ public class UtilisateurAdminService {
         return getUserById(utilisateurId);
     }
 
+    /*
+     * ============================================================
+     * MODIFIER LE RÔLE ET LE DÉPARTEMENT
+     * ============================================================
+     */
+
     @Transactional
     public UtilisateurAdminResponse updateRole(
             Long utilisateurId,
@@ -186,7 +236,7 @@ public class UtilisateurAdminService {
         if (utilisateurId == null) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "Utilisateur obligatoire."
+                    "L'utilisateur est obligatoire."
             );
         }
 
@@ -197,24 +247,54 @@ public class UtilisateurAdminService {
             );
         }
 
-        RoleInfo role = resolveInternalRole(
-                request.getRoleId(),
-                request.getTypeUtilisateur()
+        if (request.getRoleId() == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Le rôle est obligatoire."
+            );
+        }
+
+        UtilisateurAdminResponse currentUser = getUserById(
+                utilisateurId
         );
 
-        String legacyType = resolveLegacyType(role.codeRole());
+        RoleInfo role = resolveInternalRole(
+                request.getRoleId()
+        );
+
+        /*
+         * Si le frontend n'envoie pas le département,
+         * on conserve le département actuel.
+         */
+        String typeUtilisateur;
+
+        Object requestedType = request.getTypeUtilisateur();
+
+        if (
+                requestedType == null
+                        || String.valueOf(requestedType).isBlank()
+        ) {
+            typeUtilisateur = normalizeInternalType(
+                    currentUser.getTypeUtilisateur()
+            );
+        } else {
+            typeUtilisateur = normalizeInternalType(
+                    requestedType
+            );
+        }
 
         int updated = jdbcTemplate.update(
                 """
                 UPDATE utilisateur
                 SET role_id = ?,
-                    type_utilisateur = CAST(? AS type_utilisateur),
+                    type_utilisateur =
+                        CAST(? AS type_utilisateur),
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
                   AND CAST(type_utilisateur AS TEXT) <> 'CND'
                 """,
                 role.id(),
-                legacyType,
+                typeUtilisateur,
                 utilisateurId
         );
 
@@ -233,10 +313,14 @@ public class UtilisateurAdminService {
                 modificateurId,
                 null,
                 null,
-                "EL_EMAR_UPDATE_ROLE_UTILISATEUR",
-                "Modification du rôle de l'utilisateur ID "
+                "UTILISATEUR_INTERNE_UPDATE_ROLE",
+                "Modification de l'utilisateur ID "
                         + utilisateurId
-                        + ". Nouveau rôle : "
+                        + " | Ancien département : "
+                        + safe(currentUser.getTypeUtilisateur())
+                        + " | Nouveau département : "
+                        + safe(typeUtilisateur)
+                        + " | Nouveau rôle : "
                         + safe(role.nomRole())
                         + " (" + safe(role.codeRole()) + ")"
         );
@@ -244,19 +328,27 @@ public class UtilisateurAdminService {
         return getUserById(utilisateurId);
     }
 
+    /*
+     * ============================================================
+     * ACTIVER OU DÉSACTIVER UN UTILISATEUR
+     * ============================================================
+     */
+
     @Transactional
-    public UtilisateurAdminResponse toggleActif(Long utilisateurId) {
+    public UtilisateurAdminResponse toggleActif(
+            Long utilisateurId
+    ) {
         if (utilisateurId == null) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "Utilisateur obligatoire."
+                    "L'utilisateur est obligatoire."
             );
         }
 
         int updated = jdbcTemplate.update(
                 """
                 UPDATE utilisateur
-                SET actif = NOT COALESCE(actif, true),
+                SET actif = NOT COALESCE(actif, TRUE),
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
                   AND CAST(type_utilisateur AS TEXT) <> 'CND'
@@ -271,14 +363,15 @@ public class UtilisateurAdminService {
             );
         }
 
-        UtilisateurAdminResponse user =
-                getUserById(utilisateurId);
+        UtilisateurAdminResponse user = getUserById(
+                utilisateurId
+        );
 
         historiqueActionService.enregistrerAction(
                 utilisateurId,
                 null,
                 null,
-                "EL_EMAR_TOGGLE_UTILISATEUR",
+                "UTILISATEUR_INTERNE_TOGGLE_ACTIF",
                 Boolean.TRUE.equals(user.getActif())
                         ? "Activation du compte utilisateur interne."
                         : "Désactivation du compte utilisateur interne."
@@ -287,40 +380,52 @@ public class UtilisateurAdminService {
         return user;
     }
 
+    /*
+     * ============================================================
+     * CONSULTER UN UTILISATEUR
+     * ============================================================
+     */
+
     @Transactional(readOnly = true)
     public UtilisateurAdminResponse getUserById(
             Long utilisateurId
     ) {
-        List<UtilisateurAdminResponse> users =
-                jdbcTemplate.query(
-                        """
-                        SELECT
-                            u.id,
-                            u.nom,
-                            u.email,
-                            u.fonction,
-                            CAST(u.type_utilisateur AS TEXT)
-                                AS type_utilisateur,
-                            u.role_id,
-                            r.code_role,
-                            r.nom_role,
-                            u.actif,
-                            u.premiere_connexion,
-                            u.must_change_password,
-                            u.created_at,
-                            u.updated_at
-                        FROM utilisateur u
-                        LEFT JOIN role_acces r
-                            ON r.id = u.role_id
-                        WHERE u.id = ?
-                          AND CAST(
-                              u.type_utilisateur AS TEXT
-                          ) <> 'CND'
-                        LIMIT 1
-                        """,
-                        this::mapUser,
-                        utilisateurId
-                );
+        if (utilisateurId == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "L'utilisateur est obligatoire."
+            );
+        }
+
+        List<UtilisateurAdminResponse> users = jdbcTemplate.query(
+                """
+                SELECT
+                    u.id,
+                    u.nom,
+                    u.email,
+                    u.fonction,
+                    CAST(u.type_utilisateur AS TEXT)
+                        AS type_utilisateur,
+                    u.role_id,
+                    r.code_role,
+                    r.nom_role,
+                    u.actif,
+                    u.premiere_connexion,
+                    u.must_change_password,
+                    u.created_at,
+                    u.updated_at
+                FROM utilisateur u
+                LEFT JOIN role_acces r
+                    ON r.id = u.role_id
+                WHERE u.id = ?
+                  AND CAST(
+                        u.type_utilisateur AS TEXT
+                      ) <> 'CND'
+                LIMIT 1
+                """,
+                this::mapUser,
+                utilisateurId
+        );
 
         if (users.isEmpty()) {
             throw new ResponseStatusException(
@@ -332,256 +437,12 @@ public class UtilisateurAdminService {
         return users.get(0);
     }
 
-    private RoleInfo resolveInternalRole(
-            Long roleId,
-            String ancienTypeUtilisateur
-    ) {
-        List<RoleInfo> roles;
-
-        if (roleId != null) {
-            roles = jdbcTemplate.query(
-                    """
-                    SELECT
-                        id,
-                        code_role,
-                        nom_role
-                    FROM role_acces
-                    WHERE id = ?
-                      AND actif = true
-                      AND UPPER(
-                          COALESCE(type_role, 'INTERNE')
-                      ) = 'INTERNE'
-                    LIMIT 1
-                    """,
-                    this::mapRole,
-                    roleId
-            );
-        } else {
-            if (!hasText(ancienTypeUtilisateur)) {
-                throw new ResponseStatusException(
-                        HttpStatus.BAD_REQUEST,
-                        "Le rôle est obligatoire."
-                );
-            }
-
-            String codeRole =
-                    ancienTypeUtilisateur.trim().toUpperCase();
-
-            roles = jdbcTemplate.query(
-                    """
-                    SELECT
-                        id,
-                        code_role,
-                        nom_role
-                    FROM role_acces
-                    WHERE UPPER(code_role) = ?
-                      AND actif = true
-                      AND UPPER(
-                          COALESCE(type_role, 'INTERNE')
-                      ) = 'INTERNE'
-                    LIMIT 1
-                    """,
-                    this::mapRole,
-                    codeRole
-            );
-        }
-
-        if (roles.isEmpty()) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Rôle interne introuvable ou inactif."
-            );
-        }
-
-        return roles.get(0);
-    }
-
     /*
-     * Maintient la compatibilité avec l'ancienne base.
+     * ============================================================
+     * MODIFIER LES INFORMATIONS D'UN UTILISATEUR
+     * ============================================================
      */
-    private String resolveLegacyType(String codeRole) {
-        if (codeRole == null) {
-            return "EL_EMAR";
-        }
 
-        return switch (codeRole.trim().toUpperCase()) {
-            case "EL_EMAR" -> "EL_EMAR";
-            case "DA" -> "DA";
-            case "IT" -> "IT";
-            case "ADMIN" -> "ADMIN";
-
-            /*
-             * Tout nouveau rôle dynamique interne reste
-             * techniquement un compte EL_EMAR dans l'ancien système.
-             */
-            default -> "EL_EMAR";
-        };
-    }
-
-    private RoleInfo mapRole(
-            ResultSet rs,
-            int rowNum
-    ) throws SQLException {
-        return new RoleInfo(
-                rs.getLong("id"),
-                rs.getString("code_role"),
-                rs.getString("nom_role")
-        );
-    }
-
-    private UtilisateurAdminResponse mapUser(
-            ResultSet rs,
-            int rowNum
-    ) throws SQLException {
-        Object roleIdObject = rs.getObject("role_id");
-
-        Long roleId = roleIdObject == null
-                ? null
-                : ((Number) roleIdObject).longValue();
-
-        return UtilisateurAdminResponse.builder()
-                .id(rs.getLong("id"))
-                .nom(rs.getString("nom"))
-                .email(rs.getString("email"))
-                .fonction(rs.getString("fonction"))
-                .typeUtilisateur(
-                        rs.getString("type_utilisateur")
-                )
-                .roleId(roleId)
-                .roleCode(rs.getString("code_role"))
-                .roleNom(rs.getString("nom_role"))
-                .actif(
-                        rs.getObject("actif") != null
-                                ? rs.getBoolean("actif")
-                                : null
-                )
-                .premiereConnexion(
-                        rs.getObject("premiere_connexion") != null
-                                ? rs.getBoolean("premiere_connexion")
-                                : null
-                )
-                .mustChangePassword(
-                        rs.getObject("must_change_password") != null
-                                ? rs.getBoolean(
-                                "must_change_password"
-                        )
-                                : null
-                )
-                .createdAt(
-                        toLocalDateTime(
-                                rs.getTimestamp("created_at")
-                        )
-                )
-                .updatedAt(
-                        toLocalDateTime(
-                                rs.getTimestamp("updated_at")
-                        )
-                )
-                .build();
-    }
-
-    private void validateCreateRequest(
-            CreateUtilisateurRequest request
-    ) {
-        if (request == null) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Les informations utilisateur sont obligatoires."
-            );
-        }
-
-        if (!hasText(request.getNom())) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Le nom est obligatoire."
-            );
-        }
-
-        if (!hasText(request.getEmail())) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "L'email est obligatoire."
-            );
-        }
-
-        if (!hasText(request.getMotDePasse())) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Le mot de passe est obligatoire."
-            );
-        }
-
-        if (request.getMotDePasse().length() < 6) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Le mot de passe doit contenir au moins 6 caractères."
-            );
-        }
-
-        if (
-                request.getRoleId() == null
-                        && !hasText(request.getTypeUtilisateur())
-        ) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Le rôle est obligatoire."
-            );
-        }
-    }
-
-    private Long getValidUtilisateurIdOrNull(
-            Long utilisateurId
-    ) {
-        if (utilisateurId == null) {
-            return null;
-        }
-
-        Integer count = jdbcTemplate.queryForObject(
-                """
-                SELECT COUNT(*)
-                FROM utilisateur
-                WHERE id = ?
-                """,
-                Integer.class,
-                utilisateurId
-        );
-
-        return count != null && count > 0
-                ? utilisateurId
-                : null;
-    }
-
-    private boolean hasText(String value) {
-        return value != null
-                && !value.trim().isEmpty();
-    }
-
-    private String clean(String value) {
-        return value == null
-                ? null
-                : value.trim();
-    }
-
-    private String safe(String value) {
-        return value == null || value.trim().isEmpty()
-                ? "-"
-                : value.trim();
-    }
-
-    private LocalDateTime toLocalDateTime(
-            Timestamp timestamp
-    ) {
-        return timestamp == null
-                ? null
-                : timestamp.toLocalDateTime();
-    }
-
-    private record RoleInfo(
-            Long id,
-            String codeRole,
-            String nomRole
-    ) {
-    }
     @Transactional
     public UtilisateurAdminResponse updateUtilisateur(
             Long utilisateurId,
@@ -625,18 +486,19 @@ public class UtilisateurAdminService {
         String nom = clean(request.getNom());
 
         String email = clean(request.getEmail())
-                .toLowerCase();
+                .toLowerCase(Locale.ROOT);
 
         String fonction = clean(
                 request.getFonction()
         );
 
-        /*
-         * Cette méthode existe déjà dans
-         * UtilisateurAdminService.
-         */
-        UtilisateurAdminResponse before =
-                getUserById(utilisateurId);
+        UtilisateurAdminResponse before = getUserById(
+                utilisateurId
+        );
+
+        RoleInfo role = resolveInternalRole(
+                request.getRoleId()
+        );
 
         Integer emailCount = jdbcTemplate.queryForObject(
                 """
@@ -657,105 +519,63 @@ public class UtilisateurAdminService {
             );
         }
 
-        List<Map<String, Object>> roles =
-                jdbcTemplate.queryForList(
-                        """
-                        SELECT
-                            id,
-                            code_role,
-                            nom_role,
-                            type_role,
-                            actif
-                        FROM role_acces
-                        WHERE id = ?
-                        LIMIT 1
-                        """,
-                        request.getRoleId()
-                );
-
-        if (roles.isEmpty()) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Le rôle sélectionné est introuvable."
-            );
-        }
-
-        Map<String, Object> role = roles.get(0);
-
-        String typeRole = String.valueOf(
-                        role.get("type_role")
-                )
-                .trim()
-                .toUpperCase();
-
-        boolean roleActif =
-                Boolean.TRUE.equals(
-                        role.get("actif")
-                );
-
-        if (!roleActif) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Le rôle sélectionné est inactif."
-            );
-        }
-
-        if (!"INTERNE".equals(typeRole)) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Le rôle doit être un rôle interne."
-            );
-        }
-
         boolean actifFinal =
                 request.getActif() != null
-                        ? Boolean.TRUE.equals(
-                        request.getActif()
-                )
-                        : Boolean.TRUE.equals(
-                        before.getActif()
-                );
+                        ? Boolean.TRUE.equals(request.getActif())
+                        : Boolean.TRUE.equals(before.getActif());
 
-        int updated = jdbcTemplate.update(
-                """
-                UPDATE utilisateur
-                SET nom = ?,
-                    email = ?,
-                    fonction = ?,
-                    role_id = ?,
-                    actif = ?,
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE id = ?
-                """,
-                nom,
-                email,
-                fonction,
-                request.getRoleId(),
-                actifFinal,
-                utilisateurId
-        );
+        int updated;
+
+        try {
+            updated = jdbcTemplate.update(
+                    """
+                    UPDATE utilisateur
+                    SET nom = ?,
+                        email = ?,
+                        fonction = ?,
+                        role_id = ?,
+                        actif = ?,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                      AND CAST(type_utilisateur AS TEXT) <> 'CND'
+                    """,
+                    nom,
+                    email,
+                    fonction,
+                    role.id(),
+                    actifFinal,
+                    utilisateurId
+            );
+
+        } catch (DuplicateKeyException exception) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Un autre compte utilise déjà cet email."
+            );
+
+        } catch (DataIntegrityViolationException exception) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Impossible de modifier cet utilisateur."
+            );
+        }
 
         if (updated == 0) {
             throw new ResponseStatusException(
                     HttpStatus.NOT_FOUND,
-                    "Utilisateur introuvable."
+                    "Utilisateur interne introuvable."
             );
         }
 
-        /*
-         * Cette méthode existe déjà dans
-         * UtilisateurAdminService.
-         */
-        Long modificateurId =
-                getValidUtilisateurIdOrNull(
-                        request.getModificateurId()
-                );
+        Long modificateurId = getValidUtilisateurIdOrNull(
+                request.getModificateurId()
+        );
 
         historiqueActionService.enregistrerAction(
                 modificateurId,
                 null,
                 null,
-                "EL_EMAR_UPDATE_UTILISATEUR",
+                "UTILISATEUR_INTERNE_UPDATE",
                 "Modification du compte utilisateur ID "
                         + utilisateurId
                         + " | Ancien nom : "
@@ -766,12 +586,20 @@ public class UtilisateurAdminService {
                         + safe(before.getEmail())
                         + " | Nouvel email : "
                         + safe(email)
-                        + " | Nouveau rôle ID : "
-                        + request.getRoleId()
+                        + " | Nouveau rôle : "
+                        + safe(role.nomRole())
+                        + " (" + safe(role.codeRole()) + ")"
         );
 
         return getUserById(utilisateurId);
     }
+
+    /*
+     * ============================================================
+     * SUPPRIMER UN UTILISATEUR
+     * ============================================================
+     */
+
     @Transactional
     public void deleteUtilisateur(
             Long utilisateurId,
@@ -797,19 +625,20 @@ public class UtilisateurAdminService {
             );
         }
 
-        UtilisateurAdminResponse user =
-                getUserById(utilisateurId);
+        UtilisateurAdminResponse user = getUserById(
+                utilisateurId
+        );
 
-        Long validDemandeurId =
-                getValidUtilisateurIdOrNull(
-                        demandeurId
-                );
+        Long validDemandeurId = getValidUtilisateurIdOrNull(
+                demandeurId
+        );
 
         try {
             int deleted = jdbcTemplate.update(
                     """
                     DELETE FROM utilisateur
                     WHERE id = ?
+                      AND CAST(type_utilisateur AS TEXT) <> 'CND'
                     """,
                     utilisateurId
             );
@@ -817,13 +646,11 @@ public class UtilisateurAdminService {
             if (deleted == 0) {
                 throw new ResponseStatusException(
                         HttpStatus.NOT_FOUND,
-                        "Utilisateur introuvable."
+                        "Utilisateur interne introuvable."
                 );
             }
 
-        } catch (
-                DataIntegrityViolationException exception
-        ) {
+        } catch (DataIntegrityViolationException exception) {
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT,
                     "Ce compte est lié à des données de la plateforme. "
@@ -835,11 +662,333 @@ public class UtilisateurAdminService {
                 validDemandeurId,
                 null,
                 null,
-                "EL_EMAR_DELETE_UTILISATEUR",
+                "UTILISATEUR_INTERNE_DELETE",
                 "Suppression du compte utilisateur : "
                         + safe(user.getEmail())
+                        + " | Nom : "
+                        + safe(user.getNom())
                         + " | ID supprimé : "
                         + utilisateurId
         );
+    }
+
+    /*
+     * ============================================================
+     * RECHERCHER ET VALIDER UN RÔLE INTERNE
+     * ============================================================
+     */
+
+    private RoleInfo resolveInternalRole(
+            Long roleId
+    ) {
+        if (roleId == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Le rôle est obligatoire."
+            );
+        }
+
+        List<RoleInfo> roles = jdbcTemplate.query(
+                """
+                SELECT
+                    id,
+                    code_role,
+                    nom_role
+                FROM role_acces
+                WHERE id = ?
+                  AND actif = TRUE
+                  AND UPPER(
+                        COALESCE(type_role, 'INTERNE')
+                      ) = 'INTERNE'
+                LIMIT 1
+                """,
+                this::mapRole,
+                roleId
+        );
+
+        if (roles.isEmpty()) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Rôle interne introuvable ou inactif."
+            );
+        }
+
+        return roles.get(0);
+    }
+
+    /*
+     * ============================================================
+     * VALIDER LE DÉPARTEMENT
+     * ============================================================
+     */
+
+    private String normalizeInternalType(
+            Object rawValue
+    ) {
+        if (rawValue == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Le département est obligatoire."
+            );
+        }
+
+        String value = String.valueOf(rawValue)
+                .trim()
+                .toUpperCase(Locale.ROOT);
+
+        if (value.isBlank()) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Le département est obligatoire."
+            );
+        }
+
+        final TypeUtilisateur typeUtilisateur;
+
+        try {
+            typeUtilisateur = TypeUtilisateur.valueOf(
+                    value
+            );
+
+        } catch (IllegalArgumentException exception) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Département invalide : "
+                            + value
+                            + ". Valeurs autorisées : "
+                            + "IT, ACHAT, COMITE, TECHNIQUE."
+            );
+        }
+
+        if (!typeUtilisateur.isUtilisateurInterne()) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Le type CND est réservé aux intervenants externes."
+            );
+        }
+
+        return typeUtilisateur.name();
+    }
+
+    /*
+     * ============================================================
+     * MAPPING RÔLE
+     * ============================================================
+     */
+
+    private RoleInfo mapRole(
+            ResultSet rs,
+            int rowNum
+    ) throws SQLException {
+        return new RoleInfo(
+                rs.getLong("id"),
+                rs.getString("code_role"),
+                rs.getString("nom_role")
+        );
+    }
+
+    /*
+     * ============================================================
+     * MAPPING UTILISATEUR
+     * ============================================================
+     */
+
+    private UtilisateurAdminResponse mapUser(
+            ResultSet rs,
+            int rowNum
+    ) throws SQLException {
+        Object roleIdObject = rs.getObject(
+                "role_id"
+        );
+
+        Long roleId = roleIdObject == null
+                ? null
+                : ((Number) roleIdObject).longValue();
+
+        return UtilisateurAdminResponse.builder()
+                .id(rs.getLong("id"))
+                .nom(rs.getString("nom"))
+                .email(rs.getString("email"))
+                .fonction(rs.getString("fonction"))
+                .typeUtilisateur(
+                        rs.getString("type_utilisateur")
+                )
+                .roleId(roleId)
+                .roleCode(rs.getString("code_role"))
+                .roleNom(rs.getString("nom_role"))
+                .actif(
+                        rs.getObject("actif") == null
+                                ? null
+                                : rs.getBoolean("actif")
+                )
+                .premiereConnexion(
+                        rs.getObject("premiere_connexion") == null
+                                ? null
+                                : rs.getBoolean(
+                                "premiere_connexion"
+                        )
+                )
+                .mustChangePassword(
+                        rs.getObject("must_change_password") == null
+                                ? null
+                                : rs.getBoolean(
+                                "must_change_password"
+                        )
+                )
+                .createdAt(
+                        toLocalDateTime(
+                                rs.getTimestamp("created_at")
+                        )
+                )
+                .updatedAt(
+                        toLocalDateTime(
+                                rs.getTimestamp("updated_at")
+                        )
+                )
+                .build();
+    }
+
+    /*
+     * ============================================================
+     * VALIDATION DE LA CRÉATION
+     * ============================================================
+     */
+
+    private void validateCreateRequest(
+            CreateUtilisateurRequest request
+    ) {
+        if (request == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Les informations utilisateur sont obligatoires."
+            );
+        }
+
+        if (!hasText(request.getNom())) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Le nom est obligatoire."
+            );
+        }
+
+        if (!hasText(request.getEmail())) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "L'email est obligatoire."
+            );
+        }
+
+        if (!hasText(request.getMotDePasse())) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Le mot de passe est obligatoire."
+            );
+        }
+
+        if (request.getMotDePasse().length() < 8) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Le mot de passe doit contenir au moins 8 caractères."
+            );
+        }
+
+        if (request.getRoleId() == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Le rôle est obligatoire."
+            );
+        }
+
+        /*
+         * Cette méthode vérifie aussi que la valeur
+         * n'est pas CND.
+         */
+        normalizeInternalType(
+                request.getTypeUtilisateur()
+        );
+    }
+
+    /*
+     * ============================================================
+     * VÉRIFIER UN IDENTIFIANT UTILISATEUR
+     * ============================================================
+     */
+
+    private Long getValidUtilisateurIdOrNull(
+            Long utilisateurId
+    ) {
+        if (utilisateurId == null) {
+            return null;
+        }
+
+        Integer count = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM utilisateur
+                WHERE id = ?
+                """,
+                Integer.class,
+                utilisateurId
+        );
+
+        return count != null && count > 0
+                ? utilisateurId
+                : null;
+    }
+
+    /*
+     * ============================================================
+     * MÉTHODES UTILITAIRES
+     * ============================================================
+     */
+
+    private boolean hasText(
+            String value
+    ) {
+        return value != null
+                && !value.trim().isEmpty();
+    }
+
+    private String clean(
+            String value
+    ) {
+        if (value == null) {
+            return null;
+        }
+
+        String cleaned = value.trim();
+
+        return cleaned.isEmpty()
+                ? null
+                : cleaned;
+    }
+
+    private String safe(
+            String value
+    ) {
+        return value == null || value.trim().isEmpty()
+                ? "-"
+                : value.trim();
+    }
+
+    private LocalDateTime toLocalDateTime(
+            Timestamp timestamp
+    ) {
+        return timestamp == null
+                ? null
+                : timestamp.toLocalDateTime();
+    }
+
+    /*
+     * ============================================================
+     * STRUCTURE INTERNE POUR LE RÔLE
+     * ============================================================
+     */
+
+    private record RoleInfo(
+            Long id,
+            String codeRole,
+            String nomRole
+    ) {
     }
 }

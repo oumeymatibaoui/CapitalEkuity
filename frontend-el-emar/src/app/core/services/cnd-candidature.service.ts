@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, forkJoin, of, switchMap, map } from 'rxjs';
+import { environment } from '../../../environments/environment.development';
 
 export interface LotOption {
   id: number;
@@ -109,8 +110,8 @@ export interface CandidatureResponse {
 })
 export class CndCandidatureService {
 
-  private readonly candidatureApiUrl = 'http://localhost:8089/api/cnd/candidatures';
-  private readonly lotApiUrl = 'http://localhost:8089/api/lots';
+  private readonly candidatureApiUrl = `${environment.apiBaseUrl}/api/cnd/candidatures`;
+  private readonly lotApiUrl = `${environment.apiBaseUrl}/api/lots`;
 
   constructor(private http: HttpClient) {}
 

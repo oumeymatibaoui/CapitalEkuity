@@ -16,10 +16,12 @@ import java.util.List;
 public class CritereEvaluationController {
 
     private final CritereEvaluationService critereEvaluationService;
+
     @GetMapping("/pieces/noms")
     public List<String> getPieceNames() {
         return critereEvaluationService.getPieceNames();
     }
+
     @GetMapping
     public List<CritereEvaluationResponse> getAll() {
         return critereEvaluationService.getAll();
@@ -51,7 +53,9 @@ public class CritereEvaluationController {
     }
 
     @PostMapping
-    public CritereEvaluationResponse create(@RequestBody CritereEvaluationRequest request) {
+    public CritereEvaluationResponse create(
+            @RequestBody CritereEvaluationRequest request
+    ) {
         return critereEvaluationService.create(request);
     }
 

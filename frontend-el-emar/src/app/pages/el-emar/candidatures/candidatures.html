@@ -242,6 +242,16 @@
 
                     <div class="user-actions">
 
+                        <button type="button" class="small-btn" title="Modifier cet utilisateur" (click)="
+                            openEditUserModal(
+                              user,
+                              candidature.candidatureId
+                            )
+                          ">
+                          <i class="ti ti-pencil"></i>
+                          Modifier
+                        </button>
+
                         <button type="button" class="small-btn" [disabled]="user.actif === false" (click)="resetPassword(user)">
       Réinitialiser le mot de passe
     </button>
@@ -272,6 +282,29 @@
         }}
       </span>
     </button>
+
+                        <button type="button" class="small-btn danger" title="Supprimer cet utilisateur" [disabled]="
+                            deletingUserId === user.id
+                          " (click)="
+                            openDeleteUserModal(
+                              user,
+                              candidature.candidatureId
+                            )
+                          ">
+                          <i
+                            [class]="
+                              deletingUserId === user.id
+                                ? 'ti ti-loader-2'
+                                : 'ti ti-trash'
+                            "
+                          ></i>
+
+                          {{
+                            deletingUserId === user.id
+                              ? 'Suppression...'
+                              : 'Supprimer'
+                          }}
+                        </button>
 
                     </div>
                 </div>
@@ -569,18 +602,18 @@
                     </h2>
 
                     <p>
-                        Modifier les informations de la société, son type d’intervenant et les lots autorisés.
+                        Modifier la société, les lots et les utilisateurs associés.
                     </p>
                 </div>
 
                 <button type="button" class="close-btn" [disabled]="savingEdit" (click)="closeEditCandidatureModal()">
-          ×
-        </button>
+                  ×
+                </button>
             </div>
 
             <div class="modal-body">
 
-                <!-- INFORMATIONS -->
+                <!-- ÉTAPE 1 : mêmes champs que la modale Ajouter -->
                 <div class="form-block">
                     <div class="block-title">
                         <span>1</span>
@@ -591,42 +624,46 @@
                             </h3>
 
                             <p>
-                                Informations principales de l’intervenant.
+                                Les anciennes informations sont chargées automatiquement.
                             </p>
                         </div>
                     </div>
 
+                    <div class="form-grid two">
+                        <label>
+                            Nom de la société *
+
+                            <input
+                              [(ngModel)]="editForm.nomEntreprise"
+                              placeholder="Ex : Bureau Atlas Engineering"
+                              [disabled]="savingEdit"
+                            >
+                        </label>
+                    </div>
+
                     <label>
-            Nom de la société *
+                        Type d’intervenant *
 
-            <input
-              [(ngModel)]="editForm.nomEntreprise"
-              placeholder="Nom de la société"
-            >
-          </label>
+                        <select
+                          [(ngModel)]="editForm.typeIntervenantId"
+                          (ngModelChange)="onEditTypeChange()"
+                          [disabled]="savingEdit"
+                        >
+                            <option [ngValue]="null">
+                                -- Choisir un type --
+                            </option>
 
-                    <label>
-            Type d’intervenant *
-
-            <select
-              [(ngModel)]="editForm.typeIntervenantId"
-              (ngModelChange)="onEditTypeChange()"
-            >
-              <option [ngValue]="null">
-                -- Choisir un type --
-              </option>
-
-              <option
-                *ngFor="let type of types"
-                [ngValue]="type.id"
-              >
-                {{ type.libelle }}
-              </option>
-            </select>
-          </label>
+                            <option
+                              *ngFor="let type of types"
+                              [ngValue]="type.id"
+                            >
+                                {{ type.libelle }}
+                            </option>
+                        </select>
+                    </label>
                 </div>
 
-                <!-- LOTS -->
+                <!-- ÉTAPE 2 : mêmes lots que la modale Ajouter -->
                 <div class="form-block">
                     <div class="block-title">
                         <span>2</span>
@@ -635,7 +672,7 @@
                             <h3>Lots autorisés</h3>
 
                             <p>
-                                Sélectionner les lots visibles par cet intervenant.
+                                L’intervenant verra uniquement les lots sélectionnés dans son interface.
                             </p>
                         </div>
                     </div>
@@ -645,28 +682,124 @@
                     </div>
 
                     <div class="empty-mini" *ngIf="
-              !loadingEditLots &&
-              editForm.typeIntervenantId &&
-              editLots.length === 0
-            ">
+                        !loadingEditLots &&
+                        editForm.typeIntervenantId &&
+                        editLots.length === 0
+                      ">
                         Aucun lot actif trouvé pour ce type.
                     </div>
 
                     <div class="lots-grid" *ngIf="editLots.length > 0">
                         <button type="button" class="lot-option" *ngFor="
-                let lot of editLots;
-                trackBy: trackByLotId
-              " [class.selected]="
-                isEditLotSelected(lot.id)
-              " (click)="toggleEditLot(lot.id)">
-              <span>
-                {{ lot.nomLot }}
-              </span>
+                            let lot of editLots;
+                            trackBy: trackByLotId
+                          " [class.selected]="
+                            isEditLotSelected(lot.id)
+                          " [disabled]="savingEdit" (click)="toggleEditLot(lot.id)">
+                            <span>
+                                {{ lot.nomLot }}
+                            </span>
 
-              <small>
-                {{ lot.codeLot || 'LOT' }}
-              </small>
-            </button>
+                            <small>
+                                {{ lot.codeLot || 'LOT' }}
+                            </small>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ÉTAPE 3 : copie de la partie utilisateurs de la modale Ajouter -->
+                <div class="form-block">
+                    <div class="block-title">
+                        <span>3</span>
+
+                        <div>
+                            <h3>
+                                Utilisateurs de l’intervenant
+                            </h3>
+
+                            <p>
+                                Les comptes existants sont préremplis. Vous pouvez les modifier ou ajouter un autre utilisateur.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="users-title-line">
+                        <strong>
+                            Comptes utilisateurs
+                        </strong>
+
+                        <button type="button" class="secondary-btn" [disabled]="savingEdit" (click)="addEditUserRow()">
+                            + Ajouter un utilisateur
+                        </button>
+                    </div>
+
+                    <div class="empty-mini" *ngIf="editUsers.length === 0">
+                        Aucun utilisateur associé. Cliquez sur « Ajouter un utilisateur ».
+                    </div>
+
+                    <div class="user-form-card" *ngFor="
+                        let user of editUsers;
+                        let i = index;
+                        trackBy: trackByEditUser
+                      ">
+                        <div class="user-form-header">
+                            <strong>
+                                Utilisateur {{ i + 1 }}
+                            </strong>
+
+                            <span class="status-chip complete" *ngIf="user.id">
+                                Compte existant
+                            </span>
+
+                            <button type="button" class="remove-btn" *ngIf="!user.id" [disabled]="savingEdit" (click)="removeEditUserRow(i)">
+                                Supprimer
+                            </button>
+                        </div>
+
+                        <div class="form-grid two">
+                            <label>
+                                Nom complet *
+
+                                <input
+                                  [(ngModel)]="user.nomComplet"
+                                  placeholder="Ex : Ahmed Ben Ali"
+                                  [disabled]="savingEdit"
+                                >
+                            </label>
+
+                            <label>
+                                Adresse email *
+
+                                <input
+                                  type="email"
+                                  [(ngModel)]="user.email"
+                                  placeholder="Ex : ahmed@societe.com"
+                                  [disabled]="savingEdit"
+                                >
+                            </label>
+                        </div>
+
+                        <div class="form-grid two">
+                            <label>
+                                Téléphone
+
+                                <input
+                                  [(ngModel)]="user.telephone"
+                                  placeholder="+216 ..."
+                                  [disabled]="savingEdit"
+                                >
+                            </label>
+
+                            <label>
+                                Fonction
+
+                                <input
+                                  [(ngModel)]="user.fonction"
+                                  placeholder="Ex : Responsable technique"
+                                  [disabled]="savingEdit"
+                                >
+                            </label>
+                        </div>
                     </div>
                 </div>
 
@@ -674,19 +807,19 @@
 
             <div class="modal-footer">
                 <button type="button" class="cancel-btn" [disabled]="savingEdit" (click)="closeEditCandidatureModal()">
-          Annuler
-        </button>
+                    Annuler
+                </button>
 
                 <button type="button" class="save-btn" [disabled]="
-            savingEdit ||
-            loadingEditLots
-          " (click)="saveCandidatureChanges()">
-          {{
-            savingEdit
-              ? 'Enregistrement...'
-              : 'Enregistrer les modifications'
-          }}
-        </button>
+                    savingEdit ||
+                    loadingEditLots
+                  " (click)="saveCandidatureChanges()">
+                    {{
+                      savingEdit
+                        ? 'Enregistrement...'
+                        : 'Enregistrer les modifications'
+                    }}
+                </button>
             </div>
 
         </div>
@@ -744,7 +877,7 @@
 
                     <strong>
             {{
-              candidatureToDelete.lots?.length || 0
+              candidatureToDelete.lots.length || 0
             }}
           </strong>
                 </div>
@@ -756,7 +889,7 @@
 
                     <strong>
             {{
-              candidatureToDelete.utilisateurs?.length || 0
+              candidatureToDelete.utilisateurs.length || 0
             }}
           </strong>
                 </div>
@@ -939,5 +1072,187 @@
 
         </div>
 
+    </div>
+</div>
+
+
+<!-- =====================================================
+     MODAL MODIFICATION UTILISATEUR CND
+===================================================== -->
+<div class="modal-backdrop" *ngIf="editUserModalOpen" (click)="closeEditUserModal()">
+    <div class="modal-card" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+            <div>
+                <h2>Modifier l’utilisateur</h2>
+
+                <p>
+                    Modifier uniquement les informations du compte utilisateur, sans modifier la société.
+                </p>
+            </div>
+
+            <button type="button" class="close-btn" [disabled]="savingUser" (click)="closeEditUserModal()">
+        ×
+      </button>
+        </div>
+
+        <div class="modal-body">
+            <div class="form-block">
+                <div class="block-title">
+                    <span>
+            <i class="ti ti-user-edit"></i>
+          </span>
+
+                    <div>
+                        <h3>Informations utilisateur</h3>
+                        <p>
+                            Le nom de la société, le type et les lots ne sont pas modifiés ici.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="form-grid two">
+                    <label>
+            Nom complet *
+
+            <input
+              [(ngModel)]="editUserForm.nomComplet"
+              placeholder="Nom complet"
+              [disabled]="savingUser"
+            >
+          </label>
+
+                    <label>
+            Adresse email *
+
+            <input
+              type="email"
+              [(ngModel)]="editUserForm.email"
+              placeholder="utilisateur@societe.com"
+              [disabled]="savingUser"
+            >
+          </label>
+                </div>
+
+                <div class="form-grid two">
+                    <label>
+            Téléphone
+
+            <input
+              [(ngModel)]="editUserForm.telephone"
+              placeholder="+216 ..."
+              [disabled]="savingUser"
+            >
+          </label>
+
+                    <label>
+            Fonction
+
+            <input
+              [(ngModel)]="editUserForm.fonction"
+              placeholder="Responsable technique"
+              [disabled]="savingUser"
+            >
+          </label>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal-footer">
+            <button type="button" class="cancel-btn" [disabled]="savingUser" (click)="closeEditUserModal()">
+        Annuler
+      </button>
+
+            <button type="button" class="save-btn" [disabled]="savingUser" (click)="saveUserChanges()">
+        {{
+          savingUser
+            ? 'Enregistrement...'
+            : 'Enregistrer l’utilisateur'
+        }}
+      </button>
+        </div>
+    </div>
+</div>
+
+<!-- =====================================================
+     MODAL SUPPRESSION UTILISATEUR CND
+===================================================== -->
+<div class="delete-modal-backdrop" *ngIf="deleteUserModalOpen" (click)="closeDeleteUserModal()">
+    <div class="delete-modal-card" (click)="$event.stopPropagation()">
+        <div class="delete-modal-icon">
+            <i class="ti ti-user-x"></i>
+        </div>
+
+        <span class="delete-modal-label">
+      Suppression utilisateur
+    </span>
+
+        <h3>Supprimer cet utilisateur</h3>
+
+        <p class="delete-modal-question">
+            Voulez-vous vraiment supprimer
+
+            <strong>
+        {{
+          userToDelete?.nomComplet ||
+          userToDelete?.email ||
+          'cet utilisateur'
+        }}
+      </strong> ?
+        </p>
+
+        <div class="delete-modal-details" *ngIf="userToDelete">
+            <div>
+                <span>Nom</span>
+                <strong>
+          {{ userToDelete.nomComplet || '—' }}
+        </strong>
+            </div>
+
+            <div>
+                <span>Email</span>
+                <strong>
+          {{ userToDelete.email }}
+        </strong>
+            </div>
+
+            <div>
+                <span>Fonction</span>
+                <strong>
+          {{ userToDelete.fonction || '—' }}
+        </strong>
+            </div>
+        </div>
+
+        <div class="delete-modal-warning">
+            <i class="ti ti-alert-triangle"></i>
+
+            <span>
+        Cette action concerne uniquement ce compte.
+        La société et les autres utilisateurs ne seront
+        pas supprimés.
+      </span>
+        </div>
+
+        <div class="delete-modal-actions">
+            <button type="button" class="cancel-btn" [disabled]="deletingUserId !== null" (click)="closeDeleteUserModal()">
+        Annuler
+      </button>
+
+            <button type="button" class="confirm-delete-btn" [disabled]="deletingUserId !== null" (click)="confirmDeleteUser()">
+        <i
+          [class]="
+            deletingUserId !== null
+              ? 'ti ti-loader-2 delete-loading'
+              : 'ti ti-trash'
+          "
+        ></i>
+
+        {{
+          deletingUserId !== null
+            ? 'Suppression...'
+            : 'Supprimer l’utilisateur'
+        }}
+      </button>
+        </div>
     </div>
 </div>

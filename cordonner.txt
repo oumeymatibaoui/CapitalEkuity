@@ -31,3 +31,114 @@ Vous disposez des droits de lecture, d'écriture et de modification dans ce rép
 • Utilisateur : ssh intern@10.1.1.237
 
 • Mot de passe :InterShip@@2026!!
+
+
+Environment=DB_USER=elemar "DB_PASSWORD=El3amar@@2026!!"
+
+
+Email : admin@elemar.com
+Mot de passe : Admin@2026!
+
+
+
+
+
+
+
+//modification base de donnée:
+
+BEGIN;
+
+CREATE TABLE IF NOT EXISTS workflow_etape_el_emar (
+    id BIGSERIAL PRIMARY KEY,
+
+    -- Dossier El Emar concerné
+    candidature_id BIGINT NOT NULL,
+
+    -- Utilisateur précis chargé de cette étape
+    utilisateur_affecte_id BIGINT NOT NULL,
+
+    -- Exemple : ACHATS, TECHNIQUE, COMITE
+    code_etape VARCHAR(80) NOT NULL,
+
+    -- Ordre d’exécution : 1, 2, 3...
+    ordre INTEGER NOT NULL,
+
+    -- État actuel de l’étape
+    statut VARCHAR(20) NOT NULL DEFAULT 'EN_ATTENTE',
+
+    date_debut TIMESTAMP NULL,
+    date_fin TIMESTAMP NULL,
+
+    date_reouverture TIMESTAMP NULL,
+    motif_reouverture TEXT NULL,
+
+    cree_par_id BIGINT NULL,
+    modifie_par_id BIGINT NULL,
+
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    -- Protection contre les modifications simultanées
+    version BIGINT NOT NULL DEFAULT 0,
+
+    CONSTRAINT fk_workflow_etape_candidature
+        FOREIGN KEY (candidature_id)
+        REFERENCES candidature(id),
+
+    CONSTRAINT fk_workflow_etape_utilisateur_affecte
+        FOREIGN KEY (utilisateur_affecte_id)
+        REFERENCES utilisateur(id),
+
+    CONSTRAINT fk_workflow_etape_cree_par
+        FOREIGN KEY (cree_par_id)
+        REFERENCES utilisateur(id),
+
+    CONSTRAINT fk_workflow_etape_modifie_par
+        FOREIGN KEY (modifie_par_id)
+        REFERENCES utilisateur(id),
+
+    CONSTRAINT ck_workflow_etape_ordre
+        CHECK (ordre > 0),
+
+    CONSTRAINT ck_workflow_etape_statut
+        CHECK (
+            statut IN (
+                'EN_ATTENTE',
+                'A_TRAITER',
+                'EN_COURS',
+                'TERMINEE',
+                'REOUVERTE',
+                'ANNULEE'
+            )
+        ),
+
+    -- Une seule étape pour un même ordre dans un dossier
+    CONSTRAINT uq_workflow_etape_candidature_ordre
+        UNIQUE (candidature_id, ordre),
+
+    -- Un même code d’étape ne peut pas être répété dans le dossier
+    CONSTRAINT uq_workflow_etape_candidature_code
+        UNIQUE (candidature_id, code_etape)
+);
+
+CREATE INDEX IF NOT EXISTS idx_workflow_etape_candidature
+    ON workflow_etape_el_emar(candidature_id);
+
+CREATE INDEX IF NOT EXISTS idx_workflow_etape_utilisateur_statut
+    ON workflow_etape_el_emar(
+        utilisateur_affecte_id,
+        statut
+    );
+
+-- Une seule étape peut être active en même temps pour une candidature.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_workflow_etape_active_par_candidature
+    ON workflow_etape_el_emar(candidature_id)
+    WHERE statut IN (
+        'A_TRAITER',
+        'EN_COURS',
+        'REOUVERTE'
+    );
+
+COMMIT;
+

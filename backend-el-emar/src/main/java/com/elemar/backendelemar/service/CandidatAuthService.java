@@ -10,7 +10,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+
+import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
@@ -19,76 +22,70 @@ public class CandidatAuthService {
     private final UtilisateurRepository utilisateurRepository;
     private final PasswordEncoder passwordEncoder;
 
+    @Transactional
     public CandidatLoginResponse login(
             CandidatLoginRequest request
     ) {
-
-        System.out.println("=== LOGIN CANDIDAT ===");
-        System.out.println("Email reçu = " + request.getEmail());
-
-        if (
-                request.getEmail() == null ||
-                        request.getEmail().isBlank()
-        ) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Email obligatoire."
-            );
-        }
-
-        if (
-                request.getMotDePasse() == null ||
-                        request.getMotDePasse().isBlank()
-        ) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Mot de passe obligatoire."
-            );
-        }
+        validateRequest(request);
 
         String email =
                 request.getEmail()
                         .trim()
-                        .toLowerCase();
+                        .toLowerCase(Locale.ROOT);
 
-        String motDePasseRecu =
-                request.getMotDePasse().trim();
+        String rawPassword =
+                request.getMotDePasse();
 
-        Utilisateur user =
+        Utilisateur utilisateur =
                 utilisateurRepository
                         .findByEmailIgnoreCase(email)
                         .orElseThrow(() ->
-                                new ResponseStatusException(
-                                        HttpStatus.UNAUTHORIZED,
-                                        "Email ou mot de passe incorrect"
-                                )
+                                unauthorizedCredentials()
                         );
 
         if (
-                user.getTypeUtilisateur() !=
-                        TypeUtilisateur.CND
+                utilisateur.getMotDePasse() == null
+                        || !passwordMatches(
+                        rawPassword,
+                        utilisateur.getMotDePasse()
+                )
+        ) {
+            throw unauthorizedCredentials();
+        }
+
+        if (
+                utilisateur.getTypeUtilisateur()
+                        != TypeUtilisateur.CND
         ) {
             throw new ResponseStatusException(
-                    HttpStatus.UNAUTHORIZED,
+                    HttpStatus.FORBIDDEN,
                     "Ce compte n'est pas un compte candidat."
             );
         }
 
-        /*
-         * Vérifier le compte utilisateur.
-         */
-        if (Boolean.FALSE.equals(user.getActif())) {
+        if (Boolean.FALSE.equals(utilisateur.getActif())) {
             throw new ResponseStatusException(
                     HttpStatus.FORBIDDEN,
                     "Compte utilisateur désactivé."
             );
         }
 
-        /*
-         * Vérifier la candidature associée.
-         */
+        if (
+                utilisateur.getStatutCompte() != null
+                        && !"ACTIF".equalsIgnoreCase(
+                        utilisateur
+                                .getStatutCompte()
+                                .name()
+                )
+        ) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "Compte utilisateur désactivé."
+            );
+        }
+
         Candidature candidature =
-                user.getCandidature();
+                utilisateur.getCandidature();
 
         if (candidature == null) {
             throw new ResponseStatusException(
@@ -97,9 +94,6 @@ public class CandidatAuthService {
             );
         }
 
-        /*
-         * Vérifier si El Emar a bloqué l’accès.
-         */
         if (
                 Boolean.TRUE.equals(
                         candidature.getAccesBloque()
@@ -107,14 +101,10 @@ public class CandidatAuthService {
         ) {
             throw new ResponseStatusException(
                     HttpStatus.FORBIDDEN,
-                    "L’accès de cette candidature est désactivé."
+                    "L'accès de cette candidature est désactivé."
             );
         }
 
-        /*
-         * Vérifier si la candidature existe encore
-         * comme candidature active.
-         */
         if (
                 Boolean.FALSE.equals(
                         candidature.getActif()
@@ -122,68 +112,121 @@ public class CandidatAuthService {
         ) {
             throw new ResponseStatusException(
                     HttpStatus.FORBIDDEN,
-                    "Cette candidature n’est plus active."
+                    "Cette candidature n'est plus active."
             );
         }
 
-        String passwordInDatabase =
-                user.getMotDePasse();
-
-        boolean passwordOk;
-
-        if (
-                passwordInDatabase != null &&
-                        passwordInDatabase.startsWith("$2")
-        ) {
-            passwordOk =
-                    passwordEncoder.matches(
-                            motDePasseRecu,
-                            passwordInDatabase
-                    );
-        } else {
-            passwordOk =
-                    motDePasseRecu.equals(
-                            passwordInDatabase
-                    );
-        }
-
-        if (!passwordOk) {
-            throw new ResponseStatusException(
-                    HttpStatus.UNAUTHORIZED,
-                    "Email ou mot de passe incorrect"
+        /*
+         * Conversion automatique d'un ancien mot de passe
+         * texte clair vers BCrypt.
+         */
+        if (!isEncodedPassword(utilisateur.getMotDePasse())) {
+            utilisateur.setMotDePasse(
+                    passwordEncoder.encode(rawPassword)
             );
+
+            utilisateurRepository.save(utilisateur);
         }
 
         return CandidatLoginResponse.builder()
-                .utilisateurId(user.getId())
+                .utilisateurId(utilisateur.getId())
                 .candidatureId(candidature.getId())
-                .nom(user.getNom())
-                .email(user.getEmail())
-
+                .nom(utilisateur.getNom())
+                .email(utilisateur.getEmail())
                 .typeUtilisateur(
-                        user.getTypeUtilisateur() != null
-                                ? user.getTypeUtilisateur().name()
+                        utilisateur.getTypeUtilisateur() != null
+                                ? utilisateur
+                                .getTypeUtilisateur()
+                                .name()
                                 : null
                 )
-
                 .mustChangePassword(
-                        user.getMustChangePassword()
+                        utilisateur.getMustChangePassword()
                 )
-
                 .premiereConnexion(
-                        user.getPremiereConnexion()
+                        utilisateur.getPremiereConnexion()
                 )
-
                 .actif(
-                        user.getActif()
+                        utilisateur.getActif()
                 )
-
                 .statutCompte(
-                        user.getStatutCompte() != null
-                                ? user.getStatutCompte().name()
+                        utilisateur.getStatutCompte() != null
+                                ? utilisateur
+                                .getStatutCompte()
+                                .name()
                                 : null
                 )
-
                 .build();
+    }
+
+    private void validateRequest(
+            CandidatLoginRequest request
+    ) {
+        if (request == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Les informations de connexion sont obligatoires."
+            );
+        }
+
+        if (
+                request.getEmail() == null
+                        || request.getEmail().isBlank()
+        ) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Email obligatoire."
+            );
+        }
+
+        if (
+                request.getMotDePasse() == null
+                        || request.getMotDePasse().isBlank()
+        ) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Mot de passe obligatoire."
+            );
+        }
+    }
+
+    private boolean passwordMatches(
+            String rawPassword,
+            String storedPassword
+    ) {
+        if (
+                rawPassword == null
+                        || storedPassword == null
+        ) {
+            return false;
+        }
+
+        if (isEncodedPassword(storedPassword)) {
+            return passwordEncoder.matches(
+                    rawPassword,
+                    storedPassword
+            );
+        }
+
+        return storedPassword.equals(rawPassword);
+    }
+
+    private boolean isEncodedPassword(
+            String value
+    ) {
+        if (value == null) {
+            return false;
+        }
+
+        return value.startsWith("$2a$")
+                || value.startsWith("$2b$")
+                || value.startsWith("$2y$");
+    }
+
+    private ResponseStatusException unauthorizedCredentials() {
+        return new ResponseStatusException(
+                HttpStatus.UNAUTHORIZED,
+                "Email ou mot de passe incorrect."
+        );
     }
 }

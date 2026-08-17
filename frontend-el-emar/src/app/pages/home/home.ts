@@ -143,45 +143,103 @@ sendingForgotPassword = false;
 submitElEmarLogin(): void {
   this.loginError = '';
 
-  const email = this.elEmarLogin.email.trim();
-  const motDePasse = this.elEmarLogin.motDePasse;
+  const email = String(
+    this.elEmarLogin.email || ''
+  )
+    .trim()
+    .toLowerCase();
+
+  const motDePasse = String(
+    this.elEmarLogin.motDePasse || ''
+  );
 
   if (!email || !motDePasse) {
-    this.loginError = 'Veuillez saisir votre email et votre mot de passe.';
+    this.loginError =
+      'Veuillez saisir votre email et votre mot de passe.';
     return;
   }
 
-  this.authService.loginElEmar(email, motDePasse).subscribe({
-    next: (user: ConnectedUser) => {
-      console.log('LOGIN EL EMAR OK = ', user);
+  this.authService
+    .loginElEmar(email, motDePasse)
+    .subscribe({
+      next: (user: ConnectedUser) => {
+        console.log(
+          'LOGIN EL EMAR OK = ',
+          user
+        );
 
-      const role = this.getUserRole(user);
-      console.log('ROLE EL EMAR = ', role);
+        const roleCode =
+          this.getUserRole(user);
 
-      if (role === 'CND') {
-        this.loginError = 'Ce compte est un compte candidat. Veuillez utiliser l’espace candidat.';
-        return;
-      }
+        const typeUtilisateur =
+          this.getUserType(user);
 
-      this.closeElEmarLogin();
+        console.log(
+          'ROLE CODE EL EMAR = ',
+          roleCode
+        );
 
-      this.router.navigateByUrl('/el-emar/dashboard').then((success: boolean) => {
-        console.log('NAVIGATION ADMIN SUCCESS = ', success);
+        console.log(
+          'DÉPARTEMENT EL EMAR = ',
+          typeUtilisateur
+        );
 
-        if (!success) {
-          this.loginError = 'Connexion réussie, mais la route admin est introuvable.';
+        if (roleCode === 'CND') {
+          this.loginError =
+            'Ce compte est un compte candidat. '
+            + 'Veuillez utiliser l’espace candidat.';
+          return;
         }
-      });
-    },
-    error: (error: unknown) => {
-      console.error('LOGIN EL EMAR ERROR = ', error);
 
-      this.loginError = this.extractLoginError(
-        error,
-        'Email ou mot de passe incorrect.'
-      );
-    }
-  });
+        if (!roleCode) {
+          this.loginError =
+            'Connexion réussie, mais aucun rôle '
+            + 'n’est affecté à ce compte.';
+          return;
+        }
+
+        this.saveConnectedUser(user);
+        this.closeElEmarLogin();
+
+        this.router
+          .navigateByUrl('/el-emar/dashboard')
+          .then((success: boolean) => {
+            console.log(
+              'NAVIGATION EL EMAR SUCCESS = ',
+              success
+            );
+
+            if (!success) {
+              console.warn(
+                'Navigation annulée ou déjà effectuée.'
+              );
+            }
+          })
+          .catch((error: unknown) => {
+            console.error(
+              'NAVIGATION EL EMAR ERROR = ',
+              error
+            );
+
+            this.loginError =
+              'Connexion réussie, mais la page '
+              + 'du tableau de bord est inaccessible.';
+          });
+      },
+
+      error: (error: unknown) => {
+        console.error(
+          'LOGIN EL EMAR ERROR = ',
+          error
+        );
+
+        this.loginError =
+          this.extractLoginError(
+            error,
+            'Email ou mot de passe incorrect.'
+          );
+      }
+    });
 }
   // =========================
   // MODAL CANDIDAT
@@ -312,18 +370,156 @@ private saveCandidatSession(user: ConnectedCndUser): void {
     rawUser?.candidatureId ??
     null;
 
-  if (utilisateurId !== null && utilisateurId !== undefined) {
-    localStorage.setItem('userId', String(utilisateurId));
-    localStorage.setItem('candidatUtilisateurId', String(utilisateurId));
+  const token = String(
+    rawUser?.token ?? ''
+  ).trim();
+
+  const roleCode =
+    this.getUserRole(user) || 'CND';
+
+  const typeUtilisateur =
+    this.getUserType(user) || 'CND';
+
+  const roleNom = String(
+    rawUser?.roleNom ??
+    rawUser?.nomRole ??
+    rawUser?.role?.nomRole ??
+    'Candidat'
+  ).trim();
+
+  /*
+   * IMPORTANT :
+   * un utilisateur peut se connecter d'abord avec un compte
+   * El Emar puis avec un compte candidat dans le même navigateur.
+   *
+   * On supprime les anciennes informations internes afin qu'un
+   * ancien rôle ADMIN / EVALUATEUR / etc. ne soit pas utilisé
+   * par roleGuard après le login candidat.
+   */
+  [
+    'elEmarUser',
+    'elEmarConnectedUser',
+    'roleCode',
+    'userRole',
+    'roleNom',
+    'typeUtilisateur',
+    'userRoleId',
+    'userRoleCode',
+    'userRoleNom'
+  ].forEach((key) => {
+    localStorage.removeItem(key);
+  });
+
+  if (
+    utilisateurId !== null &&
+    utilisateurId !== undefined
+  ) {
+    localStorage.setItem(
+      'userId',
+      String(utilisateurId)
+    );
+
+    localStorage.setItem(
+      'candidatUtilisateurId',
+      String(utilisateurId)
+    );
   }
 
-  if (candidatureId !== null && candidatureId !== undefined) {
-    localStorage.setItem('candidatCandidatureId', String(candidatureId));
+  if (
+    candidatureId !== null &&
+    candidatureId !== undefined
+  ) {
+    localStorage.setItem(
+      'candidatCandidatureId',
+      String(candidatureId)
+    );
+  } else {
+    localStorage.removeItem(
+      'candidatCandidatureId'
+    );
   }
 
-  localStorage.setItem('candidatUser', JSON.stringify(user));
-  localStorage.setItem('connectedUser', JSON.stringify(user));
-  localStorage.setItem('currentUser', JSON.stringify(user));
+  if (token) {
+    localStorage.setItem(
+      'token',
+      token
+    );
+  }
+
+  /*
+   * On écrit aussi les clés de compatibilité encore utilisées
+   * par certains guards/composants du projet.
+   */
+  localStorage.setItem(
+    'roleCode',
+    roleCode
+  );
+
+  localStorage.setItem(
+    'userRole',
+    roleCode
+  );
+
+  localStorage.setItem(
+    'userRoleCode',
+    roleCode
+  );
+
+  localStorage.setItem(
+    'typeUtilisateur',
+    typeUtilisateur
+  );
+
+  if (roleNom) {
+    localStorage.setItem(
+      'roleNom',
+      roleNom
+    );
+
+    localStorage.setItem(
+      'userRoleNom',
+      roleNom
+    );
+  }
+
+  if (
+    rawUser?.roleId !== null &&
+    rawUser?.roleId !== undefined
+  ) {
+    localStorage.setItem(
+      'userRoleId',
+      String(rawUser.roleId)
+    );
+  }
+
+  localStorage.setItem(
+    'candidatUser',
+    JSON.stringify(user)
+  );
+
+  localStorage.setItem(
+    'connectedUser',
+    JSON.stringify(user)
+  );
+
+  localStorage.setItem(
+    'currentUser',
+    JSON.stringify(user)
+  );
+
+  localStorage.setItem(
+    'candidatMustChangePassword',
+    String(
+      rawUser?.mustChangePassword === true
+    )
+  );
+
+  localStorage.setItem(
+    'candidatPremiereConnexion',
+    String(
+      rawUser?.premiereConnexion === true
+    )
+  );
 }
   // =========================
   // REDIRECTION
@@ -360,12 +556,37 @@ private saveCandidatSession(user: ConnectedCndUser): void {
     this.router.navigate(['/admin/tableau-bord']);
   }
 
-  private getUserRole(user: ConnectedUser): string {
+  private getUserRole(
+    user: ConnectedUser | ConnectedCndUser
+  ): string {
+    const rawUser = user as any;
+
+    const roleValue =
+      rawUser?.roleCode ??
+      rawUser?.codeRole ??
+      rawUser?.role?.codeRole ??
+      rawUser?.role?.code ??
+      (
+        typeof rawUser?.role === 'string'
+          ? rawUser.role
+          : null
+      ) ??
+      rawUser?.typeUtilisateur ??
+      rawUser?.type ??
+      '';
+
+    return String(roleValue)
+      .trim()
+      .toUpperCase();
+  }
+
+  private getUserType(
+    user: ConnectedUser | ConnectedCndUser
+  ): string {
     const rawUser = user as any;
 
     return String(
       rawUser?.typeUtilisateur ??
-      rawUser?.role ??
       rawUser?.type ??
       ''
     )
@@ -373,7 +594,9 @@ private saveCandidatSession(user: ConnectedCndUser): void {
       .toUpperCase();
   }
 
-  private saveConnectedUser(user: ConnectedUser): void {
+  private saveConnectedUser(
+    user: ConnectedUser
+  ): void {
     const rawUser = user as any;
 
     const userId =
@@ -382,12 +605,77 @@ private saveCandidatSession(user: ConnectedCndUser): void {
       rawUser?.utilisateurId ??
       null;
 
-    if (userId !== null && userId !== undefined) {
-      localStorage.setItem('userId', String(userId));
+    const token = String(
+      rawUser?.token ??
+      rawUser?.accessToken ??
+      ''
+    ).trim();
+
+    const roleCode =
+      this.getUserRole(user);
+
+    const typeUtilisateur =
+      this.getUserType(user);
+
+    const roleNom = String(
+      rawUser?.roleNom ??
+      rawUser?.nomRole ??
+      rawUser?.role?.nomRole ??
+      ''
+    ).trim();
+
+    if (
+      userId !== null &&
+      userId !== undefined
+    ) {
+      localStorage.setItem(
+        'userId',
+        String(userId)
+      );
     }
 
-    localStorage.setItem('connectedUser', JSON.stringify(user));
-    localStorage.setItem('currentUser', JSON.stringify(user));
+    if (token) {
+      localStorage.setItem(
+        'token',
+        token
+      );
+    }
+
+    if (roleCode) {
+      localStorage.setItem(
+        'roleCode',
+        roleCode
+      );
+
+      localStorage.setItem(
+        'userRole',
+        roleCode
+      );
+    }
+
+    if (roleNom) {
+      localStorage.setItem(
+        'roleNom',
+        roleNom
+      );
+    }
+
+    if (typeUtilisateur) {
+      localStorage.setItem(
+        'typeUtilisateur',
+        typeUtilisateur
+      );
+    }
+
+    localStorage.setItem(
+      'connectedUser',
+      JSON.stringify(user)
+    );
+
+    localStorage.setItem(
+      'currentUser',
+      JSON.stringify(user)
+    );
   }
 
   // =========================

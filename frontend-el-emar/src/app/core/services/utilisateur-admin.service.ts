@@ -1,30 +1,49 @@
 import { Injectable } from '@angular/core';
-
 import {
   HttpClient,
   HttpParams
 } from '@angular/common/http';
+import { environment } from '../../../environments/environment.development';
 
 import { Observable } from 'rxjs';
 
 // =====================================================
-// UTILISATEUR
+// TYPES UTILISATEUR
+// =====================================================
+
+export type TypeUtilisateur =
+  | 'IT'
+  | 'ACHAT'
+  | 'COMITE'
+  | 'TECHNIQUE'
+  | 'CND';
+
+/**
+ * Types autorisés pour les utilisateurs créés
+ * depuis l’administration interne.
+ */
+export type TypeUtilisateurInterne =
+  Exclude<TypeUtilisateur, 'CND'>;
+
+// =====================================================
+// RÉPONSE UTILISATEUR
 // =====================================================
 
 export interface UtilisateurAdminResponse {
   id: number;
 
-  nom?: string | null;
-  email?: string | null;
+  nom: string;
+  email: string;
   fonction?: string | null;
 
-  typeUtilisateur?: string | null;
+  typeUtilisateur: TypeUtilisateur;
 
   roleId?: number | null;
   roleCode?: string | null;
   roleNom?: string | null;
 
-  actif?: boolean | null;
+  actif: boolean;
+
   premiereConnexion?: boolean | null;
   mustChangePassword?: boolean | null;
 
@@ -39,19 +58,22 @@ export interface UtilisateurAdminResponse {
 export interface CreateUtilisateurRequest {
   nom: string;
   email: string;
-  fonction: string;
+  fonction?: string;
+
   motDePasse: string;
-  roleId: number;
-  createurId: number | null;
-}
 
-// =====================================================
-// MODIFICATION DU RÔLE
-// =====================================================
+  /**
+   * Département :
+   * IT, ACHAT, COMITE ou TECHNIQUE.
+   */
+  typeUtilisateur: TypeUtilisateurInterne;
 
-export interface UpdateUtilisateurRoleRequest {
+  /**
+   * Identifiant du rôle dynamique.
+   */
   roleId: number;
-  modificateurId: number | null;
+
+  createurId?: number | null;
 }
 
 // =====================================================
@@ -61,10 +83,30 @@ export interface UpdateUtilisateurRoleRequest {
 export interface UpdateUtilisateurAdminRequest {
   nom: string;
   email: string;
-  fonction: string;
+  fonction?: string;
+
+  typeUtilisateur: TypeUtilisateurInterne;
   roleId: number;
   actif: boolean;
-  modificateurId: number | null;
+
+  modificateurId?: number | null;
+}
+
+// =====================================================
+// MODIFICATION DU RÔLE ET DU DÉPARTEMENT
+// =====================================================
+
+export interface UpdateUtilisateurRoleRequest {
+  roleId: number;
+
+  /**
+   * Facultatif.
+   * Lorsque la valeur n’est pas envoyée,
+   * le backend conserve le département actuel.
+   */
+  typeUtilisateur?: TypeUtilisateurInterne;
+
+  modificateurId?: number | null;
 }
 
 // =====================================================
@@ -76,20 +118,20 @@ export interface UpdateUtilisateurAdminRequest {
 })
 export class UtilisateurAdminService {
 
-  /*
-   * Cette URL doit correspondre exactement à :
-   *
+  /**
+   * Backend :
    * @RequestMapping("/api/el-emar/utilisateurs")
    */
   private readonly apiUrl =
-    'http://localhost:8089/api/el-emar/utilisateurs';
+    `${environment.apiBaseUrl}/api/el-emar/utilisateurs`;
 
   constructor(
-    private http: HttpClient
+    private readonly http: HttpClient
   ) {}
 
   // ===================================================
   // TEST
+  // GET /api/el-emar/utilisateurs/test
   // ===================================================
 
   test(): Observable<string> {
@@ -106,9 +148,23 @@ export class UtilisateurAdminService {
   // GET /api/el-emar/utilisateurs
   // ===================================================
 
-  getAllUsers(): Observable<UtilisateurAdminResponse[]> {
+  getAllUsers():
+    Observable<UtilisateurAdminResponse[]> {
     return this.http.get<UtilisateurAdminResponse[]>(
       this.apiUrl
+    );
+  }
+
+  // ===================================================
+  // DÉTAIL
+  // GET /api/el-emar/utilisateurs/{id}
+  // ===================================================
+
+  getUserById(
+    utilisateurId: number
+  ): Observable<UtilisateurAdminResponse> {
+    return this.http.get<UtilisateurAdminResponse>(
+      `${this.apiUrl}/${utilisateurId}`
     );
   }
 
@@ -122,6 +178,21 @@ export class UtilisateurAdminService {
   ): Observable<UtilisateurAdminResponse> {
     return this.http.post<UtilisateurAdminResponse>(
       this.apiUrl,
+      request
+    );
+  }
+
+  // ===================================================
+  // MODIFICATION COMPLÈTE
+  // PUT /api/el-emar/utilisateurs/{id}
+  // ===================================================
+
+  updateUser(
+    utilisateurId: number,
+    request: UpdateUtilisateurAdminRequest
+  ): Observable<UtilisateurAdminResponse> {
+    return this.http.put<UtilisateurAdminResponse>(
+      `${this.apiUrl}/${utilisateurId}`,
       request
     );
   }
@@ -156,34 +227,19 @@ export class UtilisateurAdminService {
   }
 
   // ===================================================
-  // MODIFICATION COMPLÈTE
-  // PUT /api/el-emar/utilisateurs/{id}
-  // ===================================================
-
-  updateUser(
-    utilisateurId: number,
-    request: UpdateUtilisateurAdminRequest
-  ): Observable<UtilisateurAdminResponse> {
-    return this.http.put<UtilisateurAdminResponse>(
-      `${this.apiUrl}/${utilisateurId}`,
-      request
-    );
-  }
-
-  // ===================================================
   // SUPPRESSION
   // DELETE /api/el-emar/utilisateurs/{id}
   // ===================================================
 
   deleteUser(
     utilisateurId: number,
-    demandeurId: number | null
+    demandeurId?: number | null
   ): Observable<void> {
     let params = new HttpParams();
 
     if (
-      demandeurId !== null &&
-      demandeurId !== undefined
+      demandeurId !== null
+      && demandeurId !== undefined
     ) {
       params = params.set(
         'demandeurId',

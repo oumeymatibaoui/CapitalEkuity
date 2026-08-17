@@ -19,10 +19,12 @@ public class CategorieEvaluationController {
     @GetMapping
     public List<CategorieEvaluationResponse> getByScope(
             @RequestParam Long typeIntervenantId,
-            @RequestParam(required = false) Long lotId,
-            @RequestParam(required = false, defaultValue = "true") boolean activeOnly
+            @RequestParam(required = false) Long lotId
     ) {
-        return categorieService.getByScope(typeIntervenantId, lotId, activeOnly);
+        return categorieService.getByScope(
+                typeIntervenantId,
+                lotId
+        );
     }
 
     @GetMapping("/{id}")

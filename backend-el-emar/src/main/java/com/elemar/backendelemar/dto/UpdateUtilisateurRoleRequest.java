@@ -1,23 +1,17 @@
 package com.elemar.backendelemar.dto;
 
-import lombok.AllArgsConstructor;
 import lombok.Getter;
-import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Getter
 @Setter
-@NoArgsConstructor
-@AllArgsConstructor
 public class UpdateUtilisateurRoleRequest {
 
-    /*
-     * Nouveau champ.
-     */
     private Long roleId;
 
     /*
-     * Ancien champ conservé pour compatibilité.
+     * Nouveau département.
+     * Facultatif : si null, le département actuel est conservé.
      */
     private String typeUtilisateur;
 

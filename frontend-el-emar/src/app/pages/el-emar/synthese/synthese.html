@@ -1,181 +1,247 @@
 <div class="synthese-page">
 
+    <!-- ============ HEADER ============ -->
     <div class="page-header">
-        <div>
+        <div class="header-text">
             <p class="eyebrow">Synthèse El Emar</p>
-            <h1>Classement des candidats par lot et par zone</h1>
+            <h1>Classement des candidats</h1>
             <p class="subtitle">
-                Affichage des candidats ayant une note supérieure ou égale au seuil demandé, avec classement décroissant par note.
+                Candidats classés par note, lot et zone. Les filtres s'appliquent automatiquement.
             </p>
         </div>
 
         <div class="header-actions">
-            <button type="button" class="btn primary" (click)="loadClassement()">
-        Actualiser
-      </button>
+            <span class="last-updated" *ngIf="lastUpdated">
+                <svg viewBox="0 0 20 20" fill="none"><path d="M10 5v5l3.5 2M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                Actualisé à {{ lastUpdated | date:'HH:mm:ss' }}
+            </span>
+
+            <button type="button" class="btn secondary" (click)="exportCsv()" [disabled]="loading || !classement.length">
+                <svg viewBox="0 0 20 20" fill="none"><path d="M10 3v10m0 0-3.5-3.5M10 13l3.5-3.5M4 15.5h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                Exporter
+            </button>
+
+            <button type="button" class="btn primary" (click)="loadClassement()" [disabled]="loading">
+                <svg class="icon-spin" [class.spinning]="loading" viewBox="0 0 20 20" fill="none"><path d="M16.5 10a6.5 6.5 0 1 1-2-4.7M16.5 3.5V8h-4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                Actualiser
+            </button>
         </div>
     </div>
 
+    <!-- ============ SMART FILTER BAR ============ -->
     <div class="filters-card">
-        <div class="filter-group">
-            <label>Note minimale</label>
-            <input type="number" min="0" max="100" [value]="minNote" (input)="onMinNoteChange($event)" />
+        <div class="search-field">
+            <svg viewBox="0 0 20 20" fill="none"><circle cx="9" cy="9" r="6" stroke="currentColor" stroke-width="1.6"/><path d="m17 17-3.5-3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+            <input type="text" placeholder="Rechercher un candidat, un lot, une zone..." [value]="searchTerm" (input)="onSearchChange($event)" />
         </div>
 
-        <label class="checkbox-filter">
-      <input
-        type="checkbox"
-        [checked]="admisOnly"
-        (change)="onAdmisOnlyChange($event)"
-      />
-      <span>Afficher seulement les candidats admis</span>
-    </label>
+        <div class="filter-group">
+            <label for="minNote">Note minimale</label>
+            <div class="note-input">
+                <input id="minNote" type="number" min="0" max="100" [value]="minNote" (input)="onMinNoteChange($event)" />
+                <span>/ 100</span>
+            </div>
+        </div>
 
-        <button type="button" class="btn secondary" (click)="loadClassement()">
-      Appliquer
-    </button>
+        <label class="toggle-filter">
+            <input type="checkbox" [checked]="admisOnly" (change)="onAdmisOnlyChange($event)" />
+            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            <span class="toggle-label">Admis uniquement</span>
+        </label>
+
+        <button type="button" class="btn ghost" (click)="resetFilters()" *ngIf="hasActiveFilters()">
+            <svg viewBox="0 0 20 20" fill="none"><path d="M4 4l12 12M16 4 4 16" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+            Réinitialiser
+        </button>
     </div>
 
     <div *ngIf="pageError" class="alert error">
-        {{ pageError }}
+        <svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7.5" stroke="currentColor" stroke-width="1.4"/><path d="M10 6.5v4M10 13.2v.1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        <span>{{ pageError }}</span>
+        <button type="button" class="btn secondary small" (click)="loadClassement()">Réessayer</button>
     </div>
 
-    <div *ngIf="loading" class="loading-card">
-        Chargement du classement...
+    <!-- ============ LOADING SKELETON ============ -->
+    <div *ngIf="loading" class="skeleton-block">
+        <div class="skeleton-stats">
+            <div class="skeleton-card" *ngFor="let i of [1,2,3,4]"></div>
+        </div>
+        <div class="skeleton-card tall"></div>
+        <div class="skeleton-card tall"></div>
     </div>
 
+    <!-- ============ EMPTY STATE ============ -->
     <div *ngIf="!loading && classement.length === 0" class="empty-card">
-        Aucun candidat trouvé pour ce seuil.
+        <svg viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="20" stroke="currentColor" stroke-width="1.4" opacity="0.4"/><path d="M16 27c0-4.4 3.6-8 8-8s8 3.6 8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="20" cy="19" r="1.4" fill="currentColor"/><circle cx="28" cy="19" r="1.4" fill="currentColor"/></svg>
+        <h3>Aucun candidat trouvé</h3>
+        <p>Aucun candidat n'atteint {{ minNote }}/100 avec les filtres actuels.</p>
+        <button type="button" class="btn secondary" (click)="lowerThreshold()">Baisser le seuil à {{ minNote - 10 < 0 ? 0 : minNote - 10 }}</button>
     </div>
 
-    <div *ngIf="!loading && classement.length > 0" class="stats-grid">
-        <div class="stat-card">
-            <span>Candidats / lots</span>
-            <strong>{{ classement.length }}</strong>
-        </div>
+    <!-- ============ CONTENT ============ -->
+    <ng-container *ngIf="!loading && classement.length > 0">
 
-        <div class="stat-card">
-            <span>Meilleure note</span>
-            <strong>{{ getBestNote() | number:'1.0-2' }} / 100</strong>
-        </div>
-
-        <div class="stat-card">
-            <span>Note moyenne</span>
-            <strong>{{ getAverageNote() | number:'1.0-2' }} / 100</strong>
-        </div>
-
-        <div class="stat-card">
-            <span>Seuil appliqué</span>
-            <strong>{{ minNote }} / 100</strong>
-        </div>
-    </div>
-
-    <div *ngIf="!loading && classement.length > 0" class="chart-card">
-        <div class="section-header">
-            <div>
-                <h2>Top candidats par note</h2>
-                <p>Classement décroissant des meilleurs candidats par lot et par zone.</p>
+        <!-- Stats -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <span>Candidats / lots</span>
+                <strong>{{ classement.length }}</strong>
+            </div>
+            <div class="stat-card">
+                <span>Meilleure note</span>
+                <strong>{{ getBestNote() | number:'1.0-2' }}</strong>
+            </div>
+            <div class="stat-card">
+                <span>Note moyenne</span>
+                <strong>{{ getAverageNote() | number:'1.0-2' }}</strong>
+            </div>
+            <div class="stat-card">
+                <span>Candidats admis</span>
+                <strong>{{ getAdmisCount() }}</strong>
             </div>
         </div>
 
-        <div class="chart-list">
-            <div class="chart-row" *ngFor="let row of getTopClassement(10); trackBy: trackByApplicationLot">
-                <div class="chart-label">
-                    <strong>{{ row.raisonSociale }}</strong>
-                    <span>{{ row.nomLot }} • {{ row.nomZone || 'Zone non définie' }}</span>
+        <!-- Podium -->
+        <div class="podium-card" *ngIf="topThree.length">
+            <div class="section-header">
+                <div>
+                    <h2>Meilleurs candidats</h2>
+                    <p>Les trois candidats les mieux notés, tous lots confondus.</p>
+                </div>
+            </div>
+
+            <div class="podium-row">
+                <div class="podium-slot rank-2" *ngIf="topThree[1]">
+                    <div class="medal silver">2</div>
+                    <div class="podium-name">{{ topThree[1].raisonSociale }}</div>
+                    <div class="podium-meta">{{ topThree[1].nomLot }}</div>
+                    <div class="podium-note">{{ topThree[1].noteLot | number:'1.0-2' }}</div>
                 </div>
 
-                <div class="bar-track">
-                    <div class="bar-fill" [style.width.%]="getBarWidth(row.noteLot)"></div>
+                <div class="podium-slot rank-1" *ngIf="topThree[0]">
+                    <div class="medal gold">1</div>
+                    <div class="podium-name">{{ topThree[0].raisonSociale }}</div>
+                    <div class="podium-meta">{{ topThree[0].nomLot }}</div>
+                    <div class="podium-note">{{ topThree[0].noteLot | number:'1.0-2' }}</div>
                 </div>
 
-                <div class="bar-value">
-                    {{ row.noteLot | number:'1.0-2' }}
+                <div class="podium-slot rank-3" *ngIf="topThree[2]">
+                    <div class="medal bronze">3</div>
+                    <div class="podium-name">{{ topThree[2].raisonSociale }}</div>
+                    <div class="podium-meta">{{ topThree[2].nomLot }}</div>
+                    <div class="podium-note">{{ topThree[2].noteLot | number:'1.0-2' }}</div>
+                </div>
+            </div>
+
+            <div class="chart-list">
+                <div class="chart-row" *ngFor="let row of getTopClassement(10).slice(3); trackBy: trackByApplicationLot">
+                    <div class="chart-label">
+                        <strong>{{ row.raisonSociale }}</strong>
+                        <span>{{ row.nomLot }} • {{ row.nomZone || 'Zone non définie' }}</span>
+                    </div>
+                    <div class="bar-track">
+                        <div class="bar-fill" [style.width.%]="getBarWidth(row.noteLot)"></div>
+                    </div>
+                    <div class="bar-value">{{ row.noteLot | number:'1.0-2' }}</div>
                 </div>
             </div>
         </div>
-    </div>
 
-    <div *ngIf="!loading && classement.length > 0" class="table-card">
-        <div class="section-header">
-            <div>
-                <h2>Liste détaillée</h2>
-                <p>Une ligne représente un candidat pour un lot précis.</p>
+        <!-- Table -->
+        <div class="table-card">
+            <div class="section-header">
+                <div>
+                    <h2>Liste détaillée</h2>
+                    <p>{{ sortedClassement.length }} résultat{{ sortedClassement.length > 1 ? 's' : '' }}{{ searchTerm ? ' pour "' + searchTerm + '"' : '' }}</p>
+                </div>
+            </div>
+
+            <div class="table-wrapper">
+                <table class="ranking-table" *ngIf="sortedClassement.length > 0">
+                    <thead>
+                        <tr>
+                            <th class="sortable" (click)="sortBy('rangGlobal')">
+                                Rang <span class="sort-icon" [class]="sortIcon('rangGlobal')"></span>
+                            </th>
+                            <th class="sortable" (click)="sortBy('raisonSociale')">
+                                Candidat <span class="sort-icon" [class]="sortIcon('raisonSociale')"></span>
+                            </th>
+                            <th>Type</th>
+                            <th class="sortable" (click)="sortBy('nomLot')">
+                                Lot <span class="sort-icon" [class]="sortIcon('nomLot')"></span>
+                            </th>
+                            <th class="sortable" (click)="sortBy('nomZone')">
+                                Zone <span class="sort-icon" [class]="sortIcon('nomZone')"></span>
+                            </th>
+                            <th class="sortable" (click)="sortBy('noteLot')">
+                                Note <span class="sort-icon" [class]="sortIcon('noteLot')"></span>
+                            </th>
+                            <th>Décision</th>
+                            <th>Statut</th>
+                            <th class="sortable" (click)="sortBy('dateSoumission')">
+                                Soumis le <span class="sort-icon" [class]="sortIcon('dateSoumission')"></span>
+                            </th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        <tr *ngFor="let row of visibleClassement; trackBy: trackByApplicationLot">
+                            <td>
+                                <span class="rank-badge">{{ row.rangGlobal || '-' }}</span>
+                            </td>
+
+                            <td>
+                                <div class="candidate-cell">
+                                    <span class="avatar">{{ getInitials(row.raisonSociale) }}</span>
+                                    <div>
+                                        <strong>{{ row.raisonSociale }}</strong>
+                                        <span>{{ row.emailPrincipal || '-' }}</span>
+                                        <small>{{ row.telephone || '-' }}</small>
+                                    </div>
+                                </div>
+                            </td>
+
+                            <td><span class="type-badge">{{ row.typeCandidat || '-' }}</span></td>
+
+                            <td>
+                                <div class="lot-cell">
+                                    <strong>{{ row.nomLot }}</strong>
+                                    <span>Rang lot : {{ row.rangParLot || '-' }}</span>
+                                </div>
+                            </td>
+
+                            <td><span class="zone-badge">{{ row.nomZone || '-' }}</span></td>
+
+                            <td>
+                                <span class="score-badge" [class]="getScoreClass(row.noteLot)">
+                                    {{ row.noteLot | number:'1.0-2' }}
+                                </span>
+                            </td>
+
+                            <td>
+                                <span class="decision-badge" [class.admis]="row.decisionFinale === 'ADMIS'" [class.eligible]="!row.decisionFinale" [class.rejete]="row.decisionFinale === 'REJETE'">
+                                    {{ getDecisionLabel(row.decisionFinale) }}
+                                </span>
+                            </td>
+
+                            <td>{{ row.statut || '-' }}</td>
+
+                            <td>{{ row.dateSoumission ? (row.dateSoumission | date:'dd/MM/yyyy HH:mm') : '-' }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="no-results" *ngIf="sortedClassement.length === 0">
+                    Aucun résultat pour « {{ searchTerm }} ». Essayez un autre terme.
+                </div>
+            </div>
+
+            <div class="table-footer" *ngIf="hasMoreRows">
+                <button type="button" class="btn secondary" (click)="showMoreRows()">
+                    Afficher plus ({{ sortedClassement.length - visibleClassement.length }} restants)
+                </button>
             </div>
         </div>
-
-        <div class="table-wrapper">
-            <table class="ranking-table">
-                <thead>
-                    <tr>
-                        <th>Rang</th>
-                        <th>Candidat</th>
-                        <th>Type</th>
-                        <th>Lot</th>
-                        <th>Zone</th>
-                        <th>Note</th>
-                        <th>Décision</th>
-                        <th>Statut</th>
-                        <th>Date soumission</th>
-                    </tr>
-                </thead>
-
-                <tbody>
-                    <tr *ngFor="let row of classement; trackBy: trackByApplicationLot">
-                        <td>
-                            <span class="rank-badge">
-                {{ row.rangGlobal || '-' }}
-              </span>
-                        </td>
-
-                        <td>
-                            <div class="candidate-cell">
-                                <strong>{{ row.raisonSociale }}</strong>
-                                <span>{{ row.emailPrincipal || '-' }}</span>
-                                <small>{{ row.telephone || '-' }}</small>
-                            </div>
-                        </td>
-
-                        <td>
-                            <span class="type-badge">
-                {{ row.typeCandidat || '-' }}
-              </span>
-                        </td>
-
-                        <td>
-                            <div class="lot-cell">
-                                <strong>{{ row.nomLot }}</strong>
-                                <span>Rang lot : {{ row.rangParLot || '-' }}</span>
-                            </div>
-                        </td>
-
-                        <td>
-                            <span class="zone-badge">
-                {{ row.nomZone || '-' }}
-              </span>
-                        </td>
-
-                        <td>
-                            <span class="score-badge" [class.high]="row.noteLot >= 90" [class.good]="row.noteLot >= 80 && row.noteLot < 90">
-                {{ row.noteLot | number:'1.0-2' }} / 100
-              </span>
-                        </td>
-
-                        <td>
-                            <span class="decision-badge" [class.admis]="row.decisionFinale === 'ADMIS'" [class.eligible]="!row.decisionFinale" [class.rejete]="row.decisionFinale === 'REJETE'">
-                {{ getDecisionLabel(row.decisionFinale) }}
-              </span>
-                        </td>
-
-                        <td>{{ row.statut || '-' }}</td>
-
-                        <td>
-                            {{ row.dateSoumission ? (row.dateSoumission | date:'dd/MM/yyyy HH:mm') : '-' }}
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-    </div>
+    </ng-container>
 
 </div>

@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { environment } from '../../../environments/environment.development';
 
 export interface Zone {
   id?: number;
@@ -20,7 +21,7 @@ export interface Zone {
 })
 export class ZoneService {
 
-  private apiUrl = 'http://localhost:8089/api/zones';
+  private apiUrl = `${environment.apiBaseUrl}/api/zones`;
 
   constructor(private http: HttpClient) {}
 

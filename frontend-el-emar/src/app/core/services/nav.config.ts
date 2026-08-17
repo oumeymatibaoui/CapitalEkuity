@@ -40,57 +40,56 @@ export const NAV_ITEMS: NavItem[] = [
   },
   
 
+  
   // =========================
-  // QUALIFICATION DES INTERVENANTS
-  // =========================
-  {
-    code: 'INTERVENANTS',
-    label: 'Intervenants',
-    route: '/el-emar/candidats',
-    icon: 'ti ti-users',
-    group: 'Qualification des intervenants',
-    roles: ['IT', 'ADMIN', 'EL_EMAR']
-  },
+// =========================
+// PARAMÉTRAGE DE LA QUALIFICATION
+// =========================
 
-  // =========================
-  // REFERENTIEL DE QUALIFICATION
-  // =========================
-  {
-    code: 'LOTS',
-    label: 'Domaines d’intervention',
-    route: '/el-emar/lots',
-    icon: 'ti ti-category',
-    group: 'Référentiel de qualification',
-    roles: ['IT', 'ADMIN', 'EL_EMAR']
-  },
+{
+  code: 'INTERVENANTS',
+  label: 'Intervenants',
+  route: '/el-emar/candidats',
+  icon: 'ti ti-users',
+  group: 'Paramétrage de la qualification',
+  roles: ['IT', 'ADMIN', 'EL_EMAR']
+},
 
-  {
-    code: 'ZONES',
-    label: 'Zones de classement',
-    route: '/el-emar/zones',
-    icon: 'ti ti-map',
-    group: 'Référentiel de qualification',
-    roles: ['IT', 'ADMIN', 'EL_EMAR']
-  },
+{
+  code: 'LOTS',
+  label: 'Domaines d’intervention',
+  route: '/el-emar/lots',
+  icon: 'ti ti-category',
+  group: 'Paramétrage de la qualification',
+  roles: ['IT', 'ADMIN', 'EL_EMAR']
+},
 
-  {
-    code: 'TYPES_INTERVENANT',
-    label: 'Types d’intervenants',
-    route: '/el-emar/types-intervenant',
-    icon: 'ti ti-user-plus',
-    group: 'Référentiel de qualification',
-    roles: ['IT', 'ADMIN', 'EL_EMAR']
-  },
+{
+  code: 'ZONES',
+  label: 'Zones de classement',
+  route: '/el-emar/zones',
+  icon: 'ti ti-map',
+  group: 'Paramétrage de la qualification',
+  roles: ['IT', 'ADMIN', 'EL_EMAR']
+},
 
-  {
-    code: 'GRILLE_EVALUATION',
-    label: 'Référentiel de notation',
-    route: '/el-emar/criteres',
-    icon: 'ti ti-scale',
-    group: 'Référentiel de qualification',
-    roles: ['IT', 'ADMIN', 'EL_EMAR', 'EVALUATEUR']
-  },
+{
+  code: 'TYPES_INTERVENANT',
+  label: 'Types d’intervenants',
+  route: '/el-emar/types-intervenant',
+  icon: 'ti ti-user-plus',
+  group: 'Paramétrage de la qualification',
+  roles: ['IT', 'ADMIN', 'EL_EMAR']
+},
 
+{
+  code: 'GRILLE_EVALUATION',
+  label: 'Critères de notation',
+  route: '/el-emar/criteres',
+  icon: 'ti ti-scale',
+  group: 'Paramétrage de la qualification',
+  roles: ['IT', 'ADMIN', 'EL_EMAR', 'EVALUATEUR']
+},
   // =========================
   // INSTRUCTION ET DECISION
   // =========================
@@ -115,41 +114,41 @@ export const NAV_ITEMS: NavItem[] = [
   // =========================
   // GOUVERNANCE ET ADMINISTRATION
   // =========================
-  {
-    code: 'UTILISATEURS',
-    label: 'Comptes utilisateurs',
-    route: '/el-emar/utilisateurs',
-    icon: 'ti ti-user-cog',
-    group: 'Gouvernance et administration',
-    roles: ['IT', 'ADMIN']
-  },
+  // {
+  //   code: 'UTILISATEURS',
+  //   label: 'Comptes utilisateurs',
+  //   route: '/el-emar/Admin',
+  //   icon: 'ti ti-user-cog',
+  //   group: 'Gouvernance et administration',
+  //   roles: ['IT', 'ADMIN']
+  // },
 
-  {
-    code: 'ROLES_ACCES',
-    label: 'Rôles et accès',
-    route: '/el-emar/roles-acces',
-    icon: 'ti ti-shield-lock',
-    group: 'Gouvernance et administration',
-    roles: ['IT', 'ADMIN']
-  },
+  // {
+  //   code: 'ROLES_ACCES',
+  //   label: 'Rôles et accès',
+  //   route: '/el-emar/roles-acces',
+  //   icon: 'ti ti-shield-lock',
+  //   group: 'Gouvernance et administration',
+  //   roles: ['IT', 'ADMIN']
+  // },
 
-  {
-    code: 'HISTORIQUE',
-    label: 'Traçabilité',
-    route: '/el-emar/historique',
-    icon: 'ti ti-history',
-    group: 'Gouvernance et administration',
-    roles: ['IT', 'ADMIN', 'EL_EMAR']
-  },
+  // {
+  //   code: 'HISTORIQUE',
+  //   label: 'Traçabilité',
+  //   route: '/el-emar/historique',
+  //   icon: 'ti ti-history',
+  //   group: 'Gouvernance et administration',
+  //   roles: ['IT', 'ADMIN', 'EL_EMAR']
+  // },
 
-  {
-    code: 'NOTIFICATIONS',
-    label: 'Notifications',
-    route: '/el-emar/notifications',
-    icon: 'ti ti-bell',
-    group: 'Gouvernance et administration',
-    roles: ['IT', 'ADMIN', 'EL_EMAR', 'EVALUATEUR', 'DECIDEUR']
-  },
+  // {
+  //   code: 'NOTIFICATIONS',
+  //   label: 'Notifications',
+  //   route: '/el-emar/notifications',
+  //   icon: 'ti ti-bell',
+  //   group: 'Gouvernance et administration',
+  //   roles: ['IT', 'ADMIN', 'EL_EMAR', 'EVALUATEUR', 'DECIDEUR']
+  // },
 
   // =========================
   // COMPTE PERSONNEL EL EMAR

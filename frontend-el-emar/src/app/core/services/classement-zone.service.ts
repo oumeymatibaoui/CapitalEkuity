@@ -1,12 +1,14 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { environment } from '../../../environments/environment.development';
 
 export interface SaveReferenceZoneRequest {
   referenceProjetId: number;
   applicationCandidatureId: number;
   zoneId: number;
   commentaire?: string | null;
+  utilisateurId?: number | null;
 }
 
 export interface ClassementZoneResponse {
@@ -43,7 +45,7 @@ export interface ClassementZoneResponse {
 })
 export class ClassementZoneService {
 
-  private readonly apiUrl = 'http://localhost:8089/api/el-emar/evaluations/zones';
+  private readonly apiUrl = `${environment.apiBaseUrl}/api/el-emar/evaluations/zones`;
 
   constructor(private http: HttpClient) {}
 

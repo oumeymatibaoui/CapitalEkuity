@@ -12,7 +12,7 @@ import java.util.List;
 public class ElEmarCandidatureListItemResponse {
 
     private Long candidatureId;
-
+    private String candidatureRef;
     private String raisonSociale;
 
     private String emailPrincipal;

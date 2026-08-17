@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { HttpClient, HttpParams } from '@angular/common/http';
+import { environment } from '../../../environments/environment.development';
 
 export type StatutEvaluation = 'A_VERIFIER' | 'CONFORME' | 'NON_CONFORME';
 export type DecisionFinale = 'ADMIS' | 'REJETE';
@@ -126,6 +127,7 @@ export interface SaveSolvabiliteResponse {
 
 export interface ElEmarCandidatureListItem {
   candidatureId: number;
+  candidatureRef: string;
   raisonSociale: string;
   emailPrincipal?: string | null;
   telephone?: string | null;
@@ -200,6 +202,9 @@ export interface ElEmarCritereEvaluation {
   reponseCritereId: number;
   critereEvaluationId: number;
 
+  categorieEvaluationId?: number | null;
+  categorieEvaluationLibelle?: string | null;
+
   codeCritere?: string | null;
   section?: string | null;
   libelle: string;
@@ -244,6 +249,7 @@ export interface ElEmarLotEvaluation {
 
 export interface ElEmarCandidatureDetail {
   candidatureId: number;
+  candidatureRef: string;
 
   raisonSociale?: string | null;
   formeJuridique?: string | null;
@@ -354,8 +360,8 @@ export interface ClassementParZoneGroup {
   providedIn: 'root'
 })
 export class ElEmarEvaluationService {
-  private readonly apiUrl = 'http://localhost:8089/api/el-emar/evaluations';
-  private readonly backendBaseUrl = 'http://localhost:8089';
+  private readonly apiUrl = `${environment.apiBaseUrl}/api/el-emar/evaluations`;
+  private readonly backendBaseUrl = `${environment.apiBaseUrl}`;
   constructor(private http: HttpClient) {}
 
   getCandidatures(typeIntervenantId?: number | null): Observable<ElEmarCandidatureListItem[]> {
@@ -371,18 +377,24 @@ export class ElEmarEvaluationService {
     );
   }
 
-  getCandidatureDetail(candidatureId: number): Observable<ElEmarCandidatureDetail> {
+  getCandidatureDetail(
+    candidatureRef: string
+  ): Observable<ElEmarCandidatureDetail> {
+    const ref = this.encodeRef(candidatureRef);
+
     return this.http.get<ElEmarCandidatureDetail>(
-      `${this.apiUrl}/candidatures/${candidatureId}`
+      `${this.apiUrl}/candidatures/${ref}`
     );
   }
 
   saveSolvabilite(
-    candidatureId: number,
+    candidatureRef: string,
     request: SaveSolvabiliteRequest
   ): Observable<SaveSolvabiliteResponse> {
+    const ref = this.encodeRef(candidatureRef);
+
     return this.http.put<SaveSolvabiliteResponse>(
-      `${this.apiUrl}/candidatures/${candidatureId}/solvabilite`,
+      `${this.apiUrl}/candidatures/${ref}/solvabilite`,
       request
     );
   }
@@ -442,19 +454,31 @@ export class ElEmarEvaluationService {
       request
     );
   }
-saveDocumentsStatut(
-  candidatureId: number,
-  request: SaveDocumentsStatutRequest
-): Observable<SaveDocumentsStatutResponse> {
-  return this.http.put<SaveDocumentsStatutResponse>(
-    `${this.apiUrl}/candidatures/${candidatureId}/documents-statut`,
-    request
-  );
-}
+  saveDocumentsStatut(
+    candidatureRef: string,
+    request: SaveDocumentsStatutRequest
+  ): Observable<SaveDocumentsStatutResponse> {
+    const ref = this.encodeRef(candidatureRef);
+
+    return this.http.put<SaveDocumentsStatutResponse>(
+      `${this.apiUrl}/candidatures/${ref}/documents-statut`,
+      request
+    );
+  }
   getClassementParZone(): Observable<ClassementParZoneGroup[]> {
     return this.http.get<ClassementParZoneGroup[]>(
       `${this.apiUrl}/zones/classement-par-zone`
     );
+  }
+
+  private encodeRef(value: string): string {
+    const ref = String(value || '').trim();
+
+    if (!ref) {
+      throw new Error('Référence candidature obligatoire.');
+    }
+
+    return encodeURIComponent(ref);
   }
 
   buildFullFileUrl(url: string): string {

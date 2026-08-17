@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { environment } from '../../../environments/environment.development';
 
 export interface LiaisonChampPiece {
   id?: number;
@@ -83,7 +84,7 @@ export interface ChampAppreciationRequest {
 })
 export class ChampAppreciationService {
 
-  private apiUrl = 'http://localhost:8089/api/champs-appreciation';
+  private apiUrl = `${environment.apiBaseUrl}/api/champs-appreciation`;
 
   constructor(private http: HttpClient) {}
 

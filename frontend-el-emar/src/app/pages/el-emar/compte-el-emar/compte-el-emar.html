@@ -1,676 +1,877 @@
 <div class="utilisateurs-page">
 
-    <!-- =====================================================
-       HEADER
-  ====================================================== -->
-    <div class="top-header">
+    <header class="page-header">
         <div>
-            <h1>Comptes utilisateurs</h1>
+            <span class="eyebrow">Administration</span>
+
+            <h1>Utilisateurs internes</h1>
 
             <p>
-                Créez les comptes internes El Emar, attribuez des rôles dynamiques et consultez la liste complète des utilisateurs.
+                Organisez les équipes par département et attribuez leurs rôles d’accès.
             </p>
         </div>
 
-        <button type="button" class="btn secondary" (click)="loadUtilisateurs()" [disabled]="loading">
-      {{ loading ? 'Chargement...' : 'Actualiser' }}
+        <div class="header-actions">
+            <button class="btn btn-light" type="button" (click)="loadInitialData()" [disabled]="loading">
+        <i
+          class="ti ti-refresh"
+          [class.spin]="loading"
+        ></i>
+
+        Actualiser
+      </button>
+
+            <button class="btn btn-primary" type="button" (click)="openCreateModal()">
+        <i class="ti ti-user-plus"></i>
+        Nouvel utilisateur
+      </button>
+        </div>
+    </header>
+
+    <!-- MESSAGES -->
+
+    <div class="alert alert-error" *ngIf="pageError">
+        <i class="ti ti-alert-circle"></i>
+
+        <span>{{ pageError }}</span>
+
+        <button type="button" (click)="pageError = ''">
+      <i class="ti ti-x"></i>
     </button>
     </div>
 
-    <!-- =====================================================
-       MESSAGES GÉNÉRAUX
-  ====================================================== -->
-    <div *ngIf="pageError" class="alert error">
-        {{ pageError }}
+    <div class="alert alert-success" *ngIf="successMessage">
+        <i class="ti ti-circle-check"></i>
+
+        <span>{{ successMessage }}</span>
+
+        <button type="button" (click)="successMessage = ''">
+      <i class="ti ti-x"></i>
+    </button>
     </div>
 
-    <div *ngIf="successMessage" class="alert success">
-        {{ successMessage }}
-    </div>
+    <!-- RÉSUMÉ -->
 
-    <!-- =====================================================
-       CRÉATION + RÉSUMÉ
-  ====================================================== -->
-    <div class="content-grid">
+    <section class="summary-bar">
+        <div>
+            <span class="summary-icon">
+        <i class="ti ti-users"></i>
+      </span>
 
-        <!-- =================================================
-         CRÉATION UTILISATEUR
-    ================================================== -->
-        <div class="card create-card">
-
-            <div class="card-header">
-                <h3>Créer un utilisateur interne</h3>
-
-                <p>
-                    Sélectionnez un rôle parmi les rôles internes actifs configurés dans la gestion des rôles et des accès.
-                </p>
-            </div>
-
-            <!-- MESSAGE SUCCÈS CRÉATION -->
-            <div *ngIf="createSuccessMessage" class="alert success create-alert">
-                {{ createSuccessMessage }}
-            </div>
-
-            <!-- MESSAGE ERREUR CRÉATION -->
-            <div *ngIf="createErrorMessage" class="alert error create-alert">
-                {{ createErrorMessage }}
-            </div>
-
-            <form [formGroup]="createForm" class="form-grid" (ngSubmit)="createUtilisateur()">
-
-                <!-- NOM -->
-                <div class="field">
-                    <label for="create-nom">
-            Nom
-          </label>
-
-                    <input id="create-nom" type="text" class="form-control" formControlName="nom" placeholder="Nom complet" autocomplete="off">
-                </div>
-
-                <!-- EMAIL -->
-                <div class="field">
-                    <label for="create-email">
-            Email
-          </label>
-
-                    <input id="create-email" type="email" class="form-control" formControlName="email" placeholder="exemple@elemar.com" autocomplete="off">
-                </div>
-
-                <!-- FONCTION -->
-                <div class="field">
-                    <label for="create-fonction">
-            Fonction
-          </label>
-
-                    <input id="create-fonction" type="text" class="form-control" formControlName="fonction" placeholder="Ex : Évaluateur, Responsable achat..." autocomplete="off">
-                </div>
-
-                <!-- RÔLE DYNAMIQUE -->
-                <div class="field">
-                    <label for="create-role">
-            Rôle
-          </label>
-
-                    <select id="create-role" class="form-control" formControlName="roleId" [disabled]="loadingRoles">
-            <option [ngValue]="null">
-              -- Sélectionner un rôle --
-            </option>
-
-            <option
-              *ngFor="let role of roles"
-              [ngValue]="role.id"
-            >
-              {{ role.nomRole }}
-            </option>
-          </select>
-
-                    <small *ngIf="loadingRoles">
-            Chargement des rôles...
-          </small>
-
-                    <small *ngIf="!loadingRoles && roles.length === 0">
-            Aucun rôle interne actif disponible.
-          </small>
-                </div>
-
-                <!-- MOT DE PASSE -->
-                <div class="field full">
-                    <label for="create-password">
-            Mot de passe temporaire
-          </label>
-
-                    <input id="create-password" type="password" class="form-control" formControlName="motDePasse" placeholder="Minimum 6 caractères" autocomplete="new-password">
-                </div>
-
-                <!-- ACTION CRÉATION -->
-                <div class="actions full">
-                    <button type="submit" class="btn primary" [disabled]="creating || loadingRoles || roles.length === 0">
-            {{
-              creating
-                ? 'Création en cours...'
-                : 'Créer le compte'
-            }}
-          </button>
-                </div>
-
-            </form>
-
+            <span>
+        <strong>{{ utilisateurs.length }}</strong>
+        utilisateurs internes
+      </span>
         </div>
 
-        <!-- =================================================
-         RÉSUMÉ
-    ================================================== -->
-        <div class="card stats-card">
+        <div>
+            <span class="summary-dot active"></span>
 
-            <div class="card-header">
-                <h3>Résumé</h3>
+            <span>
+        <strong>{{ totalActiveUsers }}</strong>
+        comptes actifs
+      </span>
+        </div>
 
-                <p>
-                    Vue rapide des comptes internes.
-                </p>
-            </div>
+        <div>
+            <span class="summary-dot inactive"></span>
 
-            <div class="stats-list">
+            <span>
+        <strong>
+          {{ utilisateurs.length - totalActiveUsers }}
+        </strong>
 
-                <div class="stat-item">
-                    <strong>
-            {{ utilisateurs.length }}
+        comptes inactifs
+      </span>
+        </div>
+    </section>
+
+    <!-- DÉPARTEMENTS -->
+
+    <section class="department-grid" aria-label="Départements">
+        <button type="button" class="department-card" *ngFor="
+        let department of departements;
+        trackBy: trackByDepartment
+      " [class.selected]="
+        selectedDepartment === department.code
+      " [attr.data-color]="department.couleur" (click)="selectDepartment(department.code)">
+      <span class="department-icon">
+        <i [class]="department.icon"></i>
+      </span>
+
+      <span class="department-content">
+        <span class="department-title">
+          <strong>
+            {{ department.libelle }}
           </strong>
 
-                    <span>
-            Total utilisateurs
+          <span>
+            {{ getDepartmentCount(department.code) }}
           </span>
+        </span>
+
+        <small>
+          {{ department.description }}
+        </small>
+
+        <em>
+          {{
+            getDepartmentActiveCount(
+              department.code
+            )
+          }}
+          actif(s)
+        </em>
+      </span>
+
+      <i
+        class="ti ti-chevron-right department-arrow"
+      ></i>
+    </button>
+    </section>
+
+    <!-- LISTE DU DÉPARTEMENT SÉLECTIONNÉ -->
+
+    <section class="users-panel">
+
+        <div class="panel-heading">
+            <div class="selected-department-title">
+                <span class="department-icon" [attr.data-color]="
+            selectedDepartmentView.couleur
+          ">
+          <i
+            [class]="selectedDepartmentView.icon"
+          ></i>
+        </span>
+
+                <div>
+                    <h2>
+                        Département {{ selectedDepartmentView.libelle }}
+                    </h2>
+
+                    <p>
+                        {{ displayedUsers.length }} utilisateur(s) affiché(s)
+                    </p>
                 </div>
-
-                <div class="stat-item">
-                    <strong>
-            {{ filteredUtilisateurs.length }}
-          </strong>
-
-                    <span>
-            Résultat affiché
-          </span>
-                </div>
-
-                <div class="stat-item">
-                    <strong>
-            {{ getActiveCount() }}
-          </strong>
-
-                    <span>
-            Comptes actifs
-          </span>
-                </div>
-
-                <div class="stat-item">
-                    <strong>
-            {{ getInactiveCount() }}
-          </strong>
-
-                    <span>
-            Comptes inactifs
-          </span>
-                </div>
-
             </div>
 
+            <button class="btn btn-soft" type="button" (click)="
+          openCreateModal(selectedDepartment)
+        ">
+        <i class="ti ti-plus"></i>
+
+        Ajouter dans
+        {{ selectedDepartmentView.libelle }}
+      </button>
         </div>
 
-    </div>
+        <!-- FILTRES -->
 
-    <!-- =====================================================
-       LISTE UTILISATEURS
-  ====================================================== -->
-    <div class="card users-card">
+        <div class="filters-bar">
+            <label class="search-box">
+        <i class="ti ti-search"></i>
 
-        <div class="users-toolbar">
+        <input
+          type="search"
+          placeholder="Rechercher par nom, email, fonction ou rôle..."
+          [value]="searchTerm"
+          (input)="onSearch($event)"
+        >
+      </label>
 
-            <div>
-                <h3>
-                    Liste des utilisateurs internes
-                </h3>
+            <select class="filter-select" [value]="selectedRoleFilter" (change)="onRoleFilter($event)">
+        <option value="ALL">
+          Tous les rôles
+        </option>
 
-                <p>
-                    Tous les comptes internes enregistrés dans la plateforme.
-                </p>
-            </div>
+        <option
+          *ngFor="
+            let role of roles;
+            trackBy: trackByRoleId
+          "
+          [value]="role.id"
+        >
+          {{ role.nomRole }}
+        </option>
+      </select>
 
-            <div class="filters">
+            <select class="filter-select" [value]="selectedStatusFilter" (change)="onStatusFilter($event)">
+        <option value="ALL">
+          Tous les statuts
+        </option>
 
-                <!-- RECHERCHE -->
-                <input type="text" class="form-control search-input" placeholder="Rechercher nom, email, fonction..." [value]="searchTerm" (input)="onSearchChange($event)">
+        <option value="ACTIVE">
+          Actifs
+        </option>
 
-                <!-- FILTRE RÔLE -->
-                <select class="form-control" [value]="selectedRoleFilter" (change)="onRoleFilterChange($event)">
-          <option value="ALL">
-            Tous les rôles
-          </option>
+        <option value="INACTIVE">
+          Inactifs
+        </option>
+      </select>
 
-          <option
-            *ngFor="let role of roles"
-            [value]="role.codeRole"
-          >
-            {{ role.nomRole }}
-          </option>
-        </select>
-
-            </div>
-
+            <button class="icon-button" type="button" title="Réinitialiser les filtres" (click)="clearFilters()">
+        <i class="ti ti-filter-off"></i>
+      </button>
         </div>
 
-        <!-- =================================================
-         LOADING
-    ================================================== -->
-        <div *ngIf="loading" class="loading-card">
-            Chargement des utilisateurs...
+        <!-- CHARGEMENT -->
+
+        <div class="state-box" *ngIf="loading">
+            <i class="ti ti-loader-2 spin"></i>
+
+            <strong>
+        Chargement des utilisateurs...
+      </strong>
         </div>
 
-        <!-- =================================================
-         LISTE VIDE
-    ================================================== -->
-        <div *ngIf="!loading && filteredUtilisateurs.length === 0" class="empty-card">
-            Aucun utilisateur interne trouvé.
+        <!-- LISTE VIDE -->
+
+        <div class="state-box empty" *ngIf="
+        !loading &&
+        displayedUsers.length === 0
+      ">
+            <span>
+        <i class="ti ti-users-minus"></i>
+      </span>
+
+            <strong>
+        Aucun utilisateur trouvé
+      </strong>
+
+            <p>
+                Ajoutez un utilisateur dans ce département ou modifiez les filtres.
+            </p>
+
+            <button class="btn btn-primary" type="button" (click)="
+          openCreateModal(selectedDepartment)
+        ">
+        <i class="ti ti-user-plus"></i>
+        Ajouter un utilisateur
+      </button>
         </div>
 
-        <!-- =================================================
-         TABLEAU
-    ================================================== -->
-        <div class="table-wrapper" *ngIf="!loading && filteredUtilisateurs.length > 0">
+        <!-- TABLEAU -->
 
+        <div class="table-wrapper" *ngIf="
+        !loading &&
+        displayedUsers.length > 0
+      ">
             <table class="users-table">
-
                 <thead>
                     <tr>
                         <th>Utilisateur</th>
                         <th>Fonction</th>
-                        <th>Rôle</th>
+                        <th>Rôle attribué</th>
                         <th>Statut</th>
-                        <th>Créé le</th>
-                        <th>Actions</th>
+                        <th>Création</th>
+                        <th class="actions-column">
+                            Actions
+                        </th>
                     </tr>
                 </thead>
 
                 <tbody>
-
                     <tr *ngFor="
-              let user of filteredUtilisateurs;
+              let user of displayedUsers;
               trackBy: trackByUserId
             ">
-
-                        <!-- =========================================
-                 UTILISATEUR
-            ========================================== -->
                         <td>
-                            <div class="user-cell">
-
-                                <div class="avatar">
-                                    {{ (user.nom || user.email || 'U') .charAt(0) .toUpperCase() }}
-                                </div>
-
-                                <div>
-                                    <strong>
-                    {{ user.nom || '-' }}
-                  </strong>
-
-                                    <small>
-                    {{ user.email || '-' }}
-                  </small>
-                                </div>
-
-                            </div>
-                        </td>
-
-                        <!-- =========================================
-                 FONCTION
-            ========================================== -->
-                        <td>
-                            {{ user.fonction || '-' }}
-                        </td>
-
-                        <!-- =========================================
-                 RÔLE
-            ========================================== -->
-                        <td>
-                            <div class="role-control">
-
-                                <!-- LIBELLÉ DU RÔLE ACTUEL -->
-                                <span class="role-badge" [ngClass]="getRoleClass(
-                    user.roleCode || user.typeUtilisateur
-                  )">
+                            <div class="user-identity">
+                                <span class="avatar">
                   {{
-                    user.roleNom
-                    ||
-                    getRoleLabel(
-                      user.roleCode || user.typeUtilisateur
+                    (
+                      user.nom ||
+                      user.email ||
+                      'U'
                     )
+                    .charAt(0)
+                    .toUpperCase()
                   }}
                 </span>
 
-                                <!-- MODIFICATION DU RÔLE -->
-                                <select class="role-select" [value]="getRoleSelectionValue(user) ?? ''" (change)="updateRole(user, $event)">
-                  <option
-                    value=""
-                    disabled
-                  >
-                    -- Sélectionner un rôle --
-                  </option>
+                                <span>
+                  <strong>
+                    {{ user.nom || '-' }}
+                  </strong>
 
-                  <option
-                    *ngFor="let role of roles"
-                    [value]="role.id"
-                  >
-                    {{ role.nomRole }}
-                  </option>
-                </select>
-
+                  <small>
+                    {{ user.email || '-' }}
+                  </small>
+                </span>
                             </div>
                         </td>
 
-                        <!-- =========================================
-                 STATUT
-            ========================================== -->
                         <td>
-                            <span class="status-badge" [class.active]="user.actif === true">
+                            <span class="function-value">
                 {{
-                  user.actif === true
-                    ? 'Actif'
-                    : 'Inactif'
+                  user.fonction ||
+                  'Non renseignée'
                 }}
               </span>
                         </td>
 
-                        <!-- =========================================
-                 DATE
-            ========================================== -->
+                        <td>
+                            <span class="role-pill">
+                <i class="ti ti-shield-check"></i>
+
+                {{ getRoleName(user) }}
+              </span>
+                        </td>
+
+                        <td>
+                            <span class="status-pill" [class.active]="
+                  user.actif === true
+                ">
+                <span></span> {{ user.actif === true ? 'Actif' : 'Inactif' }}
+                            </span>
+                        </td>
+
                         <td>
                             {{ formatDate(user.createdAt) }}
                         </td>
 
-                        <!-- =========================================
-                 ACTIONS
-            ========================================== -->
-                        <td>
-                            <div class="user-actions">
+                        <td class="actions-column">
+                            <div class="row-actions">
 
-                                <button type="button" class="user-action-btn edit" title="Modifier le compte" (click)="openEditUser(user)">
-      <i class="ti ti-pencil"></i>
-      <span>Modifier</span>
-    </button>
+                                <button type="button" title="Modifier" (click)="openEditModal(user)">
+                  <i class="ti ti-pencil"></i>
+                </button>
 
-                                <button type="button" class="user-action-btn status" [class.deactivate]="user.actif === true" [class.activate]="user.actif !== true" [title]="
-        user.actif === true
-          ? 'Désactiver le compte'
-          : 'Activer le compte'
-      " (click)="toggleActif(user)">
-      <i
-        [class]="
-          user.actif === true
-            ? 'ti ti-user-off'
-            : 'ti ti-user-check'
-        "
-      ></i>
+                                <button type="button" [title]="
+                    user.actif === true
+                      ? 'Désactiver'
+                      : 'Activer'
+                  " (click)="toggleActif(user)">
+                  <i
+                    [class]="
+                      user.actif === true
+                        ? 'ti ti-user-off'
+                        : 'ti ti-user-check'
+                    "
+                  ></i>
+                </button>
 
-      <span>
-        {{
-          user.actif === true
-            ? 'Désactiver'
-            : 'Activer'
-        }}
-      </span>
-    </button>
-
-                                <button type="button" class="user-action-btn delete" title="Supprimer définitivement le compte" [disabled]="isCurrentUser(user)" (click)="openDeleteUser(user)">
-      <i
-        [class]="
-          isCurrentUser(user)
-            ? 'ti ti-lock'
-            : 'ti ti-trash'
-        "
-      ></i>
-
-      <span>
-        {{
-          isCurrentUser(user)
-            ? 'Compte actuel'
-            : 'Supprimer'
-        }}
-      </span>
-    </button>
+                                <button type="button" class="danger" title="Supprimer" [disabled]="isCurrentUser(user)" (click)="openDeleteModal(user)">
+                  <i
+                    [class]="
+                      isCurrentUser(user)
+                        ? 'ti ti-lock'
+                        : 'ti ti-trash'
+                    "
+                  ></i>
+                </button>
 
                             </div>
                         </td>
-
                     </tr>
-
                 </tbody>
-
             </table>
-
         </div>
 
-    </div>
-
+    </section>
 </div>
+
 <!-- =====================================================
-     MODAL MODIFICATION UTILISATEUR
-====================================================== -->
-<div class="user-modal-overlay" *ngIf="showEditModal">
-    <div class="user-modal-card">
+     MODALE CRÉATION / MODIFICATION
+===================================================== -->
 
-        <div class="user-modal-header">
-
+<div class="modal-overlay" *ngIf="showUserModal" (click)="closeUserModal()">
+    <div class="user-modal" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
+        <header class="modal-header">
             <div>
-                <span class="modal-label">
-          Gestion du compte
+                <span class="eyebrow">
+          {{
+            modalMode === 'CREATE'
+              ? 'Nouveau compte'
+              : 'Modifier le compte'
+          }}
         </span>
 
-                <h3>
-                    Modifier l’utilisateur
-                </h3>
+                <h2>
+                    {{ modalMode === 'CREATE' ? 'Créer un utilisateur interne' : 'Informations et affectation' }}
+                </h2>
 
                 <p>
-                    Modifiez les informations, le rôle et le statut du compte.
+                    Identité, département et rôle sont gérés au même endroit.
                 </p>
             </div>
 
-            <button type="button" class="modal-close" [disabled]="savingEdit" (click)="closeEditModal()">
+            <button class="modal-close" type="button" [disabled]="saving" (click)="closeUserModal()">
         <i class="ti ti-x"></i>
       </button>
+        </header>
 
-        </div>
+        <form [formGroup]="userForm" (ngSubmit)="saveUser()">
+            <div class="modal-body">
 
-        <form [formGroup]="editForm" (ngSubmit)="saveEditedUser()">
-
-            <div class="user-modal-body">
-
-                <div class="modal-user-preview" *ngIf="editingUser">
-                    <div class="avatar">
-                        {{ ( editingUser.nom || editingUser.email || 'U' ).charAt(0).toUpperCase() }}
-                    </div>
-
-                    <div>
-                        <strong>
-              {{ editingUser.nom || '-' }}
-            </strong>
-
-                        <span>
-              {{ editingUser.email || '-' }}
-            </span>
-                    </div>
+                <div class="alert alert-error" *ngIf="modalError">
+                    <i class="ti ti-alert-circle"></i>
+                    <span>{{ modalError }}</span>
                 </div>
 
-                <div class="modal-form-grid">
+                <!-- 1. IDENTITÉ -->
 
-                    <div class="field">
-                        <label for="edit-user-nom">
-              Nom
-            </label>
+                <section class="form-section">
+                    <div class="section-title">
+                        <span>1</span>
 
-                        <input id="edit-user-nom" type="text" class="form-control" formControlName="nom">
+                        <div>
+                            <h3>Informations personnelles</h3>
+
+                            <p>
+                                Informations visibles dans la plateforme.
+                            </p>
+                        </div>
                     </div>
 
-                    <div class="field">
-                        <label for="edit-user-email">
-              Email
+                    <div class="form-grid">
+
+                        <label class="field">
+              <span>
+                Nom complet <em>*</em>
+              </span>
+
+              <input
+                class="form-control"
+                type="text"
+                formControlName="nom"
+                placeholder="Ex. Ahmed Ben Ali"
+              >
+
+              <small
+                class="field-error"
+                *ngIf="hasError('nom', 'required')"
+              >
+                Le nom est obligatoire.
+              </small>
             </label>
 
-                        <input id="edit-user-email" type="email" class="form-control" formControlName="email">
+                        <label class="field">
+              <span>
+                Adresse email <em>*</em>
+              </span>
+
+              <input
+                class="form-control"
+                type="email"
+                formControlName="email"
+                placeholder="nom@elemar.tn"
+              >
+
+              <small
+                class="field-error"
+                *ngIf="hasError('email', 'required')"
+              >
+                L’email est obligatoire.
+              </small>
+
+              <small
+                class="field-error"
+                *ngIf="hasError('email', 'email')"
+              >
+                Adresse email invalide.
+              </small>
+            </label>
+
+                        <label class="field full">
+              <span>Fonction</span>
+
+              <input
+                class="form-control"
+                type="text"
+                formControlName="fonction"
+                placeholder="Ex. Responsable des achats"
+              >
+            </label>
+
+                    </div>
+                </section>
+
+                <!-- 2. DÉPARTEMENT -->
+
+                <section class="form-section">
+                    <div class="section-title">
+                        <span>2</span>
+
+                        <div>
+                            <h3>Affectation</h3>
+
+                            <p>
+                                Le type utilisateur représente directement le département.
+                            </p>
+                        </div>
                     </div>
 
-                    <div class="field">
-                        <label for="edit-user-fonction">
-              Fonction
-            </label>
+                    <div class="choice-grid">
+                        <label class="department-choice" *ngFor="
+                let department of departements;
+                trackBy: trackByDepartment
+              " [class.selected]="
+                userForm
+                  .get('typeUtilisateur')
+                  ?.value === department.code
+              ">
+              <input
+                type="radio"
+                formControlName="typeUtilisateur"
+                [value]="department.code"
+              >
 
-                        <input id="edit-user-fonction" type="text" class="form-control" formControlName="fonction">
+              <span
+                class="department-icon"
+                [attr.data-color]="department.couleur"
+              >
+                <i [class]="department.icon"></i>
+              </span>
+
+              <span>
+                <strong>
+                  {{ department.libelle }}
+                </strong>
+
+                <small>
+                  {{ department.code }}
+                </small>
+              </span>
+
+              <i
+                class="ti ti-circle-check check-icon"
+              ></i>
+            </label>
+                    </div>
+                </section>
+
+                <!-- 3. RÔLE -->
+
+                <section class="form-section">
+                    <div class="section-title">
+                        <span>3</span>
+
+                        <div>
+                            <h3>Rôle et autorisations</h3>
+
+                            <p>
+                                Le compte hérite des accès configurés pour le rôle.
+                            </p>
+                        </div>
                     </div>
 
-                    <div class="field">
-                        <label for="edit-user-role">
-              Rôle
-            </label>
+                    <label class="field full">
+            <span>
+              Rôle <em>*</em>
+            </span>
 
-                        <select id="edit-user-role" class="form-control" formControlName="roleId" [disabled]="loadingRoles">
+            <select
+              class="form-control"
+              formControlName="roleId"
+              (change)="onRoleChange()"
+              [disabled]="loadingRoles"
+            >
               <option [ngValue]="null">
-                -- Sélectionner un rôle --
+                Sélectionner un rôle
               </option>
 
               <option
-                *ngFor="let role of roles"
+                *ngFor="
+                  let role of roles;
+                  trackBy: trackByRoleId
+                "
                 [ngValue]="role.id"
               >
                 {{ role.nomRole }}
               </option>
             </select>
+
+            <small
+              class="field-error"
+              *ngIf="hasError('roleId', 'required')"
+            >
+              Le rôle est obligatoire.
+            </small>
+          </label>
+
+                    <!-- APERÇU DES ACCÈS -->
+
+                    <div class="role-preview" *ngIf="selectedRole">
+                        <div class="preview-header">
+                            <div>
+                                <span class="role-logo">
+                  <i class="ti ti-shield-check"></i>
+                </span>
+
+                                <span>
+                  <strong>
+                    {{ selectedRole.nomRole }}
+                  </strong>
+
+                  <small>
+                    {{
+                      selectedRole.description ||
+                      'Autorisations héritées de la configuration du rôle.'
+                    }}
+                  </small>
+                </span>
+                            </div>
+
+                            <div class="preview-counts" *ngIf="!loadingRolePreview">
+                                <span>
+                  {{ previewModuleCount }} page(s)
+                </span>
+
+                                <span>
+                  {{ rolePreviewCategories.length }}
+                  catégorie(s)
+                </span>
+                            </div>
+                        </div>
+
+                        <div class="preview-loading" *ngIf="loadingRolePreview">
+                            <i class="ti ti-loader-2 spin"></i> Chargement des accès...
+                        </div>
+
+                        <div class="preview-error" *ngIf="rolePreviewError">
+                            {{ rolePreviewError }}
+                        </div>
+
+                        <div class="preview-columns" *ngIf="
+                !loadingRolePreview &&
+                !rolePreviewError
+              ">
+                            <div>
+                                <h4>Pages autorisées</h4>
+
+                                <ng-container *ngFor="
+                    let group of rolePreviewGroups
+                  ">
+                                    <small class="group-name">
+                    {{ group.groupe }}
+                  </small>
+
+                                    <span class="access-item" *ngFor="
+                      let module of group.modules;
+                      trackBy: trackByModuleId
+                    ">
+                    <i class="ti ti-check"></i>
+                    {{ module.libelle }}
+                  </span>
+                                </ng-container>
+
+                                <p class="no-access" *ngIf="
+                    rolePreviewGroups.length === 0
+                  ">
+                                    Aucune page autorisée.
+                                </p>
+                            </div>
+
+                            <div>
+                                <h4>Catégories autorisées</h4>
+
+                                <span class="access-item" *ngFor="
+                    let category
+                    of rolePreviewCategories;
+                    trackBy: trackByCategoryId
+                  ">
+                  <i class="ti ti-check"></i>
+
+                  {{
+                    category.typeIntervenantLibelle
+                  }}
+                  ·
+                  {{
+                    category.lotNom || 'Commun'
+                  }}
+                  ·
+                  {{ category.libelle }}
+                </span>
+
+                                <p class="no-access" *ngIf="
+                    rolePreviewCategories.length === 0
+                  ">
+                                    Aucune catégorie autorisée.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 4. CONNEXION -->
+
+                <section class="form-section">
+                    <div class="section-title">
+                        <span>4</span>
+
+                        <div>
+                            <h3>
+                                {{ modalMode === 'CREATE' ? 'Connexion' : 'État du compte' }}
+                            </h3>
+
+                            <p>
+                                {{ modalMode === 'CREATE' ? 'Définissez le mot de passe temporaire.' : 'Autorisez ou bloquez la connexion.' }}
+                            </p>
+                        </div>
                     </div>
 
-                    <div class="field full">
-                        <label class="status-switch-row">
+                    <label class="field full" *ngIf="modalMode === 'CREATE'">
+            <span>
+              Mot de passe temporaire <em>*</em>
+            </span>
 
-              <span>
-                <strong>
-                  Compte actif
-                </strong>
+            <input
+              class="form-control"
+              type="password"
+              formControlName="motDePasse"
+              autocomplete="new-password"
+              placeholder="Minimum 8 caractères"
+            >
 
-                <small>
-                  L’utilisateur peut se connecter lorsque
-                  cette option est activée.
-                </small>
-              </span>
+            <small class="field-hint">
+              L’utilisateur pourra le modifier
+              depuis son compte.
+            </small>
 
-              <input
-                type="checkbox"
-                formControlName="actif"
-              >
+            <small
+              class="field-error"
+              *ngIf="
+                hasError(
+                  'motDePasse',
+                  'required'
+                )
+              "
+            >
+              Le mot de passe est obligatoire.
+            </small>
 
-            </label>
-                    </div>
+            <small
+              class="field-error"
+              *ngIf="
+                hasError(
+                  'motDePasse',
+                  'minlength'
+                )
+              "
+            >
+              Minimum 8 caractères.
+            </small>
+          </label>
 
-                </div>
+                    <label class="status-switch" *ngIf="modalMode === 'EDIT'">
+            <span>
+              <strong>Compte actif</strong>
 
+              <small>
+                L’utilisateur peut se connecter
+                et utiliser ses autorisations.
+              </small>
+            </span>
+
+            <input
+              type="checkbox"
+              formControlName="actif"
+            >
+          </label>
+                </section>
             </div>
 
-            <div class="user-modal-actions">
-
-                <button type="button" class="btn secondary" [disabled]="savingEdit" (click)="closeEditModal()">
+            <footer class="modal-footer">
+                <button class="btn btn-light" type="button" [disabled]="saving" (click)="closeUserModal()">
           Annuler
         </button>
 
-                <button type="submit" class="btn primary" [disabled]="savingEdit || loadingRoles">
+                <button class="btn btn-primary" type="submit" [disabled]="saving || loadingRoles || loadingRolePreview">
           <i
             [class]="
-              savingEdit
-                ? 'ti ti-loader-2 loading-icon'
-                : 'ti ti-device-floppy'
+              saving
+                ? 'ti ti-loader-2 spin'
+                : (
+                    modalMode === 'CREATE'
+                      ? 'ti ti-user-plus'
+                      : 'ti ti-device-floppy'
+                  )
             "
           ></i>
 
           {{
-            savingEdit
-              ? 'Enregistrement...'
-              : 'Enregistrer les modifications'
+            saving
+              ? (
+                  savingStep ||
+                  'Enregistrement...'
+                )
+              : (
+                  modalMode === 'CREATE'
+                    ? 'Créer le compte'
+                    : 'Enregistrer'
+                )
           }}
         </button>
-
-            </div>
-
+            </footer>
         </form>
-
     </div>
 </div>
+
 <!-- =====================================================
-     MODAL SUPPRESSION UTILISATEUR
-====================================================== -->
-<div class="user-delete-overlay" *ngIf="showDeleteModal" (click)="closeDeleteModal()">
-    <div class="user-delete-card" (click)="$event.stopPropagation()">
+     MODALE SUPPRESSION
+===================================================== -->
 
-        <div class="user-delete-icon">
-            <i class="ti ti-trash"></i>
-        </div>
-
-        <span class="delete-label">
-      Suppression définitive
+<div class="modal-overlay" *ngIf="showDeleteModal" (click)="closeDeleteModal()">
+    <div class="delete-modal" role="alertdialog" aria-modal="true" (click)="$event.stopPropagation()">
+        <span class="delete-icon">
+      <i class="ti ti-trash"></i>
     </span>
 
-        <h3>
-            Supprimer le compte
-        </h3>
+        <h2>Supprimer le compte ?</h2>
 
         <p>
-            Voulez-vous vraiment supprimer le compte de
-
+            Le compte de
             <strong>
         {{
-          userToDelete?.nom
-          || userToDelete?.email
-          || 'cet utilisateur'
+          userToDelete?.nom ||
+          userToDelete?.email
         }}
-      </strong> ?
+      </strong> sera supprimé définitivement. S’il possède des données liées, désactivez-le plutôt.
         </p>
 
-        <div class="user-delete-details" *ngIf="userToDelete">
-            <div>
-                <span>Email</span>
-                <strong>
-          {{ userToDelete.email || '-' }}
-        </strong>
-            </div>
+        <div class="delete-details" *ngIf="userToDelete">
+            <span>
+        <small>Département</small>
 
-            <div>
-                <span>Fonction</span>
-                <strong>
-          {{ userToDelete.fonction || '-' }}
-        </strong>
-            </div>
-
-            <div>
-                <span>Rôle</span>
-                <strong>
+        <strong>
           {{
-            userToDelete.roleNom
-            || getRoleLabel(
-              userToDelete.roleCode
-              || userToDelete.typeUtilisateur
+            getDepartmentLabel(
+              userToDelete.typeUtilisateur
             )
           }}
         </strong>
-            </div>
-        </div>
-
-        <div class="user-delete-warning">
-            <i class="ti ti-alert-triangle"></i>
+      </span>
 
             <span>
-        Cette action est définitive. La suppression sera
-        refusée si ce compte est lié à des candidatures,
-        des évaluations ou d’autres données de la plateforme.
-        Dans ce cas, désactivez plutôt le compte.
+        <small>Rôle</small>
+
+        <strong>
+          {{ getRoleName(userToDelete) }}
+        </strong>
       </span>
         </div>
 
-        <div class="user-delete-actions">
-
-            <button type="button" class="btn secondary" [disabled]="deletingUser" (click)="closeDeleteModal()">
+        <div class="delete-actions">
+            <button class="btn btn-light" type="button" [disabled]="deleting" (click)="closeDeleteModal()">
         Annuler
       </button>
 
-            <button type="button" class="btn delete-confirm" [disabled]="deletingUser" (click)="confirmDeleteUser()">
+            <button class="btn btn-danger" type="button" [disabled]="deleting" (click)="confirmDelete()">
         <i
           [class]="
-            deletingUser
-              ? 'ti ti-loader-2 loading-icon'
+            deleting
+              ? 'ti ti-loader-2 spin'
               : 'ti ti-trash'
           "
         ></i>
 
         {{
-          deletingUser
+          deleting
             ? 'Suppression...'
-            : 'Supprimer définitivement'
+            : 'Supprimer'
         }}
       </button>
-
         </div>
-
     </div>
 </div>

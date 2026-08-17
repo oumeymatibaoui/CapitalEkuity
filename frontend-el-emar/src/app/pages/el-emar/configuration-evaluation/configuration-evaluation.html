@@ -1,21 +1,9 @@
 <div class="evaluation-page">
-
     <!-- HEADER -->
     <div class="evaluation-header">
         <div>
             <h1>Grille d'évaluation</h1>
-            <p>El Emar — Gestion des appels à candidature</p>
-        </div>
-
-        <div class="header-user">
-            <span class="notif">🔔</span>
-
-            <div class="avatar">A</div>
-
-            <div>
-                <strong>Admin El Emar</strong>
-                <small>Administrateur</small>
-            </div>
+            <p>Configuration simple des critères, points et justificatifs.</p>
         </div>
     </div>
 
@@ -23,7 +11,9 @@
     <div class="content-header">
         <div>
             <h2>Configuration de la grille</h2>
-            <p>Critères, champs dynamiques, pièces liées et barèmes par lot</p>
+            <p>
+                Choisissez le type d'intervenant puis le domaine. Les éléments techniques (section, code, ordre, grille) sont gérés automatiquement.
+            </p>
         </div>
 
         <button type="button" class="add-btn" (click)="openCreateModal()" [disabled]="!selectedLotId">
@@ -31,38 +21,30 @@
     </button>
     </div>
 
-    <!-- TYPE + LOTS -->
+    <!-- TYPE -->
     <div class="config-filter-card">
-
         <div class="filter-field">
-            <label>Type d’intervenant</label>
+            <label>Type d'intervenant</label>
 
-            <select [(ngModel)]="selectedTypeIntervenantId" (ngModelChange)="onTypeChange()">
+            <select [(ngModel)]="selectedTypeIntervenantId" (ngModelChange)="onTypeChange($event)">
         <option [ngValue]="null">-- Choisir un type --</option>
 
-        <option
-          *ngFor="let type of types"
-          [ngValue]="type.id"
-        >
+        <option *ngFor="let type of types" [ngValue]="type.id">
           {{ type.libelle }}
         </option>
       </select>
 
-            <small *ngIf="loadingTypes">
-        Chargement des types...
-      </small>
+            <small *ngIf="loadingTypes">Chargement...</small>
         </div>
 
         <div class="filter-info">
-            <span>Configuration actuelle</span>
-            <strong>{{ getSelectedTypeName() || 'Aucun type sélectionné' }}</strong>
+            <span>Type sélectionné</span>
+            <strong>{{ getSelectedTypeName() || 'Aucun' }}</strong>
         </div>
-
     </div>
 
-    <!-- TABS + TOTAL -->
+    <!-- DOMAINES -->
     <div class="tabs-total-line" *ngIf="selectedTypeIntervenantId">
-
         <div class="lot-tabs" *ngIf="lots.length > 0">
             <button type="button" *ngFor="let lot of lots; trackBy: trackByLotId" [class.active]="selectedLotId === lot.id" (click)="selectLot(lot.id)">
         {{ lot.nomLot }}
@@ -70,297 +52,202 @@
         </div>
 
         <div class="empty-card" *ngIf="!loadingLots && lots.length === 0">
-            Aucun domaine actif trouvé pour ce type d’intervenant.
+            Aucun domaine actif trouvé pour ce type d'intervenant.
         </div>
 
         <div class="total-badge" *ngIf="selectedLotId">
-            🏅 Total maximum :
+            <span>Grille</span>
             <strong [class.ok]="totalPoints === 100" [class.warning]="totalPoints !== 100">
         {{ totalPoints }}/100
       </strong>
+            <small>{{ restePoints }} point(s) restant(s)</small>
         </div>
-
     </div>
 
     <!-- ALERTS -->
-    <div *ngIf="errorMessage" class="alert error">
-        {{ errorMessage }}
+    <div *ngIf="errorMessage" class="alert error">{{ errorMessage }}</div>
+    <div *ngIf="successMessage" class="alert success">{{ successMessage }}</div>
+
+    <!-- LOADING / EMPTY -->
+    <div *ngIf="loading" class="loading-card">Chargement de la grille...</div>
+
+    <div *ngIf="!loading && selectedLotId && criteres.length === 0" class="empty-card">
+        Aucun critère configuré pour {{ getSelectedLotName() }}.
     </div>
 
-    <div *ngIf="successMessage" class="alert success">
-        {{ successMessage }}
-    </div>
-
-    <!-- LOADING -->
-    <div *ngIf="loading" class="loading-card">
-        Chargement de la grille...
-    </div>
-
-    <!-- EMPTY -->
-    <div *ngIf="!loading && criteres.length === 0" class="empty-card">
-        Aucun critère configuré pour le lot {{ getSelectedLotName() }}.
-    </div>
-
-    <!-- SECTION CARDS -->
+    <!-- GROUPES / CATÉGORIES -->
     <div class="section-card" *ngFor="let section of getSections()">
-
         <div class="section-card-header">
             <div class="section-title">
                 <span class="star">☆</span>
-                <h3>{{ section }}</h3>
+                <div>
+                    <h3>{{ section }}</h3>
+                    <small>{{ getCriteresBySection(section).length }} critère(s)</small>
+                </div>
             </div>
 
             <div class="section-header-actions">
                 <strong>{{ getSectionTotal(section) }} pts</strong>
 
-                <button type="button" class="delete-group-btn" title="Supprimer tous les critères de cette catégorie" (click)="openDeleteGroupModal(section)">
+                <button type="button" class="delete-group-btn" title="Retirer tous les critères de cette catégorie de la grille active" (click)="openDeleteGroupModal(section)">
           <i class="ti ti-trash"></i>
-          Supprimer groupe
+          Retirer le groupe
         </button>
             </div>
         </div>
 
         <div class="table-header">
             <span>Critère</span>
-            <span>Description</span>
-            <span>Points max</span>
-            <span>Règle de notation</span>
-            <span>Documents requis</span>
+            <span>Réponse candidat</span>
+            <span>Points</span>
+            <span>Notation</span>
+            <span>Justificatifs</span>
             <span>Actions</span>
         </div>
 
         <div class="table-row" *ngFor="let critere of getCriteresBySection(section); trackBy: trackByCritereId">
-
-            <!-- Critère -->
             <div class="cell critere-name">
                 <strong>{{ critere.libelleCritere }}</strong>
-
-                <small *ngIf="critere.codeCritere">
-          Code : {{ critere.codeCritere }}
-        </small>
-
-                <small *ngIf="critere.labelCandidat">
-          Champ candidat : {{ critere.labelCandidat }}
-        </small>
+                <small *ngIf="critere.codeCritere">{{ critere.codeCritere }}</small>
 
                 <div class="mini-tags">
-                    <span class="type-chip">
-            {{ getTypeChampLabel(critere.typeChamp) }}
-          </span>
-
                     <span class="required-chip" *ngIf="critere.obligatoire">
             Obligatoire
           </span>
-
                     <span class="optional-chip" *ngIf="!critere.obligatoire">
             Facultatif
           </span>
                 </div>
             </div>
 
-            <!-- Description -->
             <div class="cell description">
-                <p *ngIf="critere.aideCandidat">
-                    {{ critere.aideCandidat }}
+                <strong>{{ getTypeChampLabel(critere.typeChamp) }}</strong>
+                <p *ngIf="critere.labelCandidat">
+                    {{ critere.labelCandidat }}
                 </p>
-
-                <p *ngIf="critere.raisonDonnee" class="reason-line">
-                    Pourquoi : {{ critere.raisonDonnee }}
-                </p>
-
-                <p *ngIf="critere.noteCandidat" class="note-candidat">
-                    Instruction : {{ critere.noteCandidat }}
-                </p>
-
-                <p *ngIf="critere.optionsChamp" class="options-line">
-                    Options : {{ critere.optionsChamp }}
-                </p>
-
-                <span *ngIf="!critere.aideCandidat && !critere.raisonDonnee && !critere.noteCandidat && !critere.optionsChamp">
-          -
-        </span>
+                <small *ngIf="critere.aideCandidat">{{ critere.aideCandidat }}</small>
+                <small *ngIf="critere.optionsChamp">
+          Options : {{ critere.optionsChamp }}
+        </small>
             </div>
 
-            <!-- Points -->
             <div class="cell points">
                 <strong>{{ critere.pointsMax }}</strong>
                 <span>pts</span>
             </div>
 
-            <!-- Règle -->
             <div class="cell rule">
-                <p>
-                    {{ critere.baremeNotation || '-' }}
-                </p>
-
-                <small *ngIf="critere.typeNotation">
-          Type : {{ getTypeNotationLabel(critere.typeNotation) }}
-        </small>
-
-                <small *ngIf="critere.noteEvaluateur">
-          Note interne : {{ critere.noteEvaluateur }}
-        </small>
+                <strong>{{ getTypeNotationLabel(critere.typeNotation) }}</strong>
+                <p>{{ critere.baremeNotation || 'Aucun barème détaillé' }}</p>
             </div>
 
-            <!-- Pièces -->
             <div class="cell docs">
                 <span class="doc-chip" *ngFor="let piece of getPiecesText(critere)">
           {{ piece }}
         </span>
 
-                <span *ngIf="getPiecesText(critere).length === 0">
-          -
-        </span>
+                <span *ngIf="getPiecesText(critere).length === 0">-</span>
             </div>
 
-            <!-- Actions -->
             <div class="cell actions">
                 <button type="button" class="icon-btn" title="Modifier" (click)="openEditModal(critere)">
           ✎
         </button>
 
-                <button type="button" class="icon-btn danger" title="Supprimer le critère" (click)="openDeleteCritereModal(critere)">
+                <button type="button" class="icon-btn danger" title="Retirer de la grille" (click)="openDeleteCritereModal(critere)">
           <i class="ti ti-trash"></i>
         </button>
             </div>
-
         </div>
     </div>
 
-    <!-- MODAL CRITÈRE -->
+    <!-- =====================================================
+       MODAL CRITÈRE SIMPLIFIÉ
+  ====================================================== -->
     <div class="modal-backdrop" *ngIf="modalOpen">
         <div class="modal-card large">
-
             <div class="modal-header">
                 <div>
                     <h2>{{ editMode ? 'Modifier le critère' : 'Nouveau critère' }}</h2>
-                    <p>Configurer le champ candidat, la notation interne et les pièces liées.</p>
+                    <p>
+                        Renseignez uniquement les informations métier. Le système gère automatiquement la section, le code, l'ordre et la grille.
+                    </p>
                 </div>
 
-                <button type="button" class="close-btn" (click)="closeModal()">
-          ×
-        </button>
+                <button type="button" class="close-btn" (click)="closeModal()">×</button>
             </div>
 
             <div class="modal-body">
-
-                <!-- BLOCK 1 -->
+                <!-- 1. CRITÈRE -->
                 <div class="form-block">
                     <div class="block-title">
                         <span>1</span>
-
                         <div>
-                            <h3>Identification du critère</h3>
-                            <p>Informations affichées dans la grille d’évaluation El Emar.</p>
+                            <h3>Critère</h3>
+                            <p>À quelle catégorie appartient ce critère ?</p>
                         </div>
                     </div>
 
-                    <div class="form-grid two">
-                        <label>
-              Lot *
-              <select [(ngModel)]="form.lotId" disabled>
+                    <label class="category-field">
+            Catégorie *
+
+            <div class="category-select-line">
+              <select
+                name="categorieEvaluationId"
+                [(ngModel)]="selectedCategoryId"
+                (ngModelChange)="onCategoryChange($event)"
+                [disabled]="loadingCategories"
+                required
+              >
+                <option [ngValue]="null" disabled>
+                  {{ loadingCategories ? 'Chargement...' : 'Sélectionner une catégorie' }}
+                </option>
+
                 <option
-                  *ngFor="let lot of lots; trackBy: trackByLotId"
-                  [ngValue]="lot.id"
+                  *ngFor="let category of categoriesEvaluation; trackBy: trackByCategoryId"
+                  [ngValue]="category.id"
                 >
-                  {{ lot.nomLot }}
+                  {{ category.libelle }}
                 </option>
               </select>
-            </label>
 
-                        <label class="category-field">
-              Catégorie *
-
-              <div class="category-select-line">
-                <select
-                  [(ngModel)]="selectedCategoryId"
-                  (ngModelChange)="onCategoryChange($event)"
-                  [disabled]="loadingCategories || categoriesEvaluation.length === 0"
-                  class="category-select"
-                >
-                  <option [ngValue]="null">-- Choisir une catégorie --</option>
-
-                  <option
-                    *ngFor="let category of categoriesEvaluation; trackBy: trackByCategoryId"
-                    [ngValue]="category.id"
-                  >
-                    {{ category.libelle }}
-                  </option>
-                </select>
-
-                <button
-                  type="button"
-                  class="mini-add-category-btn"
-                  title="Ajouter une catégorie"
-                  (click)="$event.stopPropagation(); openCategoryModal()"
-                >
-                  <span>+</span>
-                </button>
-              </div>
-
-              <small *ngIf="loadingCategories">
-                Chargement des catégories...
-              </small>
-
-              <small *ngIf="!loadingCategories && categoriesEvaluation.length === 0">
-                Aucune catégorie configurée. Cliquez sur + pour ajouter une catégorie.
-              </small>
-            </label>
-                    </div>
-
-                    <div class="form-grid two">
-                        <label>
-              Code critère automatique
-              <input
-                [(ngModel)]="form.codeCritere"
-                readonly
-                class="readonly-input"
-                placeholder="Ex: P01"
+              <button
+                type="button"
+                class="mini-add-category-btn"
+                title="Ajouter une catégorie"
+                (click)="$event.stopPropagation(); openCategoryModal()"
               >
-            </label>
-
-                        <label>
-              Ordre d'affichage
-              <input
-                type="number"
-                [(ngModel)]="form.ordreAffichage"
-                placeholder="1"
-              >
-            </label>
-                    </div>
+                +
+              </button>
+            </div>
+          </label>
 
                     <label>
             Libellé du critère *
             <input
               [(ngModel)]="form.libelleCritere"
-              placeholder="Ex: Nombre d’ingénieurs diplômés"
-            >
+              placeholder="Ex : Nombre d'ingénieurs diplômés"
+            />
           </label>
                 </div>
 
-                <!-- BLOCK 2 -->
+                <!-- 2. RÉPONSE CANDIDAT -->
                 <div class="form-block">
                     <div class="block-title">
                         <span>2</span>
-
                         <div>
-                            <h3>Champ dynamique candidat</h3>
-                            <p>Cette partie sera visible dans le formulaire candidat, sans les notes.</p>
+                            <h3>Réponse attendue</h3>
+                            <p>Définissez simplement ce que le candidat doit renseigner.</p>
                         </div>
                     </div>
 
-                    <label>
-            Label visible candidat *
-            <input
-              [(ngModel)]="form.labelCandidat"
-              placeholder="Ex: Nombre d’ingénieurs disponibles pour ce lot"
-            >
-          </label>
-
                     <div class="form-grid two">
                         <label>
-              Type de retour candidat
-              <select [(ngModel)]="form.typeChamp">
+              Type de réponse *
+              <select
+                [(ngModel)]="form.typeChamp"
+                (ngModelChange)="onTypeChampChange($event)"
+              >
                 <option value="TEXT">Texte</option>
                 <option value="TEXTAREA">Texte long</option>
                 <option value="NUMBER">Nombre</option>
@@ -371,7 +258,7 @@
             </label>
 
                         <label>
-              Champ obligatoire
+              Réponse obligatoire
               <select [(ngModel)]="form.obligatoire">
                 <option [ngValue]="true">Oui</option>
                 <option [ngValue]="false">Non</option>
@@ -380,106 +267,84 @@
                     </div>
 
                     <label *ngIf="form.typeChamp === 'SELECT'">
-            Options de la liste
+            Options de la liste *
             <input
               [(ngModel)]="form.optionsChamp"
-              placeholder="Avancé;Moyen;Faible"
-            >
-            <small>Sépare les options par point-virgule.</small>
+              placeholder="Ex : Avancé;Moyen;Faible"
+            />
+            <small>Séparez les options par point-virgule.</small>
           </label>
 
                     <label>
-            Aide candidat
+            Aide au candidat
             <textarea
               rows="2"
               [(ngModel)]="form.aideCandidat"
-              placeholder="Explication affichée sous le champ candidat"
+              placeholder="Optionnel : courte précision pour éviter les mauvaises réponses."
             ></textarea>
           </label>
-
-                    <!-- <label>
-            Raison de la donnée
-            <textarea
-              rows="2"
-              [(ngModel)]="form.raisonDonnee"
-              placeholder="Pourquoi cette donnée est demandée"
-            ></textarea>
-          </label> -->
-
-                    <!-- <label>
-            Instruction candidat
-            <textarea
-              rows="2"
-              [(ngModel)]="form.noteCandidat"
-              placeholder="Ex: Déclarez uniquement les informations justifiables."
-            ></textarea>
-          </label> -->
                 </div>
 
-                <!-- BLOCK 3 -->
+                <!-- 3. NOTATION -->
                 <div class="form-block internal-block">
                     <div class="block-title">
                         <span>3</span>
-
                         <div>
-                            <h3>Notation interne El Emar</h3>
-                            <p>Cette partie est réservée à l’évaluateur et n’est pas visible par le candidat.</p>
+                            <h3>Notation</h3>
+                            <p>Le mode est proposé automatiquement selon le type de réponse.</p>
                         </div>
                     </div>
 
                     <div class="form-grid two">
                         <label>
-              Points max *
+              Points maximum *
               <input
                 type="number"
+                min="0.01"
+                [max]="getAvailablePointsForForm()"
+                step="0.01"
                 [(ngModel)]="form.pointsMax"
                 placeholder="10"
-              >
+              />
+              <small>
+                Disponible : {{ getAvailablePointsForForm() }} point(s)
+              </small>
             </label>
 
                         <label>
-              Type de notation
+              Mode de notation
               <select [(ngModel)]="form.typeNotation">
-                <option value="MANUEL">Manuel</option>
-                <option value="AUTOMATIQUE">Automatique</option>
+                <option value="MANUEL">Évaluation manuelle</option>
+                <option value="AUTOMATIQUE">Selon la réponse</option>
                 <option value="OUI_NON">Oui / Non</option>
-                <option value="SEUIL_NUMERIQUE">Seuil numérique</option>
+                <option value="SEUIL_NUMERIQUE">Selon la valeur</option>
               </select>
             </label>
                     </div>
 
                     <label>
-            Règle de notation
+            Barème / règle de notation
             <textarea
               rows="3"
               [(ngModel)]="form.baremeNotation"
-              placeholder="Ex: > 5 profils : 10 pts / 3-5 : 7 pts / 1-2 : 3 pts"
+              [placeholder]="getNotationHelp()"
             ></textarea>
-          </label>
-
-                    <label>
-            Remarque évaluateur
-            <textarea
-              rows="2"
-              [(ngModel)]="form.noteEvaluateur"
-              placeholder="Note interne pour guider l’évaluateur"
-            ></textarea>
+            <small>{{ getNotationHelp() }}</small>
           </label>
                 </div>
 
-                <!-- BLOCK 4 -->
+                <!-- 4. JUSTIFICATIFS -->
                 <div class="form-block pieces-block">
                     <div class="block-title">
                         <span>4</span>
-
                         <div>
-                            <h3>Pièces liées au critère</h3>
-                            <p>Choisir une pièce existante ou écrire une nouvelle pièce directement.</p>
+                            <h3>Justificatifs</h3>
+                            <p>Ajoutez uniquement les documents nécessaires pour vérifier ce critère.</p>
                         </div>
                     </div>
 
                     <div class="pieces-title-line">
-                        <strong>Pièces à demander pour ce critère</strong>
+                        <strong>Documents demandés</strong>
 
                         <button type="button" class="add-piece-btn" (click)="addPieceToCritere()">
               + Ajouter une pièce
@@ -487,7 +352,7 @@
                     </div>
 
                     <div class="piece-suggestions" *ngIf="pieceNames.length > 0">
-                        <span>Pièces déjà utilisées :</span>
+                        <span>Déjà utilisées :</span>
 
                         <button type="button" *ngFor="let name of getVisiblePieceNames()" (click)="addPieceToCritere(name)">
               {{ name }}
@@ -495,22 +360,19 @@
                     </div>
 
                     <datalist id="pieces-list">
-            <option
-              *ngFor="let name of pieceNames"
-              [value]="name"
-            ></option>
+            <option *ngFor="let name of pieceNames" [value]="name"></option>
           </datalist>
 
                     <div class="empty-piece-box" *ngIf="!form.pieces || form.pieces.length === 0">
-                        Aucune pièce liée. Clique sur “Ajouter une pièce” ou choisis une pièce déjà utilisée.
+                        Aucun justificatif demandé.
                     </div>
 
                     <div class="piece-config-card" *ngFor="let piece of form.pieces; let i = index; trackBy: trackByIndex">
                         <div class="piece-config-header">
-                            <strong>Pièce {{ i + 1 }}</strong>
+                            <strong>{{ piece.nomPiece || ('Pièce ' + (i + 1)) }}</strong>
 
                             <button type="button" class="remove-piece-btn" (click)="removePieceFromCritere(i)">
-                Supprimer
+                Retirer
               </button>
                         </div>
 
@@ -520,8 +382,8 @@
                 <input
                   list="pieces-list"
                   [(ngModel)]="piece.nomPiece"
-                  placeholder="Choisir une pièce existante ou écrire une nouvelle"
-                >
+                  placeholder="Ex : CV, diplôme, attestation..."
+                />
               </label>
 
                             <label>
@@ -534,7 +396,6 @@
                         </div>
                     </div>
                 </div>
-
             </div>
 
             <div class="modal-footer">
@@ -543,21 +404,27 @@
         </button>
 
                 <button type="button" class="save-btn" (click)="save()" [disabled]="saving">
-          {{ saving ? 'Enregistrement...' : (editMode ? 'Modifier' : 'Ajouter') }}
+          {{
+            saving
+              ? 'Enregistrement...'
+              : editMode
+                ? 'Enregistrer les modifications'
+                : 'Ajouter le critère'
+          }}
         </button>
             </div>
-
         </div>
     </div>
 
-    <!-- MINI MODAL AJOUT CATÉGORIE -->
+    <!-- =====================================================
+       MINI MODAL CATÉGORIE
+  ====================================================== -->
     <div class="mini-modal-backdrop" *ngIf="categoryModalOpen">
         <div class="mini-modal-card">
-
             <div class="mini-modal-header">
                 <div>
                     <h3>Nouvelle catégorie</h3>
-                    <p>Ajouter une catégorie d’évaluation.</p>
+                    <p>Une catégorie regroupe plusieurs critères proches.</p>
                 </div>
 
                 <button type="button" class="mini-close-btn" (click)="closeCategoryModal()">
@@ -566,56 +433,31 @@
             </div>
 
             <div class="mini-modal-body">
-
                 <div *ngIf="categoryFormError" class="alert error">
                     {{ categoryFormError }}
                 </div>
 
                 <label>
-          Libellé de la catégorie *
+          Libellé *
           <input
             [(ngModel)]="categoryForm.libelle"
-            placeholder="Ex: Ressources humaines"
-          >
-        </label>
-
-                <label>
-          Code
-          <input
-            [(ngModel)]="categoryForm.code"
-            placeholder="Ex: RH_BUREAU"
-          >
-          <small>Optionnel. Si vide, le code sera généré automatiquement.</small>
+            placeholder="Ex : Expérience spécifique"
+          />
         </label>
 
                 <label>
           Description
           <textarea
-            rows="3"
+            rows="2"
             [(ngModel)]="categoryForm.description"
-            placeholder="Description courte de la catégorie"
+            placeholder="Description courte"
           ></textarea>
         </label>
 
                 <label class="checkbox-line">
-          <input
-            type="checkbox"
-            [(ngModel)]="categoryForm.globalForType"
-          >
-
-          <span>
-            Catégorie générale pour tout le type d’intervenant
-          </span>
+          <input type="checkbox" [(ngModel)]="categoryForm.globalForType" />
+          <span>Disponible pour tous les domaines de ce type</span>
         </label>
-
-                <small *ngIf="categoryForm.globalForType">
-          Cette catégorie sera disponible pour tous les lots de ce type.
-        </small>
-
-                <small *ngIf="!categoryForm.globalForType">
-          Cette catégorie sera disponible seulement pour le lot actuel.
-        </small>
-
             </div>
 
             <div class="mini-modal-footer">
@@ -627,118 +469,52 @@
           {{ savingCategory ? 'Enregistrement...' : 'Ajouter' }}
         </button>
             </div>
-
         </div>
     </div>
 
-
     <!-- =====================================================
-         MODAL SUPPRESSION CRITÈRE / GROUPE
-    ====================================================== -->
+       MODAL RETRAIT
+  ====================================================== -->
     <div class="delete-modal-backdrop" *ngIf="deleteModalOpen" (click)="closeDeleteModal()">
         <div class="delete-modal-card" (click)="$event.stopPropagation()">
-
             <div class="delete-modal-icon">
                 <i class="ti ti-trash"></i>
             </div>
 
-            <span class="delete-modal-label">
-          Suppression de l’affichage
-        </span>
+            <span class="delete-modal-label">Grille active</span>
 
-            <h3>
-                {{ getDeleteModalTitle() }}
-            </h3>
+            <h3>{{ getDeleteModalTitle() }}</h3>
 
             <p class="delete-modal-question">
-                Voulez-vous vraiment supprimer
-
-                <strong>
-            « {{ getDeleteModalName() }} »
-          </strong> de l’affichage ?
+                Voulez-vous retirer <strong>« {{ getDeleteModalName() }} »</strong> ?
             </p>
 
             <div class="delete-modal-details" *ngIf="deleteTarget === 'GROUPE'">
                 <div>
-                    <span>Lot concerné</span>
-
-                    <strong>
-              {{ getSelectedLotName() }}
-            </strong>
+                    <span>Domaine</span>
+                    <strong>{{ getSelectedLotName() }}</strong>
                 </div>
 
                 <div>
-                    <span>Nombre de critères</span>
-
-                    <strong>
-              {{ getDeleteModalCount() }}
-            </strong>
-                </div>
-            </div>
-
-            <div class="delete-modal-details" *ngIf="deleteTarget === 'CRITERE' && critereToDelete">
-                <div>
-                    <span>Code</span>
-
-                    <strong>
-              {{ critereToDelete.codeCritere || '-' }}
-            </strong>
-                </div>
-
-                <div>
-                    <span>Points maximum</span>
-
-                    <strong>
-              {{ critereToDelete.pointsMax }} pts
-            </strong>
-                </div>
-
-                <div>
-                    <span>Catégorie</span>
-
-                    <strong>
-              {{
-                critereToDelete.categorieEvaluationLibelle ||
-                critereToDelete.section ||
-                'Sans catégorie'
-              }}
-            </strong>
+                    <span>Critères concernés</span>
+                    <strong>{{ getDeleteModalCount() }}</strong>
                 </div>
             </div>
 
             <div class="delete-modal-warning">
                 <i class="ti ti-info-circle"></i>
-
-                <span>
-            {{ getDeleteModalMessage() }}
-          </span>
+                <span>{{ getDeleteModalMessage() }}</span>
             </div>
 
             <div class="delete-modal-actions">
                 <button type="button" class="cancel-btn" [disabled]="deleting" (click)="closeDeleteModal()">
-            Annuler
-          </button>
+          Annuler
+        </button>
 
                 <button type="button" class="confirm-delete-btn" [disabled]="deleting" (click)="confirmDeleteModal()">
-            <i
-              [class]="
-                deleting
-                  ? 'ti ti-loader-2 delete-loading'
-                  : 'ti ti-trash'
-              "
-            ></i>
-
-            {{
-              deleting
-                ? 'Suppression...'
-                : deleteTarget === 'GROUPE'
-                  ? 'Supprimer le groupe'
-                  : 'Supprimer le critère'
-            }}
-          </button>
+          {{ deleting ? 'Traitement...' : 'Retirer' }}
+        </button>
             </div>
-
         </div>
     </div>
-
 </div>

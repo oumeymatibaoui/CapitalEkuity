@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { environment } from '../../../environments/environment.development';
 
 export interface HistoriqueActionResponse {
   id: number;
@@ -28,7 +29,7 @@ export interface HistoriqueActionResponse {
 })
 export class HistoriqueActionService {
 
-  private readonly apiUrl = 'http://localhost:8089/api/historique-actions';
+  private readonly apiUrl = `${environment.apiBaseUrl}/api/historique-actions`;
 
   constructor(private http: HttpClient) {}
 

@@ -1,0 +1,308 @@
+<section class="workflow-card">
+
+    <header class="workflow-header">
+        <div>
+            <span class="eyebrow">Circuit de traitement</span>
+            <h2>{{ raisonSociale || workflow?.raisonSociale || 'Dossier' }}</h2>
+            <p>
+                Le dossier reste ouvert jusqu'à la fin de la dernière étape.
+            </p>
+        </div>
+
+        <button type="button" class="icon-button" title="Actualiser le workflow" [disabled]="loading || saving" (click)="loadWorkflow()">
+      <i
+        [class]="
+          loading
+            ? 'ti ti-loader-2 spin'
+            : 'ti ti-refresh'
+        "
+      ></i>
+    </button>
+    </header>
+
+    <div class="alert error" *ngIf="errorMessage">
+        <i class="ti ti-alert-circle"></i> {{ errorMessage }}
+    </div>
+
+    <div class="alert success" *ngIf="successMessage">
+        <i class="ti ti-circle-check"></i> {{ successMessage }}
+    </div>
+
+    <div class="loading-state" *ngIf="loading && !workflow">
+        <i class="ti ti-loader-2 spin"></i> Chargement du workflow...
+    </div>
+
+    <ng-container *ngIf="workflow">
+
+        <div class="progress-row">
+            <div>
+                <strong>{{ getProgressPercent() }}%</strong>
+                <span>du circuit terminé</span>
+            </div>
+
+            <div class="progress-track">
+                <span [style.width.%]="getProgressPercent()"></span>
+            </div>
+        </div>
+
+        <div class="workflow-timeline">
+            <article class="workflow-step" *ngFor="let step of workflow.etapes; trackBy: trackByStepId" [class.active]="step.active" [class.finished]="step.statut === 'TERMINEE'" [class.reopened]="step.statut === 'REOUVERTE'">
+                <div class="step-marker">
+                    <i [class]="getStatusIcon(step.statut)"></i>
+                </div>
+
+                <div class="step-body">
+                    <div class="step-title-line">
+                        <div>
+                            <small>
+                Étape {{ step.ordre }} · {{ step.departementCode || '-' }}
+              </small>
+
+                            <h3>
+                                {{ step.libelleEtape }}
+
+                                <span class="current-user-badge" *ngIf="isStepAssignedToCurrentUser(step)">
+                  Votre étape
+                </span>
+                            </h3>
+                        </div>
+
+                        <span class="step-status" [attr.data-status]="step.statut">
+              {{ getStatusLabel(step.statut) }}
+            </span>
+                    </div>
+
+                    <div class="step-assignee">
+                        <i class="ti ti-user"></i>
+                        <div>
+                            <strong>
+                {{ step.utilisateurAffecteNom || '-' }}
+              </strong>
+                            <small>
+                {{ step.utilisateurAffecteEmail || '-' }}
+              </small>
+                        </div>
+                    </div>
+
+                    <div class="step-dates" *ngIf="step.dateDebut || step.dateFin || step.dateReouverture">
+                        <span *ngIf="step.dateDebut">
+              Début : {{ formatDate(step.dateDebut) }}
+            </span>
+                        <span *ngIf="step.dateFin">
+              Fin : {{ formatDate(step.dateFin) }}
+            </span>
+                        <span *ngIf="step.dateReouverture">
+              Réouverture : {{ formatDate(step.dateReouverture) }}
+            </span>
+                    </div>
+
+                    <div class="reopen-reason" *ngIf="step.motifReouverture">
+                        <i class="ti ti-alert-triangle"></i> {{ step.motifReouverture }}
+                    </div>
+
+                    <div class="manager-actions" *ngIf="canReassignStep(step) || canReopenStep(step)">
+                        <button type="button" *ngIf="canReassignStep(step)" (click)="openReassignModal(step)">
+              <i class="ti ti-user-share"></i>
+              Réaffecter
+            </button>
+
+                        <button type="button" *ngIf="canReopenStep(step)" (click)="openReopenModal(step)">
+              <i class="ti ti-lock-open"></i>
+              Réouvrir
+            </button>
+                    </div>
+                </div>
+            </article>
+        </div>
+
+        <!-- UTILISATEUR ACTIF -->
+        <div class="current-task-card" *ngIf="workflow.etapeActive && isCurrentUserAssigned()">
+            <div class="current-task-heading">
+                <span>
+          <i class="ti ti-user-check"></i>
+        </span>
+
+                <div>
+                    <small>Votre travail actuel</small>
+                    <h3>
+                        {{ workflow.etapeActive.libelleEtape }}
+                    </h3>
+                </div>
+            </div>
+
+            <ng-container *ngIf="canStartCurrentStep()">
+                <p>
+                    Démarrez votre étape pour activer uniquement les actions métier correspondant à cette étape.
+                </p>
+
+                <button type="button" class="primary-button" [disabled]="saving" (click)="startMyStep()">
+          <i class="ti ti-player-play"></i>
+          {{
+            workflow.etapeActive.statut === 'REOUVERTE'
+              ? 'Reprendre mon étape'
+              : 'Commencer mon étape'
+          }}
+        </button>
+            </ng-container>
+
+            <ng-container *ngIf="canTransmitCurrentStep()">
+                <p>
+                    Enregistrez votre travail dans les sections métier puis terminez l'étape pour transmettre le dossier.
+                </p>
+
+                <textarea rows="3" [(ngModel)]="transmissionComment" placeholder="Commentaire de transmission facultatif"></textarea>
+
+                <div class="transmit-warning">
+                    <i class="ti ti-info-circle"></i> Cette étape passera en lecture seule. Le dossier restera ouvert tant qu'une étape suivante existe.
+                </div>
+
+                <button type="button" class="primary-button" [disabled]="saving" (click)="transmitMyStep()">
+          <i
+            [class]="
+              saving
+                ? 'ti ti-loader-2 spin'
+                : 'ti ti-send'
+            "
+          ></i>
+          {{
+            saving
+              ? 'Transmission...'
+              : 'Terminer et transmettre'
+          }}
+        </button>
+            </ng-container>
+        </div>
+
+        <!-- UN AUTRE UTILISATEUR TRAITE LE DOSSIER -->
+        <div class="workflow-info" *ngIf="isAnotherUserActiveStep()">
+            <i class="ti ti-route"></i>
+            <div>
+                <strong>Dossier en cours de traitement</strong>
+                <span>
+          Étape actuelle :
+          {{ workflow.etapeActive?.libelleEtape }}.
+          Responsable :
+          {{ workflow.etapeActive?.utilisateurAffecteNom }}.
+          Vous pouvez consulter les informations auxquelles votre rôle donne accès.
+        </span>
+            </div>
+        </div>
+
+        <!-- CLÔTURE RÉELLE -->
+        <div class="workflow-complete" *ngIf="isDossierClosed()">
+            <i class="ti ti-rosette-discount-check"></i>
+            <div>
+                <strong>Dossier clôturé</strong>
+                <span>
+          Toutes les étapes du workflow sont terminées. Le dossier est
+          maintenant disponible uniquement en consultation.
+        </span>
+            </div>
+        </div>
+    </ng-container>
+
+    <!-- RÉAFFECTATION -->
+    <div class="modal-backdrop" *ngIf="showReassignModal" (click)="closeReassignModal()">
+        <div class="workflow-modal" (click)="$event.stopPropagation()">
+            <header>
+                <div>
+                    <small>Réaffectation</small>
+                    <h3>{{ reassignStepTarget?.libelleEtape }}</h3>
+                </div>
+                <button type="button" (click)="closeReassignModal()">
+          <i class="ti ti-x"></i>
+        </button>
+            </header>
+
+            <label>
+        <span>Nouveau responsable</span>
+        <select
+          [(ngModel)]="reassignUserId"
+          [disabled]="saving"
+        >
+          <option [ngValue]="null">
+            -- Sélectionner --
+          </option>
+          <option
+            *ngFor="let user of reassignUsers()"
+            [ngValue]="user.id"
+          >
+            {{ user.nom }} — {{ user.email }}
+          </option>
+        </select>
+      </label>
+
+            <label>
+        <span>Motif</span>
+        <textarea
+          rows="3"
+          [(ngModel)]="reassignReason"
+          [disabled]="saving"
+        ></textarea>
+      </label>
+
+            <footer>
+                <button type="button" class="secondary-button" [disabled]="saving" (click)="closeReassignModal()">
+          Annuler
+        </button>
+                <button type="button" class="primary-button" [disabled]="saving || !reassignUserId" (click)="confirmReassign()">
+          Confirmer
+        </button>
+            </footer>
+        </div>
+    </div>
+
+    <!-- RÉOUVERTURE -->
+    <div class="modal-backdrop" *ngIf="showReopenModal" (click)="closeReopenModal()">
+        <div class="workflow-modal" (click)="$event.stopPropagation()">
+            <header>
+                <div>
+                    <small>Réouverture administrative</small>
+                    <h3>{{ reopenStepTarget?.libelleEtape }}</h3>
+                </div>
+                <button type="button" (click)="closeReopenModal()">
+          <i class="ti ti-x"></i>
+        </button>
+            </header>
+
+            <div class="modal-warning">
+                <i class="ti ti-alert-triangle"></i> Cette étape et toutes les étapes suivantes seront remises à traiter. Les enregistrements métier correspondants seront déverrouillés.
+            </div>
+
+            <label>
+        <span>Responsable</span>
+        <select
+          [(ngModel)]="reopenUserId"
+          [disabled]="saving"
+        >
+          <option
+            *ngFor="let user of reopenUsers()"
+            [ngValue]="user.id"
+          >
+            {{ user.nom }} — {{ user.email }}
+          </option>
+        </select>
+      </label>
+
+            <label>
+        <span>Motif *</span>
+        <textarea
+          rows="4"
+          [(ngModel)]="reopenReason"
+          [disabled]="saving"
+          placeholder="Expliquez pourquoi cette étape doit être reprise..."
+        ></textarea>
+      </label>
+
+            <footer>
+                <button type="button" class="secondary-button" [disabled]="saving" (click)="closeReopenModal()">
+          Annuler
+        </button>
+                <button type="button" class="primary-button" [disabled]="saving || !reopenReason.trim()" (click)="confirmReopen()">
+          Réouvrir
+        </button>
+            </footer>
+        </div>
+    </div>
+
+</section>

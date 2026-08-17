@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { environment } from '../../../environments/environment.development';
 
 export interface ProjetReferenceRequest {
   id?: number | null;
@@ -62,7 +63,7 @@ longitude?: number | null;
 })
 export class CndReferenceCandidatService {
 
-  private apiUrl = 'http://localhost:8089/api/cnd/references';
+  private apiUrl = `${environment.apiBaseUrl}/api/cnd/references`;
 
   constructor(private http: HttpClient) {}
 

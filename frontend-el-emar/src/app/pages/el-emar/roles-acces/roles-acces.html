@@ -1,418 +1,954 @@
 <div class="roles-page">
-
-    <!-- =====================================================
-       EN-TÊTE
-  ====================================================== -->
     <header class="page-header">
         <div class="page-title">
-            <span class="page-title-icon"><i class="ti ti-shield-lock"></i></span>
+            <span class="page-title-icon">
+        <i class="ti ti-shield-lock"></i>
+      </span>
+
             <div>
-                <h1>Rôles et accès</h1>
-                <p>Choisissez un rôle à gauche, puis activez ou bloquez ses modules à droite.</p>
+                <h1>Rôles et autorisations</h1>
+                <p>
+                    Définissez les pages, les sections d’évaluation et les catégories accessibles à chaque rôle.
+                </p>
             </div>
         </div>
 
-        <button type="button" class="btn btn--primary" (click)="openCreateModal()">
+        <button type="button" class="btn btn-primary" (click)="openCreateRoleModal()">
       <i class="ti ti-plus"></i>
-      Nouveau rôle
+      Créer un rôle
     </button>
     </header>
 
-    <!-- =====================================================
-       MESSAGES
-  ====================================================== -->
-    <div class="alert alert--success" *ngIf="successMessage" role="status">
+    <!-- MESSAGES -->
+
+    <div class="alert alert-success" *ngIf="successMessage">
         <i class="ti ti-circle-check"></i>
         <span>{{ successMessage }}</span>
     </div>
 
-    <div class="alert alert--error" *ngIf="errorMessage" role="alert">
+    <div class="alert alert-error" *ngIf="errorMessage">
         <i class="ti ti-alert-circle"></i>
         <span>{{ errorMessage }}</span>
     </div>
 
-    <!-- =====================================================
-       APERÇU CHIFFRÉ (résumé rapide, non prioritaire)
-  ====================================================== -->
-    <div class="stats-row">
-        <div class="stat-chip">
-            <i class="ti ti-users"></i>
-            <div><strong>{{ roles.length }}</strong><span>rôles actifs</span></div>
+    <!-- GUIDE -->
+
+    <div class="process-guide">
+        <div class="process-step active">
+            <span>1</span>
+
+            <div>
+                <strong>Choisir un rôle</strong>
+                <small>Sélectionnez le profil à configurer</small>
+            </div>
         </div>
-        <div class="stat-chip">
-            <i class="ti ti-layout-grid"></i>
-            <div><strong>{{ getTotalModules() }}</strong><span>modules au total</span></div>
+
+        <i class="ti ti-chevron-right"></i>
+
+        <div class="process-step" [class.active]="selectedRole">
+            <span>2</span>
+
+            <div>
+                <strong>Définir les accès</strong>
+                <small>Pages, sections, actions et catégories</small>
+            </div>
         </div>
-        <div class="stat-chip stat-chip--ok">
-            <i class="ti ti-lock-open"></i>
-            <div><strong>{{ getTotalAuthorized() }}</strong><span>accès autorisés</span></div>
-        </div>
-        <div class="stat-chip stat-chip--danger">
-            <i class="ti ti-lock"></i>
-            <div><strong>{{ getTotalBlocked() }}</strong><span>accès bloqués</span></div>
+
+        <i class="ti ti-chevron-right"></i>
+
+        <div class="process-step" [class.active]="hasUnsavedChanges()">
+            <span>3</span>
+
+            <div>
+                <strong>Enregistrer</strong>
+                <small>Appliquer les autorisations</small>
+            </div>
         </div>
     </div>
 
-    <!-- =====================================================
-       ESPACE DE TRAVAIL : 2 ÉTAPES CÔTE À CÔTE
-       1) Choisir un rôle   2) Gérer ses accès
-  ====================================================== -->
     <div class="workspace">
+        <!-- LISTE DES RÔLES -->
 
-        <!-- ===============================================
-         ÉTAPE 1 — LISTE DES RÔLES
-    =============================================== -->
-        <section class="panel roles-panel">
-
-            <div class="panel-head">
-                <div class="step">
-                    <span class="step-number">1</span>
-                    <div>
-                        <h2>Choisir un rôle</h2>
-                        <p>{{ filteredRoles.length }} rôle(s)</p>
-                    </div>
+        <aside class="roles-panel">
+            <div class="panel-heading">
+                <div>
+                    <h2>Rôles</h2>
+                    <p>{{ filteredRoles.length }} rôle(s) disponible(s)</p>
                 </div>
             </div>
 
             <div class="search-box">
                 <i class="ti ti-search"></i>
-                <input type="text" placeholder="Rechercher par nom, code..." [(ngModel)]="searchRole" (input)="filterRoles()" />
-                <button type="button" class="icon-btn" *ngIf="searchRole" title="Effacer" (click)="clearSearch()">
+
+                <input type="text" placeholder="Rechercher un rôle" [(ngModel)]="searchRole" (input)="filterRoles()" />
+
+                <button type="button" *ngIf="searchRole" class="clear-button" title="Effacer" (click)="clearRoleSearch()">
           <i class="ti ti-x"></i>
         </button>
             </div>
 
-            <div class="roles-scroll">
-
-                <div class="empty-state" *ngIf="loading">
-                    <i class="ti ti-loader-2 spin"></i>
-                    <span>Chargement des rôles...</span>
+            <div class="roles-list">
+                <div class="loading-state" *ngIf="loading">
+                    <i class="ti ti-loader-2 spin"></i> Chargement des rôles...
                 </div>
 
                 <div class="empty-state" *ngIf="!loading && filteredRoles.length === 0">
-                    <i class="ti ti-shield-off"></i>
-                    <span>Aucun rôle ne correspond à votre recherche.</span>
+                    <i class="ti ti-users-minus"></i>
+                    <strong>Aucun rôle trouvé</strong>
+                    <span>Modifiez votre recherche.</span>
                 </div>
 
-                <button type="button" class="role-card" *ngFor="let role of filteredRoles" [class.role-card--active]="selectedRole?.id === role.id" (click)="selectRole(role)">
-          <span class="role-avatar"><i [class]="getRoleIcon(role)"></i></span>
+                <button type="button" class="role-item" *ngFor="let role of filteredRoles; trackBy: trackByRoleId" [class.selected]="selectedRole?.id === role.id" (click)="selectRole(role)">
+          <span class="role-icon">
+            <i [class]="getRoleIcon(role)"></i>
+          </span>
 
-          <span class="role-info">
+          <span class="role-content">
             <span class="role-name">
               {{ role.nomRole }}
-              <i class="ti ti-shield-lock role-system-mark" *ngIf="role.roleSysteme" title="Rôle système protégé"></i>
+
+              <i
+                *ngIf="role.roleSysteme"
+                class="ti ti-lock role-lock"
+                title="Rôle protégé"
+              ></i>
             </span>
-            <span class="role-sub">{{ role.codeRole }} · {{ role.typeRole }}</span>
+
+            <span class="role-code">
+              {{ role.codeRole }} · {{ role.typeRole }}
+            </span>
 
             <span class="role-progress">
-              <span class="role-progress-track">
+              <span class="progress-track">
                 <span
-                  class="role-progress-fill"
-                  [style.width.%]="role.totalModules > 0 ? (role.modulesAutorises / role.totalModules) * 100 : 0"
+                  class="progress-value"
+                  [style.width.%]="getRoleProgress(role)"
                 ></span>
               </span>
-              <span class="role-progress-count">{{ role.modulesAutorises }}/{{ role.totalModules }}</span>
+
+              <small>
+                {{ role.modulesAutorises || 0 }} /
+                {{ role.totalModules || 0 }}
+              </small>
             </span>
           </span>
 
           <i class="ti ti-chevron-right role-arrow"></i>
         </button>
-
             </div>
-        </section>
+        </aside>
 
-        <!-- ===============================================
-         ÉTAPE 2 — ACCÈS DU RÔLE SÉLECTIONNÉ
-    =============================================== -->
-        <section class="panel access-panel">
+        <!-- CONFIGURATION -->
 
-            <ng-container *ngIf="selectedRole; else noRoleSelected">
+        <main class="access-panel">
+            <ng-container *ngIf="selectedRole; else noSelectedRole">
+                <div class="selected-role-header">
+                    <div class="selected-role-info">
+                        <span class="selected-role-icon">
+              <i [class]="getRoleIcon(selectedRole)"></i>
+            </span>
 
-                <div class="panel-head panel-head--split">
-                    <div class="step">
-                        <span class="step-number">2</span>
                         <div>
+                            <span class="eyebrow">Rôle sélectionné</span>
+
                             <h2>{{ selectedRole.nomRole }}</h2>
-                            <p>{{ selectedRole.description || 'Aucune description.' }}</p>
+
+                            <p>
+                                {{ selectedRole.description || "Aucune description renseignée." }}
+                            </p>
                         </div>
                     </div>
 
                     <div class="role-actions">
-                        <button type="button" class="icon-btn" title="Modifier ce rôle" (click)="openEditSelectedRole()">
+                        <button type="button" class="icon-button" title="Modifier le rôle" (click)="openEditRoleModal()">
               <i class="ti ti-pencil"></i>
             </button>
-                        <button type="button" class="icon-btn icon-btn--danger" [disabled]="selectedRole.roleSysteme" [title]="selectedRole.roleSysteme ? 'Rôle système protégé — repassez-le en standard pour le supprimer' : 'Supprimer ce rôle'" (click)="openDeleteSelectedRole()">
-              <i [class]="selectedRole.roleSysteme ? 'ti ti-lock' : 'ti ti-trash'"></i>
+
+                        <button type="button" class="icon-button danger" [disabled]="selectedRole.roleSysteme" [title]="
+                selectedRole.roleSysteme
+                  ? 'Rôle protégé'
+                  : 'Supprimer le rôle'
+              " (click)="openDeleteRoleModal()">
+              <i
+                [class]="
+                  selectedRole.roleSysteme
+                    ? 'ti ti-lock'
+                    : 'ti ti-trash'
+                "
+              ></i>
             </button>
-                        <button type="button" class="icon-btn" [title]="previewOpen ? 'Masquer l’aperçu' : 'Afficher l’aperçu'" (click)="togglePreview()">
-              <i [class]="previewOpen ? 'ti ti-eye-off' : 'ti ti-eye'"></i>
+                    </div>
+                </div>
+
+                <div class="protected-note" *ngIf="selectedRole.roleSysteme">
+                    <i class="ti ti-info-circle"></i>
+
+                    <span>
+            Ce rôle est protégé contre la suppression. Ses autorisations
+            restent modifiables.
+          </span>
+                </div>
+
+                <!-- ACCÈS GLOBAL -->
+
+                <div class="access-toolbar global-access-toolbar" *ngIf="!loadingModules">
+                    <div>
+                        <strong>Accès complet au système</strong>
+
+                        <small>
+              Autorise toutes les pages, les sections, les actions
+              et toutes les catégories.
+            </small>
+                    </div>
+
+                    <div class="toolbar-actions">
+                        <span class="permission-state" [class.allowed]="hasFullSystemAccess()">
+              {{
+                hasFullSystemAccess()
+                  ? "Accès complet"
+                  : "Accès personnalisé"
+              }}
+            </span>
+
+                        <button type="button" class="btn btn-primary btn-small" [disabled]="savingAccess || hasFullSystemAccess()" (click)="setAllSystemAccess(true)">
+              <i class="ti ti-shield-check"></i>
+              Tout autoriser
+            </button>
+
+                        <button type="button" class="btn btn-light btn-small" [disabled]="savingAccess" (click)="setAllSystemAccess(false)">
+              <i class="ti ti-lock"></i>
+              Tout bloquer
             </button>
                     </div>
                 </div>
 
-                <p class="protected-note" *ngIf="selectedRole.roleSysteme">
-                    <i class="ti ti-info-circle"></i> Rôle système : protégé contre la suppression. Modifiez-le pour le repasser en rôle standard si besoin.
-                </p>
+                <!-- ONGLETS -->
 
-                <div class="toolbar">
-                    <span class="toolbar-label">Modules :</span>
-                    <button type="button" class="btn btn--sm btn--secondary" (click)="allowAll()" [disabled]="loadingModules">
-            <i class="ti ti-lock-open"></i> Tout autoriser
+                <nav class="access-tabs">
+                    <button type="button" *ngFor="let tab of tabs" [class.active]="activeTab === tab.id" (click)="setActiveTab(tab.id)">
+            <i [class]="tab.icon"></i>
+
+            <span>
+              <strong>{{ tab.label }}</strong>
+              <small>{{ tab.description }}</small>
+            </span>
+
+            <span class="tab-count" *ngIf="tab.id !== 'RESUME'">
+              {{ getTabAuthorizedCount(tab.id) }} /
+              {{ getTabCount(tab.id) }}
+            </span>
           </button>
-                    <button type="button" class="btn btn--sm btn--secondary" (click)="blockAll()" [disabled]="loadingModules">
-            <i class="ti ti-lock"></i> Tout bloquer
-          </button>
-                    <button type="button" class="btn btn--sm btn--ghost" (click)="resetChanges()" [disabled]="loadingModules">
-            <i class="ti ti-refresh"></i> Annuler mes changements
-          </button>
-                </div>
+                </nav>
 
-                <div class="empty-state" *ngIf="loadingModules">
-                    <i class="ti ti-loader-2 spin"></i>
-                    <span>Chargement des modules...</span>
-                </div>
+                <!-- OUTILS DE L’ONGLET -->
 
-                <div class="empty-state" *ngIf="!loadingModules && moduleGroups.length === 0">
-                    <i class="ti ti-layout-grid-remove"></i>
-                    <span>Aucun module disponible pour ce rôle.</span>
-                </div>
+                <div class="access-toolbar" *ngIf="activeTab !== 'RESUME' && !loadingModules">
+                    <div>
+                        <strong>
+              {{
+                activeTab === "PAGES"
+                  ? "Niveau 1 — Pages autorisées"
+                  : activeTab === "SECTIONS"
+                    ? "Niveau 2 — Sections visibles"
+                    : activeTab === "ACTIONS"
+                      ? "Niveau 3 — Actions autorisées"
+                      : activeTab === "WORKFLOW"
+                        ? "Pilotage du workflow"
+                        : "Niveau 4 — Catégories autorisées"
+              }}
+            </strong>
 
-                <div class="modules-scroll" *ngIf="!loadingModules && moduleGroups.length > 0">
-
-                    <div class="module-group" *ngFor="let group of moduleGroups">
-                        <div class="module-group-head">
-                            <strong>{{ group.groupe }}</strong>
-                            <span class="group-count">{{ group.modulesAutorises }}/{{ group.totalModules }}</span>
-                        </div>
-
-                        <div class="module-row" *ngFor="let module of group.modules">
-                            <span class="module-icon"><i [class]="module.icone"></i></span>
-
-                            <span class="module-text">
-                <span class="module-name">{{ module.libelle }}</span>
-                            <span class="module-desc">{{ module.description || 'Aucune description.' }}</span>
-                            </span>
-
-                            <span class="module-state" [class.module-state--on]="module.autorise">
-                {{ module.autorise ? 'Autorisé' : 'Bloqué' }}
-              </span>
-
-                            <button type="button" class="switch" [class.switch--on]="module.autorise" [attr.aria-pressed]="module.autorise" [attr.aria-label]="module.autorise ? 'Bloquer ' + module.libelle : 'Autoriser ' + module.libelle" (click)="toggleModule(module)">
-                <span class="switch-knob"></span>
-              </button>
-                        </div>
+                        <small>
+              Activez uniquement les éléments nécessaires à ce rôle.
+            </small>
                     </div>
 
-                </div>
+                    <div class="toolbar-actions">
+                        <button type="button" class="btn btn-light btn-small" (click)="setCurrentTabState(true)">
+              <i class="ti ti-checks"></i>
+              Tout autoriser
+            </button>
 
-                <div class="save-bar">
-                    <span class="save-hint"><i class="ti ti-info-circle"></i> N'oubliez pas d'enregistrer vos changements.</span>
-                    <button type="button" class="btn btn--primary" (click)="saveAccess()" [disabled]="savingAccess || loadingModules">
-            <i [class]="savingAccess ? 'ti ti-loader-2 spin' : 'ti ti-device-floppy'"></i>
-            {{ savingAccess ? 'Enregistrement...' : 'Enregistrer les accès' }}
-          </button>
-                </div>
-
-                <!-- APERÇU DE NAVIGATION (repliable) -->
-                <div class="preview-drawer" *ngIf="previewOpen">
-                    <div class="preview-drawer-head">
-                        <span><i class="ti ti-device-desktop"></i> Ce que verra ce rôle dans le menu</span>
+                        <button type="button" class="btn btn-light btn-small" (click)="setCurrentTabState(false)">
+              <i class="ti ti-lock"></i>
+              Tout bloquer
+            </button>
                     </div>
+                </div>
 
-                    <div class="preview-nav">
-                        <div class="preview-empty" *ngIf="getAuthorizedModulesForPreview().length === 0">
-                            <i class="ti ti-lock"></i>
-                            <span>Aucun module autorisé pour l’instant</span>
+                <div class="loading-state large" *ngIf="loadingModules">
+                    <i class="ti ti-loader-2 spin"></i> Chargement des autorisations...
+                </div>
+
+                <div class="access-content" *ngIf="!loadingModules">
+                    <!-- PAGES ET SIDEBAR -->
+
+                    <section *ngIf="activeTab === 'PAGES'">
+                        <div class="empty-state" *ngIf="getNavigationGroups().length === 0">
+                            <i class="ti ti-layout-off"></i>
+                            <strong>Aucun accès disponible</strong>
                         </div>
 
-                        <div class="preview-group" *ngFor="let group of getAuthorizedModulesForPreview()">
-                            <h4>{{ group.groupe }}</h4>
-                            <div class="preview-link" *ngFor="let module of group.modules">
-                                <i [class]="module.icone"></i>
-                                <span>{{ module.libelle }}</span>
+                        <div class="permission-group" *ngFor="let group of getNavigationGroups()">
+                            <div class="permission-group-header">
+                                <div>
+                                    <h3>{{ getGroupLabel(group.groupe) }}</h3>
+                                    <p>{{ getGroupHelp(group.groupe) }}</p>
+                                </div>
+
+                                <span>
+                  {{ group.modulesAutorises }} /
+                  {{ group.totalModules }}
+                </span>
+                            </div>
+
+                            <div class="permission-list">
+                                <div class="permission-row" *ngFor="
+                    let module of group.modules;
+                    trackBy: trackByModuleId
+                  ">
+                                    <span class="permission-icon">
+                    <i [class]="getModuleIcon(module)"></i>
+                  </span>
+
+                                    <div class="permission-text">
+                                        <strong>{{ module.libelle }}</strong>
+                                        <small>{{ getModuleDescription(module) }}</small>
+                                    </div>
+
+                                    <span class="permission-state" [class.allowed]="module.autorise">
+                    {{ module.autorise ? "Autorisé" : "Bloqué" }}
+                  </span>
+
+                                    <button type="button" class="access-switch" [class.on]="module.autorise" [attr.aria-pressed]="module.autorise" (click)="toggleModule(module)">
+                    <span></span>
+                  </button>
+                                </div>
                             </div>
                         </div>
-                    </div>
+                    </section>
+
+                    <!-- NIVEAU 2 : SECTIONS D’ÉVALUATION -->
+
+                    <section *ngIf="activeTab === 'SECTIONS'">
+                        <div class="protected-note">
+                            <i class="ti ti-eye"></i>
+                            <span>
+                              Une section autorisée est affichée. Une section bloquée est totalement masquée.
+                              La grille technique est affichée automatiquement selon les catégories et les actions autorisées.
+                            </span>
+                        </div>
+
+                        <div class="empty-state" *ngIf="getSectionGroups().length === 0">
+                            <i class="ti ti-layout-off"></i>
+                            <strong>Aucune section disponible</strong>
+                            <span>Exécutez le script SQL fourni pour créer les permissions EVAL_SECTION_*.</span>
+                        </div>
+
+                        <div class="permission-group" *ngFor="let group of getSectionGroups()">
+                            <div class="permission-group-header">
+                                <div>
+                                    <h3>{{ getGroupLabel(group.groupe) }}</h3>
+                                    <p>Parties visibles dans la fiche d’évaluation.</p>
+                                </div>
+                                <span>{{ group.modulesAutorises }} / {{ group.totalModules }}</span>
+                            </div>
+
+                            <div class="permission-list">
+                                <div class="permission-row" *ngFor="let module of group.modules; trackBy: trackByModuleId">
+                                    <span class="permission-icon action"><i [class]="getModuleIcon(module)"></i></span>
+                                    <div class="permission-text">
+                                        <strong>{{ module.libelle }}</strong>
+                                        <small>{{ getModuleDescription(module) }}</small>
+                                    </div>
+                                    <span class="permission-state" [class.allowed]="module.autorise">
+                                      {{ module.autorise ? "Visible" : "Masquée" }}
+                                    </span>
+                                    <button type="button" class="access-switch" [class.on]="module.autorise" [attr.aria-pressed]="module.autorise" (click)="toggleModule(module)">
+                                      <span></span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- NIVEAU 3 : ACTIONS -->
+
+                    <section *ngIf="activeTab === 'ACTIONS'">
+                        <div class="protected-note">
+                            <i class="ti ti-adjustments-check"></i>
+                            <span>
+                              Une action autorisée affiche uniquement les champs et boutons utiles.
+                              Une action bloquée n’apparaît pas dans la page d’évaluation.
+                            </span>
+                        </div>
+
+                        <div class="empty-state" *ngIf="getActionGroups().length === 0">
+                            <i class="ti ti-layout-off"></i>
+                            <strong>Aucune action disponible</strong>
+                            <span>Exécutez le script SQL fourni pour créer les permissions EVAL_ACTION_*.</span>
+                        </div>
+
+                        <div class="permission-group" *ngFor="let group of getActionGroups()">
+                            <div class="permission-group-header">
+                                <div>
+                                    <h3>{{ getGroupLabel(group.groupe) }}</h3>
+                                    <p>Opérations que le rôle peut exécuter dans les sections visibles.</p>
+                                </div>
+                                <span>{{ group.modulesAutorises }} / {{ group.totalModules }}</span>
+                            </div>
+
+                            <div class="permission-list">
+                                <div class="permission-row" *ngFor="let module of group.modules; trackBy: trackByModuleId">
+                                    <span class="permission-icon action"><i [class]="getModuleIcon(module)"></i></span>
+                                    <div class="permission-text">
+                                        <strong>{{ module.libelle }}</strong>
+                                        <small>{{ getModuleDescription(module) }}</small>
+                                    </div>
+                                    <span class="permission-state" [class.allowed]="module.autorise">
+                                      {{ module.autorise ? "Autorisée" : "Bloquée" }}
+                                    </span>
+                                    <button type="button" class="access-switch" [class.on]="module.autorise" [attr.aria-pressed]="module.autorise" (click)="toggleModule(module)">
+                                      <span></span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+
+                    <!-- WORKFLOW -->
+
+                    <section *ngIf="activeTab === 'WORKFLOW'">
+                        <div class="protected-note">
+                            <i class="ti ti-route"></i>
+                            <span>
+                              Ces autorisations contrôlent la consultation, l’initialisation,
+                              la réaffectation et la réouverture du workflow.
+                            </span>
+                        </div>
+
+                        <div class="empty-state" *ngIf="getWorkflowGroups().length === 0">
+                            <i class="ti ti-route-off"></i>
+                            <strong>Aucune autorisation workflow</strong>
+                            <span>Vérifiez les modules WORKFLOW_* dans module_navbar.</span>
+                        </div>
+
+                        <div class="permission-group" *ngFor="let group of getWorkflowGroups()">
+                            <div class="permission-group-header">
+                                <div>
+                                    <h3>Pilotage du workflow</h3>
+                                    <p>Définissez ce que ce rôle peut voir et administrer.</p>
+                                </div>
+                                <span>{{ group.modulesAutorises }} / {{ group.totalModules }}</span>
+                            </div>
+
+                            <div class="permission-list">
+                                <div class="permission-row" *ngFor="let module of group.modules; trackBy: trackByModuleId">
+                                    <span class="permission-icon action">
+                                      <i [class]="getModuleIcon(module)"></i>
+                                    </span>
+
+                                    <div class="permission-text">
+                                        <strong>{{ module.libelle }}</strong>
+                                        <small>{{ getModuleDescription(module) }}</small>
+                                    </div>
+
+                                    <span class="permission-state" [class.allowed]="module.autorise">
+                                      {{ module.autorise ? "Autorisée" : "Bloquée" }}
+                                    </span>
+
+                                    <button type="button" class="access-switch" [class.on]="module.autorise" [attr.aria-pressed]="module.autorise" (click)="toggleModule(module)">
+                                      <span></span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- CATÉGORIES -->
+
+                    <section *ngIf="activeTab === 'CATEGORIES'">
+                        <div class="category-search">
+                            <i class="ti ti-search"></i>
+
+                            <input type="text" placeholder="Rechercher un type, un lot ou une catégorie" [(ngModel)]="categorySearch" />
+                        </div>
+
+                        <div class="empty-state" *ngIf="getFilteredCategoryTree().length === 0">
+                            <i class="ti ti-category-off"></i>
+
+                            <strong>Aucune catégorie trouvée</strong>
+
+                            <span>
+                Vérifiez les catégories enregistrées pour les types et les
+                lots.
+              </span>
+                        </div>
+
+                        <article class="category-type-card" *ngFor="
+                let type of getFilteredCategoryTree();
+                trackBy: trackByType
+              ">
+                            <header class="category-type-header">
+                                <span>
+                  <i class="ti ti-building"></i>
+                </span>
+
+                                <div>
+                                    <small>Type d’intervenant</small>
+                                    <h3>{{ type.typeName }}</h3>
+                                </div>
+                            </header>
+
+                            <div class="category-scope" *ngFor="
+                  let scope of type.scopes;
+                  trackBy: trackByScope
+                ">
+                                <div class="category-scope-header">
+                                    <span [class.common]="isCommonScope(scope.scopeName)">
+                    <i
+                      [class]="
+                        isCommonScope(scope.scopeName)
+                          ? 'ti ti-layers-linked'
+                          : 'ti ti-briefcase'
+                      "
+                    ></i>
+                  </span>
+
+                                    <div>
+                                        <small>
+                      {{
+                        isCommonScope(scope.scopeName)
+                          ? "Applicable à tous les lots"
+                          : "Lot spécifique"
+                      }}
+                    </small>
+
+                                        <strong>{{ scope.scopeName }}</strong>
+                                    </div>
+                                </div>
+
+                                <div class="category-grid">
+                                    <div class="category-permission" *ngFor="
+                      let category of scope.categories;
+                      trackBy: trackByCategoryId
+                    " [class.allowed]="category.autorise">
+                                        <div>
+                                            <strong>{{ category.libelle }}</strong>
+                                            <small>
+                        {{ getCategoryDescription(category) }}
+                      </small>
+                                        </div>
+
+                                        <button type="button" class="access-switch" [class.on]="category.autorise" [attr.aria-pressed]="category.autorise" (click)="toggleCategory(category)">
+                      <span></span>
+                    </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </article>
+                    </section>
+
+                    <!-- RÉSUMÉ -->
+
+                    <section class="summary-section" *ngIf="activeTab === 'RESUME'">
+                        <div class="summary-header">
+                            <div>
+                                <span class="eyebrow">Aperçu final</span>
+
+                                <h3>Ce que pourra utiliser ce rôle</h3>
+
+                                <p>
+                                    Les sections techniques ne sont pas affichées dans la sidebar.
+                                </p>
+                            </div>
+
+                            <div class="summary-score">
+                                <strong>
+                  {{ getTabAuthorizedCount("RESUME") }}
+                </strong>
+
+                                <span>accès actifs</span>
+                            </div>
+                        </div>
+
+                        <div class="summary-grid">
+                            <!-- PAGES -->
+
+                            <div class="summary-card">
+                                <div class="summary-card-title">
+                                    <i class="ti ti-layout-dashboard"></i>
+
+                                    <div>
+                                        <strong>Pages visibles</strong>
+
+                                        <small>
+                      {{ getAuthorizedNavigationPreview().length }}
+                      groupe(s)
+                    </small>
+                                    </div>
+                                </div>
+
+                                <div class="summary-empty" *ngIf="
+                    getAuthorizedNavigationPreview().length === 0
+                  ">
+                                    Aucune page autorisée
+                                </div>
+
+                                <ng-container *ngFor="
+                    let group of getAuthorizedNavigationPreview()
+                  ">
+                                    <span class="summary-group-label">
+                    {{ getGroupLabel(group.groupe) }}
+                  </span>
+
+                                    <div class="summary-line" *ngFor="let module of group.modules">
+                                        <i [class]="getModuleIcon(module)"></i> {{ module.libelle }}
+                                    </div>
+                                </ng-container>
+                            </div>
+
+                            <!-- SECTIONS -->
+
+                            <div class="summary-card">
+                                <div class="summary-card-title">
+                                    <i class="ti ti-layout-list"></i>
+                                    <div>
+                                        <strong>Sections visibles</strong>
+                                        <small>{{ getAuthorizedSectionModules().length }} accès</small>
+                                    </div>
+                                </div>
+                                <div class="summary-empty" *ngIf="getAuthorizedSectionModules().length === 0">
+                                    Aucune section visible
+                                </div>
+                                <div class="summary-line" *ngFor="let module of getAuthorizedSectionModules()">
+                                    <i [class]="getModuleIcon(module)"></i> {{ module.libelle }}
+                                </div>
+                            </div>
+
+                            <!-- ACTIONS -->
+
+                            <div class="summary-card">
+                                <div class="summary-card-title">
+                                    <i class="ti ti-adjustments-check"></i>
+                                    <div>
+                                        <strong>Actions autorisées</strong>
+                                        <small>{{ getAuthorizedActionModules().length }} accès</small>
+                                    </div>
+                                </div>
+                                <div class="summary-empty" *ngIf="getAuthorizedActionModules().length === 0">
+                                    Aucune action autorisée
+                                </div>
+                                <div class="summary-line" *ngFor="let module of getAuthorizedActionModules()">
+                                    <i [class]="getModuleIcon(module)"></i> {{ module.libelle }}
+                                </div>
+                            </div>
+
+
+                            <!-- WORKFLOW -->
+
+                            <div class="summary-card">
+                                <div class="summary-card-title">
+                                    <i class="ti ti-route"></i>
+                                    <div>
+                                        <strong>Workflow</strong>
+                                        <small>{{ getAuthorizedWorkflowModules().length }} accès</small>
+                                    </div>
+                                </div>
+                                <div class="summary-empty" *ngIf="getAuthorizedWorkflowModules().length === 0">
+                                    Aucun accès workflow
+                                </div>
+                                <div class="summary-line" *ngFor="let module of getAuthorizedWorkflowModules()">
+                                    <i [class]="getModuleIcon(module)"></i> {{ module.libelle }}
+                                </div>
+                            </div>
+
+                            <!-- CATÉGORIES -->
+
+                            <div class="summary-card">
+                                <div class="summary-card-title">
+                                    <i class="ti ti-category"></i>
+
+                                    <div>
+                                        <strong>Catégories</strong>
+
+                                        <small>
+                      {{ getAuthorizedCategoryAccesses().length }}
+                      catégorie(s)
+                    </small>
+                                    </div>
+                                </div>
+
+                                <div class="summary-empty" *ngIf="
+                    getAuthorizedCategoryAccesses().length === 0
+                  ">
+                                    Aucune catégorie autorisée
+                                </div>
+
+                                <div class="summary-line" *ngFor="
+                    let category of getAuthorizedCategoryAccesses();
+                    trackBy: trackByCategoryId
+                  ">
+                                    <i class="ti ti-check"></i> {{ category.lotNom }} — {{ category.libelle }}
+                                </div>
+                            </div>
+                        </div>
+                    </section>
                 </div>
 
+                <!-- BARRE D’ENREGISTREMENT -->
+
+                <footer class="save-bar">
+                    <div>
+                        <ng-container *ngIf="
+                hasUnsavedChanges();
+                else accessUpToDate
+              ">
+                            <strong>
+                {{ getChangedCount() }}
+                modification(s) non enregistrée(s)
+              </strong>
+
+                            <small>
+                Enregistrez avant de quitter ce rôle.
+              </small>
+                        </ng-container>
+
+                        <ng-template #accessUpToDate>
+                            <strong>Autorisations à jour</strong>
+                            <small>Aucune modification en attente.</small>
+                        </ng-template>
+                    </div>
+
+                    <div class="save-actions">
+                        <button type="button" class="btn btn-light" [disabled]="
+                !hasUnsavedChanges() || savingAccess
+              " (click)="resetAccessChanges()">
+              Annuler les changements
+            </button>
+
+                        <button type="button" class="btn btn-primary" [disabled]="
+                !hasUnsavedChanges() || savingAccess
+              " (click)="saveAccess()">
+              <i
+                [class]="
+                  savingAccess
+                    ? 'ti ti-loader-2 spin'
+                    : 'ti ti-device-floppy'
+                "
+              ></i>
+
+              {{
+                savingAccess
+                  ? "Enregistrement..."
+                  : "Enregistrer les accès"
+              }}
+            </button>
+                    </div>
+                </footer>
             </ng-container>
 
-            <ng-template #noRoleSelected>
-                <div class="empty-state empty-state--big">
-                    <i class="ti ti-pointer"></i>
-                    <h2>Aucun rôle sélectionné</h2>
-                    <p>Choisissez un rôle dans la liste à gauche pour voir et modifier ses accès.</p>
+            <!-- AUCUN RÔLE SÉLECTIONNÉ -->
+
+            <ng-template #noSelectedRole>
+                <div class="no-role-selected">
+                    <span>
+            <i class="ti ti-pointer"></i>
+          </span>
+
+                    <h2>Sélectionnez un rôle</h2>
+
+                    <p>
+                        Choisissez un rôle dans la colonne de gauche pour définir ses autorisations.
+                    </p>
                 </div>
             </ng-template>
-
-        </section>
-
+        </main>
     </div>
-
 </div>
 
-<!-- =========================================================
-     MODAL 1/3 — CRÉER UN RÔLE (indépendante de la modification)
-========================================================== -->
-<div class="modal-overlay" *ngIf="showCreateModal" (click)="closeCreateModal()">
-    <div class="modal-card" (click)="$event.stopPropagation()">
+<!-- MODAL CRÉATION / MODIFICATION -->
 
-        <div class="modal-header">
-            <div class="modal-title">
-                <span class="modal-icon modal-icon--create"><i class="ti ti-plus"></i></span>
-                <div>
-                    <h3>Nouveau rôle</h3>
-                    <p>Créez un rôle et définissez ses accès juste après.</p>
-                </div>
+<div class="modal-overlay" *ngIf="showRoleModal" (click)="closeRoleModal()">
+    <div class="modal-card" (click)="$event.stopPropagation()">
+        <header class="modal-header">
+            <div>
+                <span class="modal-label">
+          Gestion des rôles
+        </span>
+
+                <h3>
+                    {{ editRoleMode ? "Modifier le rôle" : "Créer un rôle" }}
+                </h3>
+
+                <p>
+                    {{ editRoleMode ? "Mettez à jour les informations du rôle." : "Créez le rôle avec tous les accès ou avec un accès personnalisé." }}
+                </p>
             </div>
-            <button type="button" class="icon-btn" (click)="closeCreateModal()" [disabled]="savingRole">
+
+            <button type="button" class="modal-close" [disabled]="savingRole" (click)="closeRoleModal()">
         <i class="ti ti-x"></i>
       </button>
-        </div>
+        </header>
 
         <div class="modal-body">
-
-            <div class="form-group">
-                <label for="create-name">Nom du rôle <span class="required">*</span></label>
-                <input id="create-name" type="text" placeholder="Ex. Responsable régional" [(ngModel)]="createForm.nomRole" name="createNomRole" maxlength="120" />
+            <div class="alert alert-error" *ngIf="roleModalError">
+                <i class="ti ti-alert-circle"></i> {{ roleModalError }}
             </div>
 
-            <div class="form-group">
-                <label for="create-description">Description</label>
-                <textarea id="create-description" placeholder="À quoi sert ce rôle ?" [(ngModel)]="createForm.description" name="createDescription" maxlength="500"></textarea>
+            <div class="field">
+                <label for="role-name">
+          Nom du rôle *
+        </label>
+
+                <input id="role-name" type="text" [(ngModel)]="roleForm.nomRole" placeholder="Ex. Évaluateur technique" maxlength="120" />
             </div>
 
-            <div class="form-group">
+            <div class="field">
+                <label for="role-description">
+          Description
+        </label>
+
+                <textarea id="role-description" rows="3" [(ngModel)]="roleForm.description" placeholder="Expliquez simplement la responsabilité de ce rôle" maxlength="500"></textarea>
+            </div>
+
+            <div class="field">
                 <label>Type de rôle</label>
-                <div class="choice-row">
-                    <button type="button" class="choice" [class.choice--active]="createForm.typeRole === 'INTERNE'" (click)="createForm.typeRole = 'INTERNE'">
+
+                <div class="role-type-options">
+                    <button type="button" [class.selected]="
+              roleForm.typeRole === 'INTERNE'
+            " (click)="roleForm.typeRole = 'INTERNE'">
             <i class="ti ti-building"></i>
-            <span>Interne <small>Collaborateur El Emar</small></span>
+
+            <span>
+              <strong>Interne</strong>
+              <small>Collaborateur El Emar</small>
+            </span>
           </button>
-                    <button type="button" class="choice" [class.choice--active]="createForm.typeRole === 'EXTERNE'" (click)="createForm.typeRole = 'EXTERNE'">
+
+                    <button type="button" [class.selected]="
+              roleForm.typeRole === 'EXTERNE'
+            " (click)="roleForm.typeRole = 'EXTERNE'">
             <i class="ti ti-user-external-link"></i>
-            <span>Externe <small>Intervenant extérieur</small></span>
+
+            <span>
+              <strong>Externe</strong>
+              <small>Utilisateur extérieur</small>
+            </span>
           </button>
                 </div>
             </div>
 
-            <div class="form-group">
-                <div class="switch-field">
-                    <div>
-                        <label>Rôle système</label>
-                        <p class="field-help">Un rôle système ne peut pas être supprimé tant qu'il garde ce statut.</p>
-                    </div>
-                    <button type="button" class="switch" [class.switch--on]="createForm.roleSysteme" [attr.aria-pressed]="createForm.roleSysteme" (click)="createForm.roleSysteme = !createForm.roleSysteme">
-            <span class="switch-knob"></span>
-          </button>
-                </div>
-            </div>
+            <!-- TOUS LES ACCÈS À LA CRÉATION -->
 
+            <label class="system-role-option" *ngIf="!editRoleMode">
+        <span>
+          <strong>Créer avec tous les accès</strong>
+
+          <small>
+            Toutes les pages, les sections, les actions et les catégories
+            seront immédiatement autorisées.
+          </small>
+        </span>
+
+        <input
+          type="checkbox"
+          [(ngModel)]="grantAllAccessOnCreate"
+        />
+      </label>
+
+            <!-- PROTECTION DU RÔLE -->
+
+            <label class="system-role-option">
+        <span>
+          <strong>Protéger ce rôle</strong>
+
+          <small>
+            Un rôle protégé ne peut pas être supprimé.
+          </small>
+        </span>
+
+        <input
+          type="checkbox"
+          [(ngModel)]="roleForm.roleSysteme"
+        />
+      </label>
         </div>
 
-        <div class="modal-actions">
-            <button type="button" class="btn btn--secondary" (click)="closeCreateModal()" [disabled]="savingRole">Annuler</button>
-            <button type="button" class="btn btn--primary" (click)="saveNewRole()" [disabled]="savingRole">
-        <i [class]="savingRole ? 'ti ti-loader-2 spin' : 'ti ti-check'"></i>
-        {{ savingRole ? 'Création...' : 'Créer le rôle' }}
+        <footer class="modal-actions">
+            <button type="button" class="btn btn-light" [disabled]="savingRole" (click)="closeRoleModal()">
+        Annuler
       </button>
-        </div>
 
+            <button type="button" class="btn btn-primary" [disabled]="savingRole" (click)="saveRole()">
+        <i
+          [class]="
+            savingRole
+              ? 'ti ti-loader-2 spin'
+              : 'ti ti-check'
+          "
+        ></i>
+
+        {{
+          savingRole
+            ? "Enregistrement..."
+            : editRoleMode
+              ? "Enregistrer"
+              : "Créer le rôle"
+        }}
+      </button>
+        </footer>
     </div>
 </div>
 
-<!-- =========================================================
-     MODAL 2/3 — MODIFIER UN RÔLE (distincte de la création)
-========================================================== -->
-<div class="modal-overlay" *ngIf="showEditModal" (click)="closeEditModal()">
-    <div class="modal-card" (click)="$event.stopPropagation()">
+<!-- MODAL SUPPRESSION -->
 
-        <div class="modal-header">
-            <div class="modal-title">
-                <span class="modal-icon modal-icon--edit"><i class="ti ti-pencil"></i></span>
-                <div>
-                    <h3>Modifier le rôle</h3>
-                    <p>Mettez à jour les informations générales.</p>
-                </div>
-            </div>
-            <button type="button" class="icon-btn" (click)="closeEditModal()" [disabled]="savingRole">
-        <i class="ti ti-x"></i>
-      </button>
-        </div>
-
-        <div class="modal-body">
-
-            <div class="form-group">
-                <label for="edit-name">Nom du rôle <span class="required">*</span></label>
-                <input id="edit-name" type="text" placeholder="Ex. Responsable régional" [(ngModel)]="editForm.nomRole" name="editNomRole" maxlength="120" />
-            </div>
-
-            <div class="form-group">
-                <label for="edit-description">Description</label>
-                <textarea id="edit-description" placeholder="À quoi sert ce rôle ?" [(ngModel)]="editForm.description" name="editDescription" maxlength="500"></textarea>
-            </div>
-
-            <div class="form-group">
-                <label>Type de rôle</label>
-                <div class="choice-row">
-                    <button type="button" class="choice" [class.choice--active]="editForm.typeRole === 'INTERNE'" (click)="editForm.typeRole = 'INTERNE'">
-            <i class="ti ti-building"></i>
-            <span>Interne <small>Collaborateur El Emar</small></span>
-          </button>
-                    <button type="button" class="choice" [class.choice--active]="editForm.typeRole === 'EXTERNE'" (click)="editForm.typeRole = 'EXTERNE'">
-            <i class="ti ti-user-external-link"></i>
-            <span>Externe <small>Intervenant extérieur</small></span>
-          </button>
-                </div>
-            </div>
-
-            <div class="form-group">
-                <div class="switch-field">
-                    <div>
-                        <label>Rôle système</label>
-                        <p class="field-help">Désactivez cette option pour pouvoir supprimer le rôle plus tard.</p>
-                    </div>
-                    <button type="button" class="switch" [class.switch--on]="editForm.roleSysteme" [attr.aria-pressed]="editForm.roleSysteme" (click)="editForm.roleSysteme = !editForm.roleSysteme">
-            <span class="switch-knob"></span>
-          </button>
-                </div>
-            </div>
-
-        </div>
-
-        <div class="modal-actions">
-            <button type="button" class="btn btn--secondary" (click)="closeEditModal()" [disabled]="savingRole">Annuler</button>
-            <button type="button" class="btn btn--primary" (click)="saveEditedRole()" [disabled]="savingRole">
-        <i [class]="savingRole ? 'ti ti-loader-2 spin' : 'ti ti-check'"></i>
-        {{ savingRole ? 'Enregistrement...' : 'Enregistrer les modifications' }}
-      </button>
-        </div>
-
-    </div>
-</div>
-
-<!-- =========================================================
-     MODAL 3/3 — SUPPRIMER UN RÔLE
-========================================================== -->
 <div class="modal-overlay" *ngIf="showDeleteRoleModal" (click)="closeDeleteRoleModal()">
-    <div class="modal-card modal-card--small" (click)="$event.stopPropagation()">
+    <div class="modal-card small" (click)="$event.stopPropagation()">
+        <div class="delete-modal-content">
+            <span class="delete-icon">
+        <i class="ti ti-trash"></i>
+      </span>
 
-        <div class="modal-body modal-body--center">
-            <span class="modal-icon modal-icon--danger"><i class="ti ti-trash"></i></span>
+            <span class="modal-label danger">
+        Suppression définitive
+      </span>
 
-            <h3>Supprimer « {{ roleToDelete?.nomRole }} » ?</h3>
+            <h3>
+                Supprimer « {{ roleToDelete?.nomRole }} » ?
+            </h3>
+
             <p>
-                Cette action est définitive et supprimera aussi ses autorisations. Elle sera refusée si le rôle est encore attribué à un utilisateur.
+                Les autorisations du rôle seront supprimées. Cette action sera refusée si le rôle est encore attribué à un utilisateur.
             </p>
+
+            <div class="alert alert-error" *ngIf="deleteModalError">
+                {{ deleteModalError }}
+            </div>
         </div>
 
-        <div class="modal-actions modal-actions--center">
-            <button type="button" class="btn btn--secondary" (click)="closeDeleteRoleModal()" [disabled]="deletingRole">Annuler</button>
-            <button type="button" class="btn btn--danger" (click)="confirmDeleteRole()" [disabled]="deletingRole">
-        <i [class]="deletingRole ? 'ti ti-loader-2 spin' : 'ti ti-trash'"></i>
-        {{ deletingRole ? 'Suppression...' : 'Supprimer définitivement' }}
+        <footer class="modal-actions centered">
+            <button type="button" class="btn btn-light" [disabled]="deletingRole" (click)="closeDeleteRoleModal()">
+        Annuler
       </button>
-        </div>
 
+            <button type="button" class="btn btn-danger" [disabled]="deletingRole" (click)="confirmDeleteRole()">
+        <i
+          [class]="
+            deletingRole
+              ? 'ti ti-loader-2 spin'
+              : 'ti ti-trash'
+          "
+        ></i>
+
+        {{
+          deletingRole
+            ? "Suppression..."
+            : "Supprimer"
+        }}
+      </button>
+        </footer>
     </div>
 </div>

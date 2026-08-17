@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { forkJoin, of } from 'rxjs';
 
 import {
   CandidatureAccessResponse,
@@ -8,7 +9,8 @@ import {
   CreateCandidatureAccessRequest,
   GeneratedAccountResponse,
   UpdateCandidatureAccessRequest,
-   UtilisateurCndResponse
+  UpdateCndUserRequest,
+  UtilisateurCndResponse
 } from '../../../core/services/candidature-access.service';
 import {
   TypeIntervenant,
@@ -24,6 +26,16 @@ type LotView = Lot & {
   id: number;
   nomLot: string;
   codeLot?: string;
+};
+
+type EditCndUserRow = {
+  id: number | null;
+  nomComplet: string;
+  email: string;
+  telephone: string;
+  fonction: string;
+  actif: boolean;
+  mustChangePassword: boolean;
 };
 
 @Component({
@@ -43,6 +55,29 @@ userAccessToChange: UtilisateurCndResponse | null = null;
 userAccessCandidatureId: number | null = null;
 
 changingUserAccess = false;
+
+/* =====================================================
+   MODIFICATION / SUPPRESSION D'UN UTILISATEUR CND
+===================================================== */
+editUserModalOpen = false;
+deleteUserModalOpen = false;
+
+editingUser: UtilisateurCndResponse | null = null;
+editingUserCandidatureId: number | null = null;
+
+userToDelete: UtilisateurCndResponse | null = null;
+userToDeleteCandidatureId: number | null = null;
+
+savingUser = false;
+deletingUserId: number | null = null;
+
+editUserForm: UpdateCndUserRequest = {
+  nomComplet: '',
+  email: '',
+  telephone: '',
+  fonction: ''
+};
+
 editingCandidature: CandidatureAccessResponse | null = null;
 candidatureToDelete: CandidatureAccessResponse | null = null;
 
@@ -56,6 +91,9 @@ editForm: UpdateCandidatureAccessRequest = {
   typeIntervenantId: null,
   lotIds: []
 };
+
+/* Utilisateurs affichés directement dans la modale Modifier. */
+editUsers: EditCndUserRow[] = [];
   deletingCandidatureId: number | null = null;
 changingAccessCandidatureId: number | null = null;
   types: TypeIntervenant[] = [];
@@ -222,6 +260,27 @@ openEditCandidatureModal(
       .filter(id => Number.isFinite(id))
   };
 
+  /*
+   * Même présentation que dans la modale Ajouter,
+   * mais avec les comptes existants déjà remplis.
+   */
+  this.editUsers =
+    (candidature.utilisateurs || [])
+      .map(user => ({
+        id: Number(user.id) || null,
+        nomComplet:
+          String(user.nomComplet || ''),
+        email:
+          String(user.email || ''),
+        telephone:
+          String(user.telephone || ''),
+        fonction:
+          String(user.fonction || ''),
+        actif: user.actif !== false,
+        mustChangePassword:
+          user.mustChangePassword === true
+      }));
+
   this.editCandidatureModalOpen = true;
   this.loadEditLots();
 }
@@ -233,6 +292,7 @@ closeEditCandidatureModal(): void {
   this.editCandidatureModalOpen = false;
   this.editingCandidature = null;
   this.editLots = [];
+  this.editUsers = [];
 
   this.editForm = {
     nomEntreprise: '',
@@ -240,6 +300,53 @@ closeEditCandidatureModal(): void {
     lotIds: []
   };
 }
+addEditUserRow(): void {
+  this.editUsers = [
+    ...this.editUsers,
+    {
+      id: null,
+      nomComplet: '',
+      email: '',
+      telephone: '',
+      fonction: '',
+      actif: true,
+      mustChangePassword: true
+    }
+  ];
+}
+
+removeEditUserRow(index: number): void {
+  const user = this.editUsers[index];
+
+  if (!user) {
+    return;
+  }
+
+  /*
+   * Dans cette modale, Supprimer retire seulement
+   * une nouvelle ligne qui n'est pas encore enregistrée.
+   * La suppression d'un compte existant garde son action
+   * dédiée dans la liste principale.
+   */
+  if (user.id) {
+    this.errorMessage =
+      'Pour supprimer un utilisateur existant, utilisez son bouton Supprimer dans la liste principale.';
+    return;
+  }
+
+  this.editUsers =
+    this.editUsers.filter(
+      (_, userIndex) => userIndex !== index
+    );
+}
+
+trackByEditUser(
+  index: number,
+  user: EditCndUserRow
+): number | string {
+  return user.id || `new-${index}`;
+}
+
 loadEditLots(): void {
   const typeId =
     Number(this.editForm.typeIntervenantId);
@@ -349,65 +456,175 @@ saveCandidatureChanges(): void {
     return;
   }
 
-  const request: UpdateCandidatureAccessRequest = {
-    nomEntreprise,
-    typeIntervenantId,
-    lotIds
-  };
+  /*
+   * Ignorer uniquement les nouvelles lignes totalement vides.
+   * Les utilisateurs existants restent toujours pris en compte.
+   */
+  const users =
+    (this.editUsers || [])
+      .map(user => ({
+        id: user.id,
+        nomComplet:
+          String(user.nomComplet || '').trim(),
+        email:
+          String(user.email || '')
+            .trim()
+            .toLowerCase(),
+        telephone:
+          String(user.telephone || '').trim(),
+        fonction:
+          String(user.fonction || '').trim(),
+        actif: user.actif,
+        mustChangePassword:
+          user.mustChangePassword
+      }))
+      .filter(user =>
+        !!user.id ||
+        !!user.nomComplet ||
+        !!user.email ||
+        !!user.telephone ||
+        !!user.fonction
+      );
+
+  if (users.length === 0) {
+    this.errorMessage =
+      'Veuillez conserver ou ajouter au moins un utilisateur.';
+    return;
+  }
+
+  const incompleteUser =
+    users.find(user =>
+      !user.nomComplet || !user.email
+    );
+
+  if (incompleteUser) {
+    this.errorMessage =
+      'Le nom complet et l’adresse email sont obligatoires pour chaque utilisateur.';
+    return;
+  }
+
+  const invalidEmail =
+    users.find(user =>
+      !this.isValidEmail(user.email)
+    );
+
+  if (invalidEmail) {
+    this.errorMessage =
+      `Email invalide : ${invalidEmail.email}`;
+    return;
+  }
+
+  const duplicatedEmail =
+    this.findDuplicatedEmail(
+      users.map(user => user.email)
+    );
+
+  if (duplicatedEmail) {
+    this.errorMessage =
+      `Email dupliqué dans le formulaire : ${duplicatedEmail}`;
+    return;
+  }
+
+  const candidatureRequest:
+    UpdateCandidatureAccessRequest = {
+      nomEntreprise,
+      typeIntervenantId,
+      lotIds
+    };
+
+  const existingUsers =
+    users.filter(user => !!user.id);
+
+  const newUsers =
+    users.filter(user => !user.id);
+
+  const updateUserRequests =
+    existingUsers.map(user =>
+      this.candidatureService.updateUser(
+        Number(user.id),
+        {
+          nomComplet: user.nomComplet,
+          email: user.email,
+          telephone: user.telephone,
+          fonction: user.fonction
+        }
+      )
+    );
+
+  const addUserRequests =
+    newUsers.map(user =>
+      this.candidatureService.addUser(
+        candidatureId,
+        {
+          nomComplet: user.nomComplet,
+          email: user.email,
+          telephone: user.telephone,
+          fonction: user.fonction
+        }
+      )
+    );
 
   this.errorMessage = '';
   this.successMessage = '';
   this.savingEdit = true;
 
-  this.candidatureService
-    .updateCandidature(
-      candidatureId,
-      request
-    )
-    .subscribe({
-      next: (
-        updated: CandidatureAccessResponse
-      ) => {
-        this.savingEdit = false;
-        this.editCandidatureModalOpen = false;
-        this.editingCandidature = null;
-        this.editLots = [];
+  forkJoin({
+    candidature:
+      this.candidatureService
+        .updateCandidature(
+          candidatureId,
+          candidatureRequest
+        ),
 
-        const index =
-          this.candidatures.findIndex(
-            item =>
-              Number(item.candidatureId) ===
-              candidatureId
-          );
+    updatedUsers:
+      updateUserRequests.length > 0
+        ? forkJoin(updateUserRequests)
+        : of([]),
 
-        if (index >= 0) {
-          this.candidatures[index] = updated;
-          this.candidatures = [
-            ...this.candidatures
-          ];
-        } else {
-          this.loadCandidatures();
-        }
+    generatedAccounts:
+      addUserRequests.length > 0
+        ? forkJoin(addUserRequests)
+        : of([])
+  }).subscribe({
+    next: result => {
+      this.savingEdit = false;
+      this.editCandidatureModalOpen = false;
+      this.editingCandidature = null;
+      this.editLots = [];
+      this.editUsers = [];
 
-        this.successMessage =
-          'Candidature modifiée avec succès.';
-      },
+      this.successMessage =
+        'Intervenant et utilisateurs modifiés avec succès.';
 
-      error: (error: any) => {
-        console.error(
-          'UPDATE CANDIDATURE ERROR',
-          error
-        );
+      this.generatedAccounts =
+        result.generatedAccounts || [];
 
-        this.savingEdit = false;
+      this.generatedAccountsModalOpen =
+        this.generatedAccounts.length > 0;
 
-        this.errorMessage =
-          error?.error?.message ||
-          error?.error?.detail ||
-          'Erreur lors de la modification de la candidature.';
-      }
-    });
+      /*
+       * Recharger afin de récupérer exactement les comptes,
+       * les lots et les informations renvoyés par le backend.
+       */
+      this.loadCandidatures();
+    },
+
+    error: (error: any) => {
+      console.error(
+        'UPDATE CANDIDATURE AND USERS ERROR',
+        error
+      );
+
+      this.savingEdit = false;
+
+      this.errorMessage =
+        error?.error?.message ||
+        error?.error?.detail ||
+        'Erreur lors de la modification de l’intervenant ou de ses utilisateurs.';
+    }
+  });
 }
+
 isEditLotSelected(lotId: number): boolean {
   return this.editForm.lotIds.includes(
     Number(lotId)
@@ -968,6 +1185,270 @@ confirmUserAccessChange(): void {
   //     }
   //   });
   // }
+
+
+  // =====================================================
+  // MODIFICATION D'UN UTILISATEUR CND
+  // =====================================================
+
+  openEditUserModal(
+    user: UtilisateurCndResponse,
+    candidatureId: number
+  ): void {
+    const userId = Number(user?.id);
+    const parentId = Number(candidatureId);
+
+    if (!userId || !parentId) {
+      this.errorMessage =
+        'Utilisateur ou intervenant introuvable.';
+      return;
+    }
+
+    this.errorMessage = '';
+    this.successMessage = '';
+
+    this.editingUser = user;
+    this.editingUserCandidatureId = parentId;
+
+    this.editUserForm = {
+      nomComplet: String(user.nomComplet || '').trim(),
+      email: String(user.email || '').trim(),
+      telephone: String(user.telephone || '').trim(),
+      fonction: String(user.fonction || '').trim()
+    };
+
+    this.editUserModalOpen = true;
+  }
+
+  closeEditUserModal(): void {
+    if (this.savingUser) {
+      return;
+    }
+
+    this.editUserModalOpen = false;
+    this.editingUser = null;
+    this.editingUserCandidatureId = null;
+
+    this.editUserForm = {
+      nomComplet: '',
+      email: '',
+      telephone: '',
+      fonction: ''
+    };
+  }
+
+  saveUserChanges(): void {
+    const userId = Number(this.editingUser?.id);
+    const candidatureId =
+      Number(this.editingUserCandidatureId);
+
+    if (!userId || !candidatureId) {
+      this.errorMessage =
+        'Utilisateur ou intervenant introuvable.';
+      return;
+    }
+
+    const nomComplet =
+      String(this.editUserForm.nomComplet || '').trim();
+
+    const email =
+      String(this.editUserForm.email || '')
+        .trim()
+        .toLowerCase();
+
+    const telephone =
+      String(this.editUserForm.telephone || '').trim();
+
+    const fonction =
+      String(this.editUserForm.fonction || '').trim();
+
+    if (!nomComplet) {
+      this.errorMessage =
+        'Le nom complet de l’utilisateur est obligatoire.';
+      return;
+    }
+
+    if (!email) {
+      this.errorMessage =
+        'L’adresse email de l’utilisateur est obligatoire.';
+      return;
+    }
+
+    if (!this.isValidEmail(email)) {
+      this.errorMessage =
+        'L’adresse email saisie est invalide.';
+      return;
+    }
+
+    const request: UpdateCndUserRequest = {
+      nomComplet,
+      email,
+      telephone,
+      fonction
+    };
+
+    this.errorMessage = '';
+    this.successMessage = '';
+    this.savingUser = true;
+
+    this.candidatureService
+      .updateUser(userId, request)
+      .subscribe({
+        next: (
+          updatedUser: UtilisateurCndResponse
+        ) => {
+          this.candidatures =
+            this.candidatures.map(candidature => {
+              if (
+                Number(candidature.candidatureId) !==
+                candidatureId
+              ) {
+                return candidature;
+              }
+
+              return {
+                ...candidature,
+                utilisateurs:
+                  (candidature.utilisateurs || [])
+                    .map(user =>
+                      Number(user.id) === userId
+                        ? {
+                            ...user,
+                            ...updatedUser
+                          }
+                        : user
+                    )
+              };
+            });
+
+          this.savingUser = false;
+          this.editUserModalOpen = false;
+          this.editingUser = null;
+          this.editingUserCandidatureId = null;
+
+          this.successMessage =
+            'Utilisateur modifié avec succès.';
+        },
+
+        error: (error: any) => {
+          console.error(
+            'UPDATE CND USER ERROR',
+            error
+          );
+
+          this.savingUser = false;
+
+          this.errorMessage =
+            error?.error?.message ||
+            error?.error?.detail ||
+            'Erreur lors de la modification de l’utilisateur.';
+        }
+      });
+  }
+
+  // =====================================================
+  // SUPPRESSION D'UN UTILISATEUR CND
+  // =====================================================
+
+  openDeleteUserModal(
+    user: UtilisateurCndResponse,
+    candidatureId: number
+  ): void {
+    const userId = Number(user?.id);
+    const parentId = Number(candidatureId);
+
+    if (!userId || !parentId) {
+      this.errorMessage =
+        'Utilisateur ou intervenant introuvable.';
+      return;
+    }
+
+    this.errorMessage = '';
+    this.successMessage = '';
+
+    this.userToDelete = user;
+    this.userToDeleteCandidatureId = parentId;
+    this.deleteUserModalOpen = true;
+  }
+
+  closeDeleteUserModal(): void {
+    if (this.deletingUserId !== null) {
+      return;
+    }
+
+    this.deleteUserModalOpen = false;
+    this.userToDelete = null;
+    this.userToDeleteCandidatureId = null;
+  }
+
+  confirmDeleteUser(): void {
+    const userId = Number(this.userToDelete?.id);
+    const candidatureId =
+      Number(this.userToDeleteCandidatureId);
+
+    if (!userId || !candidatureId) {
+      this.errorMessage =
+        'Utilisateur ou intervenant introuvable.';
+      return;
+    }
+
+    const userName =
+      this.userToDelete?.nomComplet ||
+      this.userToDelete?.email ||
+      'Utilisateur';
+
+    this.errorMessage = '';
+    this.successMessage = '';
+    this.deletingUserId = userId;
+
+    this.candidatureService
+      .deleteUser(userId)
+      .subscribe({
+        next: () => {
+          this.candidatures =
+            this.candidatures.map(candidature => {
+              if (
+                Number(candidature.candidatureId) !==
+                candidatureId
+              ) {
+                return candidature;
+              }
+
+              return {
+                ...candidature,
+                utilisateurs:
+                  (candidature.utilisateurs || [])
+                    .filter(
+                      user =>
+                        Number(user.id) !== userId
+                    )
+              };
+            });
+
+          this.deletingUserId = null;
+          this.deleteUserModalOpen = false;
+          this.userToDelete = null;
+          this.userToDeleteCandidatureId = null;
+
+          this.successMessage =
+            `L’utilisateur "${userName}" a été supprimé.`;
+        },
+
+        error: (error: any) => {
+          console.error(
+            'DELETE CND USER ERROR',
+            error
+          );
+
+          this.deletingUserId = null;
+
+          this.errorMessage =
+            error?.error?.message ||
+            error?.error?.detail ||
+            'Erreur lors de la suppression de l’utilisateur.';
+        }
+      });
+  }
 
   closeGeneratedAccountsModal(): void {
     this.generatedAccountsModalOpen = false;

@@ -1,30 +1,32 @@
 package com.elemar.backendelemar.dto;
 
-import lombok.AllArgsConstructor;
 import lombok.Getter;
-import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Getter
 @Setter
-@NoArgsConstructor
-@AllArgsConstructor
 public class CreateUtilisateurRequest {
 
     private String nom;
+
     private String email;
-    private String motDePasse;
+
     private String fonction;
 
     /*
-     * Nouveau champ principal.
-     */
-    private Long roleId;
-
-    /*
-     * Ancien champ temporairement conservé.
+     * IT, ACHAT, COMITE ou TECHNIQUE
      */
     private String typeUtilisateur;
 
+    /*
+     * Identifiant du rôle dans role_acces
+     */
+    private Long roleId;
+
+    private String motDePasse;
+
+    /*
+     * Utilisateur connecté qui crée le compte
+     */
     private Long createurId;
 }

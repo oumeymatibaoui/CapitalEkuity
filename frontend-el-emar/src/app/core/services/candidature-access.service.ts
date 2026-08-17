@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { environment } from '../../../environments/environment.development';
 
 export interface CreateCndUserRequest {
   nomComplet: string;
@@ -67,13 +68,25 @@ export interface CandidatureAccessResponse {
   utilisateurs: UtilisateurCndResponse[];
   comptesGeneres: GeneratedAccountResponse[];
 }
+export interface CreateCndUserRequest {
+  nomComplet: string;
+  email: string;
+  telephone?: string | null;
+  fonction?: string | null;
+}
 
+export interface UpdateCndUserRequest {
+  nomComplet: string;
+  email: string;
+  telephone?: string | null;
+  fonction?: string | null;
+}
 @Injectable({
   providedIn: 'root'
 })
 export class CandidatureAccessService {
 
-  private readonly baseUrl = 'http://localhost:8089/api/el-emar/candidatures-access';
+  private readonly baseUrl = `${environment.apiBaseUrl}/api/el-emar/candidatures-access`;
 
   constructor(private http: HttpClient) {}
 
@@ -121,12 +134,15 @@ activateCandidature(
     );
   }
 
-  addUser(candidatureId: number, user: CreateCndUserRequest): Observable<GeneratedAccountResponse> {
-    return this.http.post<GeneratedAccountResponse>(
-      `${this.baseUrl}/${candidatureId}/utilisateurs`,
-      user
-    );
-  }
+addUser(
+  candidatureId: number,
+  request: UpdateCndUserRequest
+): Observable<GeneratedAccountResponse> {
+  return this.http.post<GeneratedAccountResponse>(
+    `${this.baseUrl}/${candidatureId}/users`,
+    request
+  );
+}
 activateUser(userId: number): Observable<void> {
   return this.http.patch<void>(
     `${this.baseUrl}/utilisateurs/${userId}/activate`,
@@ -152,4 +168,22 @@ deactivateUser(userId: number): Observable<void> {
       `${this.baseUrl}/${candidatureId}`
     );
   }
+  updateUser(
+  userId: number,
+  request: UpdateCndUserRequest
+): Observable<UtilisateurCndResponse> {
+  return this.http.put<UtilisateurCndResponse>(
+    `${this.baseUrl}/users/${userId}`,
+    request
+  );
+}
+
+deleteUser(
+  userId: number
+): Observable<void> {
+  return this.http.delete<void>(
+    `${this.baseUrl}/users/${userId}`
+  );
+}
+
 }

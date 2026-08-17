@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { environment } from '../../../environments/environment.development';
 
 import {
   HistoriqueActionResponse
@@ -36,7 +37,7 @@ export interface ChangePasswordRequest {
 })
 export class ElEmarCompteService {
 
-  private readonly apiUrl = 'http://localhost:8089/api/el-emar/compte';
+  private readonly apiUrl = `${environment.apiBaseUrl}/api/el-emar/compte`;
 
   constructor(private http: HttpClient) {}
 

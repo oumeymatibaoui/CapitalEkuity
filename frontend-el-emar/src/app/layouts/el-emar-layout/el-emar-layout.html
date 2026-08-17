@@ -1,9 +1,17 @@
-<div class="el-emar-shell">
+<div class="el-emar-layout" [class.sidebar-collapsed]="sidebarCollapsed">
 
-    <app-sidebar></app-sidebar>
+    <app-sidebar (collapsedChange)="
+      onSidebarCollapsedChange($event)
+    "></app-sidebar>
 
-    <main class="el-emar-main">
-        <router-outlet></router-outlet>
-    </main>
+    <div class="layout-main">
+
+        <app-topbar title="Plateforme El Emar" subtitle="Gestion de la qualification des intervenants"></app-topbar>
+
+        <main class="layout-content">
+            <router-outlet></router-outlet>
+        </main>
+
+    </div>
 
 </div>

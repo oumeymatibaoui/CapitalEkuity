@@ -42,9 +42,9 @@ public class ApplicationCandidature {
     private Lot lot;
 
     // Ancien modèle conservé pour le futur module Appel/Campagne
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "appel_lot_id")
-    private AppelLot appelLot;
+//    @ManyToOne(fetch = FetchType.LAZY)
+//    @JoinColumn(name = "appel_lot_id")
+//    private AppelLot appelLot;
 
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.NAMED_ENUM)

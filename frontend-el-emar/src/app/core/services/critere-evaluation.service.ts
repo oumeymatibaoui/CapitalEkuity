@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, map } from 'rxjs';
+import { environment } from '../../../environments/environment.development';
 
 /* =====================================================
    LOT / DOMAINE
@@ -226,9 +227,9 @@ export interface CritereEvaluationRequest {
 })
 export class CritereEvaluationService {
 
-  private readonly apiUrl = 'http://localhost:8089/api/criteres-evaluation';
-  private readonly lotsUrl = 'http://localhost:8089/api/lots';
-  private readonly categoriesUrl = 'http://localhost:8089/api/categories-evaluation';
+  private readonly apiUrl = `${environment.apiBaseUrl}/api/criteres-evaluation`;
+  private readonly lotsUrl = `${environment.apiBaseUrl}/api/lots`;
+  private readonly categoriesUrl = `${environment.apiBaseUrl}/api/categories-evaluation`;
 
   constructor(private http: HttpClient) {}
 

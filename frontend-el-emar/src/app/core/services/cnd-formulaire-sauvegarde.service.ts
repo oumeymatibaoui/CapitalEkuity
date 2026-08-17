@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { environment } from '../../../environments/environment.development';
 
 export interface ReponseCritereSaveRequest {
   critereId: number;
@@ -35,7 +36,7 @@ export interface FormulaireLotSavedResponse {
 })
 export class CndFormulaireSauvegardeService {
 
-  private apiUrl = 'http://localhost:8089/api/cnd/formulaire-candidature';
+  private apiUrl = `${environment.apiBaseUrl}/api/cnd/formulaire-candidature`;
 
   constructor(private http: HttpClient) {}
 

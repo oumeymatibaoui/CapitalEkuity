@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { environment } from '../../../environments/environment.development';
 
 export interface Lot {
   id?: number;
@@ -21,7 +22,7 @@ export interface Lot {
 })
 export class LotService {
 
-  private readonly apiUrl = 'http://localhost:8089/api/lots';
+  private readonly apiUrl = `${environment.apiBaseUrl}/api/lots`;
 
   constructor(private http: HttpClient) {}
 

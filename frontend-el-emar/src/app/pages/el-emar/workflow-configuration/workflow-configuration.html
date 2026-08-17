@@ -1,0 +1,393 @@
+<div class="workflow-config-page">
+
+    <!-- =====================================================
+       HEADER
+  ====================================================== -->
+
+    <header class="page-header">
+        <div class="header-copy">
+            <span class="header-icon">
+        <i class="ti ti-route"></i>
+      </span>
+
+            <div>
+                <span class="eyebrow">
+          {{ canEditStructure ? 'Administration globale' : 'Consultation workflow' }}
+        </span>
+
+                <h1>
+                    Configuration dynamique du workflow
+                </h1>
+
+                <p *ngIf="canEditStructure">
+                    Créez le circuit depuis zéro, ajoutez des étapes, changez leur ordre, leur responsable et les étapes libres. Les nouvelles candidatures recevront automatiquement une copie du modèle.
+                </p>
+
+                <p *ngIf="isAdminAchatReadOnly">
+                    Vous pouvez consulter l'intégralité du modèle. La structure est en lecture seule. Le remplacement d'un responsable se fait uniquement dans le workflow du dossier concerné.
+                </p>
+            </div>
+        </div>
+
+        <div class="header-actions">
+            <button type="button" class="btn secondary" [disabled]="loading || saving" (click)="load()">
+        <i class="ti ti-refresh"></i>
+        Actualiser
+      </button>
+
+            <button *ngIf="canEditStructure" type="button" class="btn secondary" [disabled]="loading || saving" (click)="addStep()">
+        <i class="ti ti-plus"></i>
+        Ajouter une étape
+      </button>
+
+            <button *ngIf="canEditStructure" type="button" class="btn primary" [disabled]="loading || saving || steps.length === 0" (click)="save()">
+        <i
+          [class]="saving ? 'ti ti-loader-2 spin' : 'ti ti-device-floppy'"
+        ></i>
+
+        {{ saving ? 'Enregistrement...' : 'Enregistrer le workflow' }}
+      </button>
+        </div>
+    </header>
+
+    <!-- =====================================================
+       MESSAGES
+  ====================================================== -->
+
+    <div class="alert error" *ngIf="pageError">
+        <i class="ti ti-alert-circle"></i>
+        <span>{{ pageError }}</span>
+    </div>
+
+    <div class="alert success" *ngIf="successMessage">
+        <i class="ti ti-circle-check"></i>
+        <span>{{ successMessage }}</span>
+    </div>
+
+    <!-- =====================================================
+       INFORMATION
+  ====================================================== -->
+
+    <div class="info-banner">
+        <i class="ti ti-info-circle"></i>
+
+        <div>
+            <strong>Principe</strong>
+            <span>
+        Le modèle est global. Une candidature déjà initialisée conserve son propre circuit.
+        Vous pouvez ajouter autant d'étapes libres que nécessaire et placer les quatre étapes métier
+        à l'endroit souhaité dans le circuit.
+      </span>
+        </div>
+    </div>
+
+    <div class="business-note" *ngIf="isAdminAchatReadOnly">
+        <i class="ti ti-eye"></i>
+        <div>
+            <strong>Mode consultation — Administrateur Achat</strong>
+            <span>
+        Vous voyez tout le workflow mais vous ne pouvez ni ajouter, ni supprimer,
+        ni réordonner, ni renommer une étape, ni changer le modèle global.
+        La seule écriture autorisée est la réaffectation d'un responsable dans un dossier.
+      </span>
+        </div>
+    </div>
+
+    <div class="business-note">
+        <i class="ti ti-shield-check"></i>
+        <div>
+            <strong>4 types métier doivent exister avant l'enregistrement</strong>
+            <span>
+        Recevabilité administrative, Évaluation technique, Décision finale et Classement par zone.
+        Leur ordre est libre, mais leur département métier reste protégé afin de ne pas casser les contrôles backend.
+      </span>
+        </div>
+    </div>
+
+    <!-- =====================================================
+       LOADING
+  ====================================================== -->
+
+    <div class="loading-card" *ngIf="loading">
+        <i class="ti ti-loader-2 spin"></i> Chargement de la configuration...
+    </div>
+
+    <!-- =====================================================
+       EMPTY
+  ====================================================== -->
+
+    <section class="empty-workflow-card" *ngIf="!loading && steps.length === 0">
+        <span class="empty-icon">
+      <i class="ti ti-route-off"></i>
+    </span>
+
+        <h2>Aucun workflow configuré</h2>
+
+        <p>
+            Commencez depuis zéro ou ajoutez automatiquement les quatre étapes métier.
+        </p>
+
+        <div class="empty-actions" *ngIf="canEditStructure">
+            <button type="button" class="btn primary" (click)="addStep()">
+        <i class="ti ti-plus"></i>
+        Créer une première étape
+      </button>
+
+            <button type="button" class="btn secondary" (click)="createBusinessTemplate()">
+        <i class="ti ti-wand"></i>
+        Ajouter les 4 étapes métier
+      </button>
+        </div>
+    </section>
+
+    <!-- =====================================================
+       TOOLBAR
+  ====================================================== -->
+
+    <div class="workflow-toolbar" *ngIf="!loading && steps.length > 0">
+        <div class="workflow-count">
+            <strong>{{ steps.length }}</strong>
+            <span>étape(s)</span>
+        </div>
+
+        <div class="workflow-toolbar-actions" *ngIf="canEditStructure">
+            <button type="button" class="btn secondary" [disabled]="saving" (click)="createBusinessTemplate()">
+        <i class="ti ti-wand"></i>
+        Ajouter les étapes métier manquantes
+      </button>
+
+            <button type="button" class="btn danger" [disabled]="saving" (click)="clearWorkflow()">
+        <i class="ti ti-trash"></i>
+        Vider l'écran
+      </button>
+        </div>
+    </div>
+
+    <!-- =====================================================
+       STEPS
+  ====================================================== -->
+
+    <section class="steps-card" *ngIf="!loading && steps.length > 0">
+        <div class="steps-line"></div>
+
+        <article class="step-card" *ngFor="let step of steps; let i = index; trackBy: trackByUid">
+            <div class="step-index">
+                {{ step.ordre }}
+            </div>
+
+            <div class="step-main">
+                <div class="step-heading">
+                    <span class="step-icon">
+            <i [class]="stepIcon(step)"></i>
+          </span>
+
+                    <div class="step-title">
+                        <small>Étape {{ step.ordre }}</small>
+                        <h2>{{ step.libelleEtape || 'Nouvelle étape' }}</h2>
+                        <code>{{ step.codeEtape }}</code>
+                    </div>
+
+                    <span class="department-badge" [attr.data-department]="step.departementCode">
+            {{ departmentLabel(step.departementCode) }}
+          </span>
+
+                    <div class="step-actions" *ngIf="canEditStructure">
+                        <button type="button" class="icon-btn" title="Monter l'étape" [disabled]="i === 0 || saving" (click)="moveUp(i)">
+              <i class="ti ti-arrow-up"></i>
+            </button>
+
+                        <button type="button" class="icon-btn" title="Descendre l'étape" [disabled]="i === steps.length - 1 || saving" (click)="moveDown(i)">
+              <i class="ti ti-arrow-down"></i>
+            </button>
+
+                        <button type="button" class="icon-btn danger" title="Supprimer l'étape" [disabled]="saving" (click)="removeStep(step)">
+              <i class="ti ti-trash"></i>
+            </button>
+                    </div>
+                </div>
+
+                <div class="form-grid">
+
+                    <!-- TYPE -->
+                    <label>
+            <span>Type d'étape</span>
+
+            <select
+              class="form-control"
+              [ngModel]="step.typeEtape"
+              [disabled]="!canEditStructure || saving"
+              (ngModelChange)="onTypeChange(step, $event)"
+            >
+              <option
+                *ngFor="let option of stepTypes"
+                [ngValue]="option.code"
+                [disabled]="isBusinessTypeUsed(option.code, step)"
+              >
+                {{ option.label }}
+              </option>
+            </select>
+
+            <small class="form-hint" *ngIf="isBusinessStep(step)">
+              Cette étape ouvre une section métier de l'évaluation.
+            </small>
+
+            <small class="form-hint" *ngIf="!isBusinessStep(step)">
+              Une étape libre sert au traitement / contrôle / transmission sans action métier spécifique.
+            </small>
+          </label>
+
+                    <!-- LIBELLE -->
+                    <label>
+            <span>Libellé affiché</span>
+
+            <input
+              type="text"
+              class="form-control"
+              [(ngModel)]="step.libelleEtape"
+              [disabled]="!canEditStructure || saving"
+              maxlength="160"
+              placeholder="Ex. Validation Direction"
+            />
+          </label>
+
+                    <!-- CODE -->
+                    <label>
+            <span>Code technique</span>
+
+            <input
+              type="text"
+              class="form-control code-control"
+              [(ngModel)]="step.codeEtape"
+              [disabled]="!canEditStructure || isBusinessStep(step) || saving"
+              maxlength="80"
+              (blur)="onCustomCodeBlur(step)"
+              placeholder="EX. VALIDATION_DIRECTION"
+            />
+
+            <small class="form-hint" *ngIf="isBusinessStep(step)">
+              Code métier protégé.
+            </small>
+
+            <small class="form-hint" *ngIf="!isBusinessStep(step)">
+              Lettres, chiffres et underscore. Le code est normalisé automatiquement.
+            </small>
+          </label>
+
+                    <!-- DEPARTEMENT -->
+                    <label>
+            <span>Département</span>
+
+            <select
+              class="form-control"
+              [(ngModel)]="step.departementCode"
+              [disabled]="!canEditStructure || departmentLocked(step) || saving"
+              (ngModelChange)="onDepartmentChange(step)"
+            >
+              <option
+                *ngFor="let department of departments"
+                [ngValue]="department.code"
+              >
+                {{ department.label }}
+              </option>
+            </select>
+
+            <small class="form-hint" *ngIf="departmentLocked(step)">
+              Département imposé par la fonction métier.
+            </small>
+          </label>
+
+                    <!-- RESPONSABLE -->
+                    <label class="responsible-field">
+            <span>Responsable par défaut</span>
+
+            <select
+              class="form-control"
+              [(ngModel)]="step.utilisateurDefautId"
+              [disabled]="!canEditStructure || saving"
+            >
+              <option [ngValue]="null">
+                -- Choisir un utilisateur {{ departmentLabel(step.departementCode) }} --
+              </option>
+
+              <option
+                *ngFor="let user of usersForStep(step); trackBy: trackByUserId"
+                [ngValue]="user.id"
+              >
+                {{ user.nom }}
+                <ng-container *ngIf="user.email">
+                  — {{ user.email }}
+                </ng-container>
+              </option>
+            </select>
+
+            <small
+              class="form-hint warning"
+              *ngIf="usersForStep(step).length === 0"
+            >
+              Aucun utilisateur actif disponible dans le département
+              {{ departmentLabel(step.departementCode) }}.
+            </small>
+
+            <small
+              class="form-hint"
+              *ngIf="usersForStep(step).length > 0"
+            >
+              {{ usersForStep(step).length }} utilisateur(s) disponible(s).
+            </small>
+          </label>
+                </div>
+            </div>
+        </article>
+
+        <button *ngIf="canEditStructure" type="button" class="add-step-bottom" [disabled]="saving" (click)="addStep()">
+      <i class="ti ti-plus"></i>
+      Ajouter une étape au circuit
+    </button>
+    </section>
+
+    <!-- =====================================================
+       MIGRATION EXISTANTS
+  ====================================================== -->
+
+    <section class="migration-card" *ngIf="canEditStructure && !loading && steps.length > 0">
+        <div>
+            <span class="migration-icon">
+        <i class="ti ti-database-import"></i>
+      </span>
+
+            <div>
+                <h2>Reprise des dossiers existants</h2>
+                <p>
+                    À utiliser seulement après avoir enregistré le modèle. Un workflow déjà commencé n'est jamais détruit automatiquement.
+                </p>
+            </div>
+        </div>
+
+        <div class="migration-actions">
+            <button type="button" class="btn secondary" [disabled]="backfilling || rebuilding || saving" (click)="initializeExistingWithoutWorkflow()">
+        <i
+          [class]="backfilling ? 'ti ti-loader-2 spin' : 'ti ti-folder-plus'"
+        ></i>
+
+        {{
+          backfilling
+            ? 'Initialisation...'
+            : 'Dossiers soumis sans workflow'
+        }}
+      </button>
+
+            <button type="button" class="btn warning" [disabled]="rebuilding || backfilling || saving" (click)="rebuildUnstartedLegacy()">
+        <i
+          [class]="rebuilding ? 'ti ti-loader-2 spin' : 'ti ti-reload'"
+        ></i>
+
+        {{
+          rebuilding
+            ? 'Reconstruction...'
+            : 'Reconstruire circuits non démarrés'
+        }}
+      </button>
+        </div>
+    </section>
+
+</div>

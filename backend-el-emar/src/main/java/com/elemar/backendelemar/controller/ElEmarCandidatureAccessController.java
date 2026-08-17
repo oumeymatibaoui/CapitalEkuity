@@ -45,11 +45,22 @@ public class ElEmarCandidatureAccessController {
     }
 
     @PostMapping("/{candidatureId}/utilisateurs")
-    public GeneratedAccountResponse addUser(
+    public GeneratedAccountResponse addUsers(
             @PathVariable Long candidatureId,
             @RequestBody CreateCndUserRequest request
     ) {
         return service.addUser(candidatureId, request);
+    }
+    @PostMapping("/{candidatureId}/users")
+    @ResponseStatus(HttpStatus.CREATED)
+    public GeneratedAccountResponse addUser(
+            @PathVariable Long candidatureId,
+            @RequestBody CreateCndUserRequest request
+    ) {
+        return service.addUser(
+                candidatureId,
+                request
+        );
     }
 
     @PatchMapping("/utilisateurs/{userId}/deactivate")
@@ -111,4 +122,23 @@ public class ElEmarCandidatureAccessController {
     ) {
         return service.activateCandidature(candidatureId);
     }
+    @PutMapping("/users/{userId}")
+    public UtilisateurCndResponse updateUser(
+            @PathVariable Long userId,
+            @RequestBody UpdateCndUserRequest request
+    ) {
+        return service.updateUser(
+                userId,
+                request
+        );
+    }
+
+    @DeleteMapping("/users/{userId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteUser(
+            @PathVariable Long userId
+    ) {
+        service.deleteUser(userId);
+    }
+
 }

@@ -5,14 +5,16 @@ import com.elemar.backendelemar.dto.LoginRequest;
 import com.elemar.backendelemar.dto.LoginResponse;
 import com.elemar.backendelemar.entity.RoleAcces;
 import com.elemar.backendelemar.entity.Utilisateur;
+import com.elemar.backendelemar.enums.TypeUtilisateur;
 import com.elemar.backendelemar.repository.UtilisateurRepository;
 import lombok.RequiredArgsConstructor;
-import org.hibernate.Hibernate;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+
+import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
@@ -23,23 +25,30 @@ public class AuthService {
     private final JwtService jwtService;
 
     @Transactional
-    public LoginResponse login(LoginRequest request) {
-        Utilisateur utilisateur = authenticate(request);
+    public LoginResponse login(
+            LoginRequest request
+    ) {
+        Utilisateur utilisateur =
+                authenticate(request);
+
         return toLoginResponse(utilisateur);
     }
 
     @Transactional
-    public LoginResponse loginCandidat(LoginRequest request) {
-        Utilisateur utilisateur = authenticate(request);
+    public LoginResponse loginCandidat(
+            LoginRequest request
+    ) {
 
-        String type = utilisateur.getTypeUtilisateur() == null
-                ? ""
-                : utilisateur.getTypeUtilisateur().name();
+        Utilisateur utilisateur =
+                authenticate(request);
 
-        if (!"CND".equalsIgnoreCase(type)) {
+        if (
+                utilisateur.getTypeUtilisateur()
+                        != TypeUtilisateur.CND
+        ) {
             throw new ResponseStatusException(
                     HttpStatus.FORBIDDEN,
-                    "Cet accès est réservé aux candidats / prestataires"
+                    "Cet accès est réservé aux candidats / prestataires."
             );
         }
 
@@ -47,101 +56,144 @@ public class AuthService {
     }
 
     @Transactional
-    public LoginResponse loginElEmar(LoginRequest request) {
-        Utilisateur utilisateur = authenticate(request);
+    public LoginResponse loginElEmar(
+            LoginRequest request
+    ) {
 
-        String type = utilisateur.getTypeUtilisateur() == null
-                ? ""
-                : utilisateur.getTypeUtilisateur().name();
+        Utilisateur utilisateur =
+                authenticate(request);
 
-        if ("CND".equalsIgnoreCase(type)) {
+        if (
+                utilisateur.getTypeUtilisateur()
+                        == TypeUtilisateur.CND
+        ) {
             throw new ResponseStatusException(
                     HttpStatus.FORBIDDEN,
                     "Ce compte est un compte candidat. "
-                            + "Veuillez utiliser l’espace candidat."
+                            + "Veuillez utiliser l'espace candidat."
             );
         }
 
         return toLoginResponse(utilisateur);
     }
 
-    private Utilisateur authenticate(LoginRequest request) {
-        if (
-                request == null
-                        || request.email() == null
-                        || request.motDePasse() == null
-        ) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Email et mot de passe sont obligatoires"
-            );
-        }
+    private Utilisateur authenticate(
+            LoginRequest request
+    ) {
 
-        String email = request.email().trim();
+        validateRequest(request);
+
+        String email =
+                request.email()
+                        .trim()
+                        .toLowerCase(Locale.ROOT);
+
+        String rawPassword =
+                request.motDePasse();
 
         Utilisateur utilisateur =
-                utilisateurRepository.findByEmail(email)
-                        .orElseThrow(() ->
-                                new ResponseStatusException(
-                                        HttpStatus.UNAUTHORIZED,
-                                        "Email ou mot de passe incorrect"
-                                )
+                utilisateurRepository
+                        .findByEmailIgnoreCase(email)
+                        .orElseThrow(
+                                this::invalidCredentials
                         );
 
+        String storedPassword =
+                utilisateur.getMotDePasse();
+
         if (
-                utilisateur.getMotDePasse() == null
+                storedPassword == null
                         || !passwordMatches(
-                        request.motDePasse(),
-                        utilisateur.getMotDePasse()
+                        rawPassword,
+                        storedPassword
                 )
         ) {
-            throw new ResponseStatusException(
-                    HttpStatus.UNAUTHORIZED,
-                    "Email ou mot de passe incorrect"
-            );
+            throw invalidCredentials();
         }
 
         if (Boolean.FALSE.equals(utilisateur.getActif())) {
             throw new ResponseStatusException(
                     HttpStatus.FORBIDDEN,
-                    "Ce compte est inactif"
+                    "Ce compte est inactif."
             );
         }
 
         if (
                 utilisateur.getStatutCompte() != null
                         && !"ACTIF".equalsIgnoreCase(
-                        utilisateur.getStatutCompte().name()
+                        utilisateur
+                                .getStatutCompte()
+                                .name()
                 )
         ) {
             throw new ResponseStatusException(
                     HttpStatus.FORBIDDEN,
-                    "Ce compte est inactif"
+                    "Ce compte est inactif."
+            );
+        }
+
+        /*
+         * Convertit automatiquement les anciens mots
+         * de passe texte clair en BCrypt.
+         */
+        if (!isEncodedPassword(storedPassword)) {
+
+            utilisateur.setMotDePasse(
+                    passwordEncoder.encode(
+                            rawPassword
+                    )
+            );
+
+            utilisateur =
+                    utilisateurRepository.save(
+                            utilisateur
+                    );
+        }
+
+        return utilisateur;
+    }
+
+    private void validateRequest(
+            LoginRequest request
+    ) {
+
+        if (request == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Les informations de connexion sont obligatoires."
             );
         }
 
         if (
-                !isEncodedPassword(utilisateur.getMotDePasse())
-                        && utilisateur.getMotDePasse()
-                        .equals(request.motDePasse())
+                request.email() == null
+                        || request.email().isBlank()
         ) {
-            utilisateur.setMotDePasse(
-                    passwordEncoder.encode(
-                            request.motDePasse()
-                    )
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "L'email est obligatoire."
             );
-
-            utilisateurRepository.save(utilisateur);
         }
 
-        return utilisateur;
+        if (
+                request.motDePasse() == null
+                        || request.motDePasse().isBlank()
+        ) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Le mot de passe est obligatoire."
+            );
+        }
     }
 
     private boolean passwordMatches(
             String rawPassword,
             String storedPassword
     ) {
-        if (rawPassword == null || storedPassword == null) {
+
+        if (
+                rawPassword == null
+                        || storedPassword == null
+        ) {
             return false;
         }
 
@@ -152,34 +204,77 @@ public class AuthService {
             );
         }
 
-        return storedPassword.equals(rawPassword);
+        return storedPassword.equals(
+                rawPassword
+        );
     }
 
-    private boolean isEncodedPassword(String value) {
-        return value.startsWith("$2a$")
-                || value.startsWith("$2b$")
-                || value.startsWith("$2y$");
+    private boolean isEncodedPassword(
+            String password
+    ) {
+
+        if (password == null) {
+            return false;
+        }
+
+        return password.startsWith("$2a$")
+                || password.startsWith("$2b$")
+                || password.startsWith("$2y$");
     }
 
     private LoginResponse toLoginResponse(
             Utilisateur utilisateur
     ) {
-        RoleAcces role = utilisateur.getRoleAcces();
 
-        Long roleId = role == null
-                ? null
-                : role.getId();
+        RoleAcces role =
+                utilisateur.getRoleAcces();
 
-        String roleCode = role == null
-                ? utilisateur.getTypeUtilisateur().name()
-                : role.getCodeRole();
+        Long roleId = null;
+        String roleCode = null;
+        String roleNom = null;
 
-        String roleNom = role == null
-                ? null
-                : role.getNomRole();
+        if (role != null) {
 
-        String token = jwtService.generateToken(utilisateur
-        );
+            roleId =
+                    role.getId();
+
+            roleCode =
+                    normalizeRoleCode(
+                            role.getCodeRole()
+                    );
+
+            roleNom =
+                    role.getNomRole();
+        }
+
+        /*
+         * Si aucun rôle personnalisé n'est associé,
+         * utiliser le type utilisateur.
+         */
+        if (
+                roleCode == null
+                        && utilisateur.getTypeUtilisateur() != null
+        ) {
+            roleCode =
+                    utilisateur
+                            .getTypeUtilisateur()
+                            .name();
+        }
+
+        if (
+                roleNom == null
+                        && utilisateur.getTypeUtilisateur() != null
+        ) {
+            roleNom =
+                    utilisateur
+                            .getTypeUtilisateur()
+                            .name();
+        }
+
+        String token =
+                jwtService.generateToken(
+                        utilisateur
+                );
 
         return new LoginResponse(
                 utilisateur.getId(),
@@ -190,6 +285,37 @@ public class AuthService {
                 roleCode,
                 roleNom,
                 token
+        );
+    }
+
+    private String normalizeRoleCode(
+            String roleCode
+    ) {
+
+        if (
+                roleCode == null
+                        || roleCode.isBlank()
+        ) {
+            return null;
+        }
+
+        String normalized =
+                roleCode
+                        .trim()
+                        .toUpperCase(Locale.ROOT);
+
+        if (normalized.startsWith("ROLE_")) {
+            normalized =
+                    normalized.substring(5);
+        }
+
+        return normalized;
+    }
+
+    private ResponseStatusException invalidCredentials() {
+        return new ResponseStatusException(
+                HttpStatus.UNAUTHORIZED,
+                "Email ou mot de passe incorrect."
         );
     }
 }

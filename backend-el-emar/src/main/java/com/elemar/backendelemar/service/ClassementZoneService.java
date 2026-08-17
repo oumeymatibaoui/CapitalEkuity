@@ -29,6 +29,10 @@ public class ClassementZoneService {
     private final ProjetReferenceRepository projetReferenceRepository;
     private final HistoriqueActionService historiqueActionService;
 
+    // =====================================================
+    // ENREGISTREMENT DU CLASSEMENT D'UNE RÉFÉRENCE
+    // =====================================================
+
     @Transactional
     public ClassementZoneResponse validerReferenceZoneEtCalculerClassement(
             SaveReferenceZoneRequest request
@@ -38,34 +42,48 @@ public class ClassementZoneService {
         Long applicationId = request.getApplicationCandidatureId();
         Long referenceId = request.getReferenceProjetId();
         Long zoneId = request.getZoneId();
+
+        /*
+         * Le motif est obligatoire.
+         * Il explique pourquoi cette référence correspond à la zone choisie.
+         */
         String commentaire = clean(request.getCommentaire());
 
         ApplicationCandidature application =
-                applicationCandidatureRepository.findById(applicationId)
+                applicationCandidatureRepository
+                        .findById(applicationId)
                         .orElseThrow(() -> new ResponseStatusException(
                                 HttpStatus.NOT_FOUND,
                                 "Application candidature introuvable."
                         ));
 
         ProjetReference reference =
-                projetReferenceRepository.findById(referenceId)
+                projetReferenceRepository
+                        .findById(referenceId)
                         .orElseThrow(() -> new ResponseStatusException(
                                 HttpStatus.NOT_FOUND,
                                 "Projet de référence introuvable."
                         ));
 
         Zone zone =
-                zoneRepository.findById(zoneId)
+                zoneRepository
+                        .findById(zoneId)
                         .orElseThrow(() -> new ResponseStatusException(
                                 HttpStatus.NOT_FOUND,
                                 "Zone introuvable."
                         ));
 
-        verifierReferenceDansApplication(reference, applicationId);
+        verifierReferenceDansApplication(
+                reference,
+                applicationId
+        );
 
         /*
-         * Sauvegarde sur le projet de référence exact.
-         * Ces champs seront relus quand la page sera rouverte.
+         * Sauvegarde sur la référence projet exacte.
+         *
+         * zoneElEmarNom         = zone choisie
+         * zoneElEmarCommentaire = motif du classement
+         * zoneValidee            = verrou métier après enregistrement
          */
         reference.setZoneElEmarId(zone.getId());
         reference.setZoneElEmarNom(zone.getNomZone());
@@ -75,12 +93,12 @@ public class ClassementZoneService {
         projetReferenceRepository.save(reference);
 
         /*
-         * Classement du lot.
-         * On met à jour le classement actif existant.
-         * S'il n'existe pas encore, on en crée un.
+         * Classement du lot/application.
+         * On conserve un seul classement actif.
          */
         List<ClassementZone> classements =
-                classementZoneRepository.findAllByApplicationCandidature_Id(applicationId);
+                classementZoneRepository
+                        .findAllByApplicationCandidature_Id(applicationId);
 
         ClassementZone classementActif =
                 classements.stream()
@@ -89,14 +107,17 @@ public class ClassementZoneService {
                         .orElseGet(ClassementZone::new);
 
         /*
-         * Désactiver les anciens doublons actifs éventuels.
+         * Nettoyage d'anciens doublons actifs éventuels.
          */
         for (ClassementZone ancien : classements) {
             boolean estLeClassementChoisi =
                     classementActif.getId() != null
                             && classementActif.getId().equals(ancien.getId());
 
-            if (!estLeClassementChoisi && Boolean.TRUE.equals(ancien.getActif())) {
+            if (
+                    !estLeClassementChoisi
+                            && Boolean.TRUE.equals(ancien.getActif())
+            ) {
                 ancien.setActif(false);
                 classementZoneRepository.save(ancien);
             }
@@ -104,7 +125,9 @@ public class ClassementZoneService {
 
         classementActif.setApplicationCandidature(application);
         classementActif.setZone(zone);
-        classementActif.setCategorie(calculerCategorieDepuisZone(zone));
+        classementActif.setCategorie(
+                calculerCategorieDepuisZone(zone)
+        );
         classementActif.setCommentaire(commentaire);
         classementActif.setActif(true);
 
@@ -127,9 +150,14 @@ public class ClassementZoneService {
         return toResponse(saved);
     }
 
+    // =====================================================
+    // LECTURE
+    // =====================================================
+
     @Transactional(readOnly = true)
     public List<ClassementZoneResponse> getClassements() {
-        return classementZoneRepository.findAll()
+        return classementZoneRepository
+                .findAll()
                 .stream()
                 .map(this::toResponse)
                 .toList();
@@ -140,13 +168,21 @@ public class ClassementZoneService {
             Long applicationCandidatureId
     ) {
         return classementZoneRepository
-                .findAllByApplicationCandidature_Id(applicationCandidatureId)
+                .findAllByApplicationCandidature_Id(
+                        applicationCandidatureId
+                )
                 .stream()
                 .map(this::toResponse)
                 .toList();
     }
 
-    private void verifierRequest(SaveReferenceZoneRequest request) {
+    // =====================================================
+    // VALIDATION
+    // =====================================================
+
+    private void verifierRequest(
+            SaveReferenceZoneRequest request
+    ) {
         if (request == null) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
@@ -174,6 +210,17 @@ public class ClassementZoneService {
                     "Zone obligatoire."
             );
         }
+
+        /*
+         * Important : contrôle également côté backend.
+         * Le frontend ne doit jamais être la seule protection.
+         */
+        if (clean(request.getCommentaire()) == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Le motif du classement est obligatoire."
+            );
+        }
     }
 
     private void verifierReferenceDansApplication(
@@ -184,7 +231,9 @@ public class ClassementZoneService {
                 reference.getApplicationCandidature() == null
                         || reference.getApplicationCandidature().getId() == null
                         || !applicationId.equals(
-                        reference.getApplicationCandidature().getId()
+                        reference
+                                .getApplicationCandidature()
+                                .getId()
                 )
         ) {
             throw new ResponseStatusException(
@@ -193,6 +242,10 @@ public class ClassementZoneService {
             );
         }
     }
+
+    // =====================================================
+    // HISTORIQUE
+    // =====================================================
 
     private void enregistrerHistorique(
             SaveReferenceZoneRequest request,
@@ -227,13 +280,21 @@ public class ClassementZoneService {
                         + " | Lot : " + safe(nomLot)
                         + " | Référence ID : " + reference.getId()
                         + " | Zone : " + safe(zone.getNomZone())
+                        + " | Description zone : " + safe(zone.getDescription())
                         + " | Catégorie : " + safe(categorie)
-                        + " | Commentaire : " + safe(commentaire)
+                        + " | Motif classement : " + safe(commentaire)
         );
     }
 
-    private ClassementZoneResponse toResponse(ClassementZone classement) {
-        ClassementZoneResponse response = new ClassementZoneResponse();
+    // =====================================================
+    // RESPONSE
+    // =====================================================
+
+    private ClassementZoneResponse toResponse(
+            ClassementZone classement
+    ) {
+        ClassementZoneResponse response =
+                new ClassementZoneResponse();
 
         response.setId(classement.getId());
 
@@ -241,21 +302,33 @@ public class ClassementZoneService {
             ApplicationCandidature application =
                     classement.getApplicationCandidature();
 
-            response.setApplicationCandidatureId(application.getId());
+            response.setApplicationCandidatureId(
+                    application.getId()
+            );
 
             if (application.getCandidature() != null) {
                 response.setNomEntreprise(
-                        application.getCandidature().getNomEntreprise()
+                        application
+                                .getCandidature()
+                                .getNomEntreprise()
                 );
+
                 response.setRaisonSociale(
-                        application.getCandidature().getRaisonSociale()
+                        application
+                                .getCandidature()
+                                .getRaisonSociale()
                 );
             }
         }
 
         if (classement.getZone() != null) {
-            response.setZoneId(classement.getZone().getId());
-            response.setNomZone(classement.getZone().getNomZone());
+            response.setZoneId(
+                    classement.getZone().getId()
+            );
+
+            response.setNomZone(
+                    classement.getZone().getNomZone()
+            );
         }
 
         response.setCategorie(
@@ -264,19 +337,40 @@ public class ClassementZoneService {
                         : "A_CLASSER"
         );
 
-        response.setCommentaire(classement.getCommentaire());
-        response.setActif(classement.getActif());
-        response.setCreatedAt(classement.getCreatedAt());
+        response.setCommentaire(
+                classement.getCommentaire()
+        );
+
+        response.setActif(
+                classement.getActif()
+        );
+
+        response.setCreatedAt(
+                classement.getCreatedAt()
+        );
 
         return response;
     }
 
+    // =====================================================
+    // CATÉGORIE
+    // =====================================================
+
     /**
-     * La catégorie est calculée à partir du nom de la zone,
-     * afin de ne pas dépendre des IDs PostgreSQL.
+     * La catégorie actuelle reste calculée depuis le nom de zone,
+     * comme dans ton fonctionnement existant.
+     *
+     * Zone 1 / A -> A
+     * Zone 2 / B -> B
+     * Zone 3 / C -> C
      */
-    private String calculerCategorieDepuisZone(Zone zone) {
-        if (zone == null || zone.getNomZone() == null) {
+    private String calculerCategorieDepuisZone(
+            Zone zone
+    ) {
+        if (
+                zone == null
+                        || zone.getNomZone() == null
+        ) {
             return "A_CLASSER";
         }
 
@@ -284,20 +378,33 @@ public class ClassementZoneService {
                 .trim()
                 .toUpperCase();
 
-        if (nom.equals("ZONE 1") || nom.equals("A")) {
+        if (
+                nom.equals("ZONE 1")
+                        || nom.equals("A")
+        ) {
             return "A";
         }
 
-        if (nom.equals("ZONE 2") || nom.equals("B")) {
+        if (
+                nom.equals("ZONE 2")
+                        || nom.equals("B")
+        ) {
             return "B";
         }
 
-        if (nom.equals("ZONE 3") || nom.equals("C")) {
+        if (
+                nom.equals("ZONE 3")
+                        || nom.equals("C")
+        ) {
             return "C";
         }
 
         return "A_CLASSER";
     }
+
+    // =====================================================
+    // HELPERS
+    // =====================================================
 
     private String clean(String value) {
         if (value == null) {

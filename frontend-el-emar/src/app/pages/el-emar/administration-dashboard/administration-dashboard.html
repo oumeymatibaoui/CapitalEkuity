@@ -1,0 +1,934 @@
+<div class="admin-dashboard">
+
+    <!-- ===================================================
+       MESSAGES
+  ==================================================== -->
+
+    <div class="alert alert--success" *ngIf="successMessage">
+        <i class="ti ti-circle-check"></i>
+        <span>{{ successMessage }}</span>
+    </div>
+
+    <div class="alert alert--error" *ngIf="errorMessage">
+        <i class="ti ti-alert-circle"></i>
+        <span>{{ errorMessage }}</span>
+    </div>
+
+    <!-- ===================================================
+       EN-TÊTE
+  ==================================================== -->
+
+    <!-- <header class="page-hero">
+
+        <div class="hero-main">
+
+            <div class="hero-icon">
+                <i class="ti ti-settings-cog"></i>
+            </div>
+
+            <div class="hero-content">
+
+                <span class="hero-label">
+          Administration
+        </span>
+
+                <h1>
+                    Gestion de la plateforme
+                </h1>
+
+                <p>
+                    Gérez les utilisateurs, les rôles et les autorisations depuis un espace centralisé.
+                </p>
+
+            </div>
+
+        </div>
+
+        <div class="hero-actions">
+
+            <div class="platform-status">
+                <span class="status-indicator"></span>
+
+                <div>
+                    <strong>Administration active</strong>
+                    <small>
+            {{ getActiveUsers() }} compte(s) actif(s)
+          </small>
+                </div>
+            </div>
+
+            <button type="button" class="button button--hero" [disabled]="refreshing" (click)="refreshAll()">
+        <i
+          class="ti"
+          [ngClass]="
+            refreshing
+              ? 'ti-loader-2 spin'
+              : 'ti-refresh'
+          "
+        ></i>
+
+        <span>
+          {{ refreshing ? 'Actualisation' : 'Actualiser' }}
+        </span>
+      </button>
+
+        </div>
+
+    </header> -->
+
+    <!-- ===================================================
+       INDICATEURS
+  ==================================================== -->
+
+    <section class="metrics-grid">
+
+        <article class="metric-card">
+
+            <div class="metric-icon metric-icon--users">
+                <i class="ti ti-users"></i>
+            </div>
+
+            <div class="metric-content">
+                <span>Utilisateurs</span>
+                <strong>{{ getTotalUsers() }}</strong>
+                <small>Comptes internes enregistrés</small>
+            </div>
+
+        </article>
+
+        <article class="metric-card">
+
+            <div class="metric-icon metric-icon--active">
+                <i class="ti ti-user-check"></i>
+            </div>
+
+            <div class="metric-content">
+                <span>Comptes actifs</span>
+                <strong>{{ getActiveUsers() }}</strong>
+                <small>
+          {{ getActiveUserPercentage() }} % des comptes
+        </small>
+            </div>
+
+        </article>
+
+        <article class="metric-card">
+
+            <div class="metric-icon metric-icon--roles">
+                <i class="ti ti-shield-lock"></i>
+            </div>
+
+            <div class="metric-content">
+                <span>Rôles actifs</span>
+                <strong>{{ getTotalRoles() }}</strong>
+                <small>
+          {{ getSystemRoles() }} rôle(s) système
+        </small>
+            </div>
+
+        </article>
+
+        <article class="metric-card" [class.metric-card--warning]="
+        getAttentionCount() > 0
+      ">
+
+            <div class="metric-icon metric-icon--attention">
+                <i class="ti ti-alert-triangle"></i>
+            </div>
+
+            <div class="metric-content">
+                <span>Points à vérifier</span>
+                <strong>{{ getAttentionCount() }}</strong>
+                <small>
+          Comptes ou rôles à contrôler
+        </small>
+            </div>
+
+        </article>
+
+    </section>
+
+    <!-- ===================================================
+       ACTIONS PRINCIPALES
+  ==================================================== -->
+
+    <section class="section-block">
+
+        <div class="section-heading">
+
+            <div>
+                <span>Actions principales</span>
+                <!-- <h2>Que souhaitez-vous gérer ?</h2>
+                <p>
+                    Accédez directement aux opérations les plus utilisées.
+                </p> -->
+            </div>
+
+        </div>
+
+        <div class="action-grid">
+
+            <article class="action-card">
+
+                <div class="action-card-header">
+
+                    <div class="action-icon action-icon--users">
+                        <i class="ti ti-users"></i>
+                    </div>
+
+                    <div>
+                        <span class="action-category">
+              Gestion des comptes
+            </span>
+
+                        <h3>Utilisateurs</h3>
+                    </div>
+
+                </div>
+
+                <p>
+                    Créez les comptes internes, affectez leur département, choisissez leur rôle et gérez leur statut.
+                </p>
+
+                <div class="action-summary">
+
+                    <div>
+                        <strong>{{ getTotalUsers() }}</strong>
+                        <span>comptes</span>
+                    </div>
+
+                    <div>
+                        <strong>{{ getInactiveUsers() }}</strong>
+                        <span>inactifs</span>
+                    </div>
+
+                    <div>
+                        <strong>{{ getUsersWithoutRole() }}</strong>
+                        <span>sans rôle</span>
+                    </div>
+
+                </div>
+
+                <div class="action-buttons">
+
+                    <button type="button" class="button button--secondary" (click)="openQuickUserModal()">
+            <i class="ti ti-user-plus"></i>
+            Créer un utilisateur
+          </button>
+
+                    <button type="button" class="button button--primary" (click)="goToUsersPage()">
+            Gérer les utilisateurs
+            <i class="ti ti-arrow-right"></i>
+          </button>
+
+                </div>
+
+            </article>
+
+            <article class="action-card">
+
+                <div class="action-card-header">
+
+                    <div class="action-icon action-icon--roles">
+                        <i class="ti ti-shield-lock"></i>
+                    </div>
+
+                    <div>
+                        <span class="action-category">
+              Gestion des autorisations
+            </span>
+
+                        <h3>Rôles et accès</h3>
+                    </div>
+
+                </div>
+
+                <p>
+                    Définissez les responsabilités de chaque rôle et les pages accessibles dans la plateforme.
+                </p>
+
+                <div class="action-summary">
+
+                    <div>
+                        <strong>{{ getTotalRoles() }}</strong>
+                        <span>rôles</span>
+                    </div>
+
+                    <div>
+                        <strong>{{ getConfiguredRoles() }}</strong>
+                        <span>configurés</span>
+                    </div>
+
+                    <div>
+                        <strong>{{ getRolesWithoutAccess() }}</strong>
+                        <span>sans accès</span>
+                    </div>
+
+                </div>
+
+                <div class="action-buttons">
+
+                    <button type="button" class="button button--secondary" (click)="openQuickRoleModal()">
+            <i class="ti ti-shield-plus"></i>
+            Créer un rôle
+          </button>
+
+                    <button type="button" class="button button--primary" (click)="goToRolesPage()">
+            Configurer les accès
+            <i class="ti ti-arrow-right"></i>
+          </button>
+
+                </div>
+
+            </article>
+
+            <!-- WORKFLOW -->
+
+            <article class="action-card">
+
+                <div class="action-card-header">
+
+                    <div class="action-icon action-icon--roles">
+                        <i class="ti ti-route"></i>
+                    </div>
+
+                    <div>
+                        <span class="action-category">
+              Gestion du circuit
+            </span>
+
+                        <h3>Configuration du workflow</h3>
+                    </div>
+
+                </div>
+
+                <p>
+                    Définissez l’ordre des étapes, affectez les utilisateurs responsables et modifiez le circuit de traitement des candidatures.
+                </p>
+
+                <div class="action-summary">
+
+                    <div>
+                        <strong>Étapes</strong>
+                        <span>ordre dynamique</span>
+                    </div>
+
+                    <div>
+                        <strong>Responsables</strong>
+                        <span>affectation</span>
+                    </div>
+
+                    <div>
+                        <strong>Suivi</strong>
+                        <span>réaffectation</span>
+                    </div>
+
+                </div>
+
+                <div class="action-buttons">
+
+                    <button type="button" class="button button--primary" (click)="goToWorkflowConfigurationPage()">
+            Modifier le workflow
+            <i class="ti ti-arrow-right"></i>
+          </button>
+
+                </div>
+
+            </article>
+
+        </div>
+
+    </section>
+
+    <!-- ===================================================
+       POINTS À VÉRIFIER
+  ==================================================== -->
+
+    <section class="attention-panel" *ngIf="getAttentionCount() > 0">
+
+        <div class="attention-header">
+
+            <div class="attention-icon">
+                <i class="ti ti-alert-triangle"></i>
+            </div>
+
+            <div>
+                <h2>Points à vérifier</h2>
+                <p>
+                    Quelques éléments nécessitent votre attention.
+                </p>
+            </div>
+
+        </div>
+
+        <div class="attention-items">
+
+            <button type="button" class="attention-item" *ngIf="getInactiveUsers() > 0" (click)="goToUsersPage()">
+        <i class="ti ti-user-off"></i>
+
+        <span>
+          <strong>
+            {{ getInactiveUsers() }}
+          </strong>
+          compte(s) inactif(s)
+        </span>
+
+        <i class="ti ti-chevron-right"></i>
+      </button>
+
+            <button type="button" class="attention-item" *ngIf="getUsersWithoutRole() > 0" (click)="goToUsersPage()">
+        <i class="ti ti-user-question"></i>
+
+        <span>
+          <strong>
+            {{ getUsersWithoutRole() }}
+          </strong>
+          utilisateur(s) sans rôle
+        </span>
+
+        <i class="ti ti-chevron-right"></i>
+      </button>
+
+            <button type="button" class="attention-item" *ngIf="getRolesWithoutAccess() > 0" (click)="goToRolesPage()">
+        <i class="ti ti-lock-off"></i>
+
+        <span>
+          <strong>
+            {{ getRolesWithoutAccess() }}
+          </strong>
+          rôle(s) sans accès
+        </span>
+
+        <i class="ti ti-chevron-right"></i>
+      </button>
+
+        </div>
+
+    </section>
+
+    <!-- ===================================================
+       CONSULTATION
+  ==================================================== -->
+
+    <section class="section-block">
+
+        <div class="section-heading">
+
+            <div>
+                <span>Consultation</span>
+                <!-- <h2>Vue rapide des données</h2>
+                <p>
+                    Recherchez et consultez les derniers comptes et rôles.
+                </p> -->
+            </div>
+
+        </div>
+
+        <div class="data-grid">
+
+            <!-- UTILISATEURS -->
+
+            <article class="data-panel">
+
+                <header class="panel-header">
+
+                    <div class="panel-title">
+
+                        <div class="panel-title-icon panel-title-icon--users">
+                            <i class="ti ti-users"></i>
+                        </div>
+
+                        <div>
+                            <h3>Utilisateurs</h3>
+                            <span>
+                {{ getTotalUsers() }} compte(s)
+              </span>
+                        </div>
+
+                    </div>
+
+                    <div class="export-actions">
+
+                        <button type="button" class="icon-button" title="Exporter au format Excel" [disabled]="getTotalUsers() === 0" (click)="exportUsersToExcel()">
+              <i class="ti ti-file-spreadsheet"></i>
+            </button>
+
+                        <button type="button" class="icon-button" title="Exporter au format PDF" [disabled]="getTotalUsers() === 0" (click)="exportUsersToPdf()">
+              <i class="ti ti-file-type-pdf"></i>
+            </button>
+
+                    </div>
+
+                </header>
+
+                <div class="search-box">
+
+                    <i class="ti ti-search"></i>
+
+                    <input type="search" placeholder="Nom, email, fonction ou rôle" [(ngModel)]="searchUser">
+
+                    <button type="button" class="clear-search" *ngIf="searchUser" (click)="searchUser = ''">
+            <i class="ti ti-x"></i>
+          </button>
+
+                </div>
+
+                <div class="panel-state" *ngIf="loadingUsers">
+                    <i class="ti ti-loader-2 spin"></i> Chargement des utilisateurs
+                </div>
+
+                <div class="panel-state panel-state--empty" *ngIf="
+            !loadingUsers
+            && filteredUsers.length === 0
+          ">
+                    <i class="ti ti-user-search"></i>
+                    <strong>Aucun utilisateur trouvé</strong>
+                    <span>Modifiez votre recherche.</span>
+                </div>
+
+                <div class="table-wrapper" *ngIf="
+            !loadingUsers
+            && filteredUsers.length > 0
+          ">
+
+                    <table class="data-table">
+
+                        <thead>
+                            <tr>
+                                <th>Utilisateur</th>
+                                <th>Département</th>
+                                <th>Rôle</th>
+                                <th>Statut</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+
+                            <tr *ngFor="
+                  let user of filteredUsers;
+                  trackBy: trackByUserId
+                ">
+
+                                <td>
+                                    <div class="identity-cell">
+
+                                        <span class="avatar">
+                      {{
+                        (user.nom || 'U')
+                          .charAt(0)
+                          .toUpperCase()
+                      }}
+                    </span>
+
+                                        <div>
+                                            <strong>
+                        {{ user.nom || 'Utilisateur' }}
+                      </strong>
+
+                                            <small>
+                        {{ user.email || '-' }}
+                      </small>
+                                        </div>
+
+                                    </div>
+                                </td>
+
+                                <td>
+                                    <span class="department-badge">
+                    {{
+                      getDepartmentLabel(
+                        user.typeUtilisateur
+                      )
+                    }}
+                  </span>
+                                </td>
+
+                                <td>
+                                    <span class="role-badge">
+                    {{
+                      getRoleLabel(
+                        user.roleCode
+                      )
+                    }}
+                  </span>
+                                </td>
+
+                                <td>
+                                    <span class="status-badge" [class.status-badge--inactive]="
+                      !user.actif
+                    ">
+                    <span class="status-dot"></span> {{ user.actif ? 'Actif' : 'Inactif' }}
+                                    </span>
+                                </td>
+
+                            </tr>
+
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+                <button type="button" class="panel-footer-button" (click)="goToUsersPage()">
+          Voir tous les utilisateurs
+          <i class="ti ti-arrow-right"></i>
+        </button>
+
+            </article>
+
+            <!-- RÔLES -->
+
+            <article class="data-panel">
+
+                <header class="panel-header">
+
+                    <div class="panel-title">
+
+                        <div class="panel-title-icon panel-title-icon--roles">
+                            <i class="ti ti-shield-lock"></i>
+                        </div>
+
+                        <div>
+                            <h3>Rôles et accès</h3>
+                            <span>
+                {{ getTotalRoles() }} rôle(s)
+              </span>
+                        </div>
+
+                    </div>
+
+                    <div class="export-actions">
+
+                        <button type="button" class="icon-button" title="Exporter au format Excel" [disabled]="getTotalRoles() === 0" (click)="exportRolesToExcel()">
+              <i class="ti ti-file-spreadsheet"></i>
+            </button>
+
+                        <button type="button" class="icon-button" title="Exporter au format PDF" [disabled]="getTotalRoles() === 0" (click)="exportRolesToPdf()">
+              <i class="ti ti-file-type-pdf"></i>
+            </button>
+
+                    </div>
+
+                </header>
+
+                <div class="search-box">
+
+                    <i class="ti ti-search"></i>
+
+                    <input type="search" placeholder="Nom, code ou description" [(ngModel)]="searchRole">
+
+                    <button type="button" class="clear-search" *ngIf="searchRole" (click)="searchRole = ''">
+            <i class="ti ti-x"></i>
+          </button>
+
+                </div>
+
+                <div class="panel-state" *ngIf="loadingRoles">
+                    <i class="ti ti-loader-2 spin"></i> Chargement des rôles
+                </div>
+
+                <div class="panel-state panel-state--empty" *ngIf="
+            !loadingRoles
+            && filteredRolesList.length === 0
+          ">
+                    <i class="ti ti-shield-search"></i>
+                    <strong>Aucun rôle trouvé</strong>
+                    <span>Modifiez votre recherche.</span>
+                </div>
+
+                <div class="table-wrapper" *ngIf="
+            !loadingRoles
+            && filteredRolesList.length > 0
+          ">
+
+                    <table class="data-table">
+
+                        <thead>
+                            <tr>
+                                <th>Rôle</th>
+                                <th>Type</th>
+                                <th>Accès</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+
+                            <tr *ngFor="
+                  let role of filteredRolesList;
+                  trackBy: trackByRoleId
+                ">
+
+                                <td>
+                                    <div class="role-cell">
+                                        <strong>
+                      {{ role.nomRole || '-' }}
+                    </strong>
+
+                                        <small>
+                      {{ role.codeRole || '-' }}
+                    </small>
+                                    </div>
+                                </td>
+
+                                <td>
+                                    <span class="type-badge">
+                    {{ role.typeRole || 'INTERNE' }}
+                  </span>
+                                </td>
+
+                                <td>
+                                    <div class="access-progress">
+
+                                        <div class="access-progress-header">
+                                            <strong>
+                        {{ role.modulesAutorises || 0 }}
+                      </strong>
+
+                                            <span>
+                        / {{ role.totalModules || 0 }}
+                      </span>
+                                        </div>
+
+                                        <div class="access-track">
+                                            <div class="access-fill" [style.width.%]="
+                          getRoleAccessPercentage(role)
+                        "></div>
+                                        </div>
+
+                                    </div>
+                                </td>
+
+                            </tr>
+
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+                <button type="button" class="panel-footer-button" (click)="goToRolesPage()">
+          Voir tous les rôles
+          <i class="ti ti-arrow-right"></i>
+        </button>
+
+            </article>
+
+        </div>
+
+    </section>
+
+    <!-- ===================================================
+       MODALE UTILISATEUR
+  ==================================================== -->
+
+    <div class="modal-backdrop" *ngIf="showQuickUserModal" (click)="closeQuickUserModal()">
+
+        <section class="modal-card" (click)="$event.stopPropagation()">
+
+            <header class="modal-header">
+
+                <div>
+                    <span>Création rapide</span>
+                    <h2>Nouvel utilisateur</h2>
+                    <p>
+                        Créez un compte interne et affectez son département.
+                    </p>
+                </div>
+
+                <button type="button" class="modal-close" [disabled]="savingUser" (click)="closeQuickUserModal()">
+          <i class="ti ti-x"></i>
+        </button>
+
+            </header>
+
+            <div class="modal-body">
+
+                <div class="form-grid">
+
+                    <div class="field">
+                        <label>Nom complet *</label>
+
+                        <input type="text" [(ngModel)]="quickUserForm.nom" placeholder="Exemple : Ahmed Ben Salah">
+                    </div>
+
+                    <div class="field">
+                        <label>Adresse email *</label>
+
+                        <input type="email" [(ngModel)]="quickUserForm.email" placeholder="nom@entreprise.tn">
+                    </div>
+
+                    <div class="field">
+                        <label>Département *</label>
+
+                        <select [(ngModel)]="
+                quickUserForm.typeUtilisateur
+              ">
+              <option
+                *ngFor="
+                  let department
+                  of departmentOptions
+                "
+                [value]="department.code"
+              >
+                {{ department.label }}
+              </option>
+            </select>
+                    </div>
+
+                    <div class="field">
+                        <label>Fonction</label>
+
+                        <input type="text" [(ngModel)]="quickUserForm.fonction" placeholder="Exemple : Évaluateur technique">
+                    </div>
+
+                    <div class="field">
+                        <label>Rôle *</label>
+
+                        <select [(ngModel)]="quickUserForm.roleId">
+              <option
+                [ngValue]="null"
+                disabled
+              >
+                Sélectionner un rôle
+              </option>
+
+              <option
+                *ngFor="let role of availableInternalRoles"
+                [ngValue]="role.id"
+              >
+                {{ role.nomRole }}
+              </option>
+            </select>
+                    </div>
+
+                    <div class="field">
+                        <label>Mot de passe temporaire *</label>
+
+                        <input type="password" [(ngModel)]="
+                quickUserForm.motDePasse
+              " placeholder="8 caractères minimum">
+                    </div>
+
+                </div>
+
+                <div class="information-box">
+                    <i class="ti ti-info-circle"></i>
+
+                    <span>
+            Le rôle contrôle les pages visibles. Le département
+            représente l’équipe de l’utilisateur.
+          </span>
+                </div>
+
+            </div>
+
+            <footer class="modal-footer">
+
+                <button type="button" class="button button--secondary" [disabled]="savingUser" (click)="closeQuickUserModal()">
+          Annuler
+        </button>
+
+                <button type="button" class="button button--primary" [disabled]="savingUser" (click)="saveQuickUser()">
+          <i
+            class="ti"
+            [ngClass]="
+              savingUser
+                ? 'ti-loader-2 spin'
+                : 'ti-user-plus'
+            "
+          ></i>
+
+          {{
+            savingUser
+              ? 'Création en cours'
+              : 'Créer le compte'
+          }}
+        </button>
+
+            </footer>
+
+        </section>
+
+    </div>
+
+    <!-- ===================================================
+       MODALE RÔLE
+  ==================================================== -->
+
+    <div class="modal-backdrop" *ngIf="showQuickRoleModal" (click)="closeQuickRoleModal()">
+
+        <section class="modal-card modal-card--small" (click)="$event.stopPropagation()">
+
+            <header class="modal-header">
+
+                <div>
+                    <span>Création rapide</span>
+                    <h2>Nouveau rôle</h2>
+                    <p>
+                        Créez le rôle puis configurez ses accès.
+                    </p>
+                </div>
+
+                <button type="button" class="modal-close" [disabled]="savingRole" (click)="closeQuickRoleModal()">
+          <i class="ti ti-x"></i>
+        </button>
+
+            </header>
+
+            <div class="modal-body">
+
+                <div class="field">
+                    <label>Nom du rôle *</label>
+
+                    <input type="text" [(ngModel)]="quickRoleForm.nomRole" placeholder="Exemple : Évaluateur technique">
+                </div>
+
+                <div class="field">
+                    <label>Description</label>
+
+                    <textarea rows="4" [(ngModel)]="
+              quickRoleForm.description
+            " placeholder="Décrivez les responsabilités principales."></textarea>
+                </div>
+
+                <div class="information-box">
+                    <i class="ti ti-info-circle"></i>
+
+                    <span>
+            Le rôle sera créé sans accès spécifique. Configurez
+            ensuite ses modules dans la page Rôles et accès.
+          </span>
+                </div>
+
+            </div>
+
+            <footer class="modal-footer">
+
+                <button type="button" class="button button--secondary" [disabled]="savingRole" (click)="closeQuickRoleModal()">
+          Annuler
+        </button>
+
+                <button type="button" class="button button--primary" [disabled]="savingRole" (click)="saveQuickRole()">
+          <i
+            class="ti"
+            [ngClass]="
+              savingRole
+                ? 'ti-loader-2 spin'
+                : 'ti-shield-plus'
+            "
+          ></i>
+
+          {{
+            savingRole
+              ? 'Création en cours'
+              : 'Créer le rôle'
+          }}
+        </button>
+
+            </footer>
+
+        </section>
+
+    </div>
+
+</div>

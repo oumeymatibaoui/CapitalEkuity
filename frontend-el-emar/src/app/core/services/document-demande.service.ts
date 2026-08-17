@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, map } from 'rxjs';
+import { environment } from '../../../environments/environment.development';
 
 export interface LiaisonChampPieceRequest {
   id?: number | null;
@@ -68,7 +69,7 @@ export interface DocumentDemandeRequest {
 })
 export class DocumentDemandeService {
 
-  private apiUrl = 'http://localhost:8089/api/documents-demandes';
+  private apiUrl = `${environment.apiBaseUrl}/api/documents-demandes`;
 
   constructor(private http: HttpClient) {}
 

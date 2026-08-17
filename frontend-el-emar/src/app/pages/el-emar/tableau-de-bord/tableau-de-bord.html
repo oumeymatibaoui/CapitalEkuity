@@ -1,451 +1,923 @@
-<div class="dashboard-page">
+<div class="dashboard-page" [attr.data-profile]="profile">
+    <header class="page-header">
+        <div class="page-heading">
+            <span class="page-eyebrow">{{ pageEyebrow }}</span>
+            <h1>{{ pageTitle }}</h1>
+            <p>{{ pageSubtitle }}</p>
 
-    <div class="top-header">
-        <div>
-            <h1>Tableau de bord</h1>
-            <p>Pilotage des intervenants, conformité des dossiers, scores et décisions.</p>
+            <div class="identity-line">
+                <span class="profile-badge" [class.profile-badge--admin]="isAdmin">
+          <i
+            [class]="isAdmin ? 'ti ti-shield-lock' : 'ti ti-user-check'"
+          ></i>
+          {{ profileLabel }}
+        </span>
+                <span>{{ userName }}</span>
+                <span class="identity-dot"></span>
+                <span>{{ roleName }}</span>
+            </div>
         </div>
 
-        <button type="button" class="btn secondary" (click)="loadDashboard()" [disabled]="loading">
-      {{ loading ? 'Chargement...' : 'Actualiser' }}
-    </button>
+        <div class="page-actions">
+            <ng-container *ngIf="isAdmin">
+                <button type="button" class="button button--secondary" [disabled]="loading" (click)="exportDashboardExcel()">
+          <i class="ti ti-file-spreadsheet"></i>
+          Excel
+        </button>
+
+                <button type="button" class="button button--secondary" [disabled]="loading" (click)="exportDashboardPdf()">
+          <i class="ti ti-file-type-pdf"></i>
+          PDF
+        </button>
+            </ng-container>
+
+            <button type="button" class="button button--primary" [disabled]="loading" (click)="loadDashboard()">
+        <i [class]="loading ? 'ti ti-loader-2 spin' : 'ti ti-refresh'"></i>
+        {{ loading ? 'Chargement' : 'Actualiser' }}
+      </button>
+        </div>
+    </header>
+
+    <div *ngIf="pageError" class="message message--error">
+        <i class="ti ti-alert-circle"></i>
+        <span>{{ pageError }}</span>
     </div>
 
-    <div *ngIf="pageError" class="alert error">
-        {{ pageError }}
-    </div>
+    <section class="quick-section" *ngIf="quickActions.length > 0">
+        <div class="section-title section-title--inline">
+            <div>
+                <span>Actions</span>
+                <h2>Accès utiles</h2>
+            </div>
+            <small>Modules autorisés pour votre rôle</small>
+        </div>
 
-    <div class="filters-card">
+        <div class="quick-grid">
+            <a class="quick-action" *ngFor="let action of quickActions; trackBy: trackByAction" [routerLink]="action.route">
+                <span class="quick-icon">
+          <i [class]="action.icon || 'ti ti-arrow-up-right'"></i>
+        </span>
 
-        <div class="filter-field">
-            <label>Type d’intervenant</label>
-            <select [ngModel]="filters.typeIntervenantId" (ngModelChange)="onTypeChange($event)">
+                <span class="quick-copy">
+          <strong>{{ action.label }}</strong>
+          <small>{{ action.description || 'Ouvrir le module' }}</small>
+        </span>
+
+                <i class="ti ti-chevron-right quick-arrow"></i>
+            </a>
+        </div>
+    </section>
+
+    <!-- =====================================================
+         SUPERVISION WORKFLOW — ADMIN
+         Lecture seule : aucune action de modification ici.
+    ====================================================== -->
+    <section class="panel table-panel" *ngIf="canSuperviseWorkflow">
+        <header class="panel-header">
+            <div>
+                <span class="panel-eyebrow">Workflow</span>
+                <h2>Supervision des circuits</h2>
+                <p *ngIf="isAdminIt">
+                    Supervision globale des circuits et des responsables.
+                </p>
+
+                <p *ngIf="isAdminAchat">
+                    Consultation des circuits. Vous pouvez uniquement changer le responsable d'une étape.
+                </p>
+            </div>
+
+            <span class="counter" [class.counter--active]="adminWorkflows.length > 0">
+                {{ adminWorkflows.length }}
+            </span>
+        </header>
+
+        <div class="message message--success" *ngIf="workflowActionMessage">
+            <i class="ti ti-circle-check"></i>
+            <span>{{ workflowActionMessage }}</span>
+        </div>
+
+        <div class="message message--error" *ngIf="workflowActionError">
+            <i class="ti ti-alert-circle"></i>
+            <span>{{ workflowActionError }}</span>
+        </div>
+
+        <div class="empty-state" *ngIf="
+                !loadingAdminWorkflows &&
+                !adminWorkflowError &&
+                adminWorkflows.length === 0
+            ">
+            <i class="ti ti-route-off"></i>
+
+            <div>
+                <strong>Aucun workflow initialisé</strong>
+                <span>
+                    Aucun circuit actif n'est disponible dans le périmètre actuel.
+                </span>
+            </div>
+        </div>
+
+        <div class="message message--error" *ngIf="adminWorkflowError">
+            <i class="ti ti-alert-circle"></i>
+            <span>{{ adminWorkflowError }}</span>
+        </div>
+
+        <div class="empty-inline" *ngIf="loadingAdminWorkflows">
+            <i class="ti ti-loader-2 spin"></i> Chargement des workflows...
+        </div>
+
+        <div class="table-scroll" *ngIf="
+                !loadingAdminWorkflows &&
+                adminWorkflows.length > 0
+            ">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Intervenant</th>
+                        <th>Ordre</th>
+                        <th>Étape</th>
+                        <th>Responsable</th>
+                        <th>Email</th>
+                        <th>Statut</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    <ng-container *ngFor="
+                            let workflow of adminWorkflows;
+                            trackBy: trackByWorkflowCandidature
+                        ">
+                        <tr *ngFor="
+                                let step of workflow.etapes;
+                                trackBy: trackByWorkflowStep
+                            ">
+                            <td>
+                                <strong>
+                                    {{
+                                        workflow.raisonSociale ||
+                                        'Intervenant'
+                                    }}
+                                </strong>
+                            </td>
+
+                            <td>
+                                {{ step.ordre }}
+                            </td>
+
+                            <td>
+                                <strong>
+                                    {{ step.libelleEtape }}
+                                </strong>
+                            </td>
+
+                            <td>
+                                {{ step.utilisateurAffecteNom || 'Non affecté' }}
+                            </td>
+
+                            <td>
+                                {{ step.utilisateurAffecteEmail || '—' }}
+                            </td>
+
+                            <td>
+                                <span class="status-badge" [ngClass]="
+                                        getWorkflowStatusClass(
+                                            step.statut
+                                        )
+                                    ">
+                                    {{
+                                        getWorkflowStatusLabel(
+                                            step.statut
+                                        )
+                                    }}
+                                </span>
+                            </td>
+
+                            <td>
+                                <button type="button" class="button button--secondary button--small" *ngIf="canReassignWorkflowStep(step)" (click)="openWorkflowReassign(step)">
+                                    <i class="ti ti-user-edit"></i>
+                                    Changer
+                                </button>
+
+                                <span *ngIf="!canReassignWorkflowStep(step)" class="muted-text">
+                                    —
+                                </span>
+                            </td>
+                        </tr>
+                    </ng-container>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="filters-card" *ngIf="showFilters">
+        <div class="filters-intro">
+            <span class="filters-icon">
+        <i class="ti ti-adjustments-horizontal"></i>
+      </span>
+            <div>
+                <strong>Filtrer les données</strong>
+                <small>Seules les données actives sont prises en compte</small>
+            </div>
+        </div>
+
+        <label class="field">
+      <span>Type d’intervenant</span>
+      <select
+        [ngModel]="filters.typeIntervenantId"
+        (ngModelChange)="onTypeChange($event)"
+      >
         <option [ngValue]="null">Tous les types</option>
         <option *ngFor="let type of typesIntervenant" [ngValue]="type.id">
           {{ type.label }}
         </option>
       </select>
-        </div>
+    </label>
 
-        <div class="filter-field">
-            <label>Lot / domaine</label>
-            <select [ngModel]="filters.lotId" (ngModelChange)="onLotChange($event)">
-        <option [ngValue]="null">Tous les lots</option>
+        <label class="field">
+      <span>Domaine</span>
+      <select [ngModel]="filters.lotId" (ngModelChange)="onLotChange($event)">
+        <option [ngValue]="null">Tous les domaines</option>
         <option *ngFor="let lot of lots" [ngValue]="lot.id">
           {{ lot.label }}
         </option>
       </select>
-        </div>
+    </label>
 
-        <div class="filter-field">
-            <label>Décision</label>
-            <select [ngModel]="filters.decision" (ngModelChange)="onDecisionChange($event)">
+        <label class="field" *ngIf="showDecisionFilter">
+      <span>Décision</span>
+      <select [(ngModel)]="filters.decision">
         <option value="ALL">Toutes les décisions</option>
         <option value="ADMIS">Admis</option>
-        <option value="EN_COURS">En cours</option>
+        <option value="EN_COURS">Décision en attente</option>
         <option value="A_CORRIGER">À corriger</option>
-        <option value="REJETES">Rejetés</option>
+        <option value="REJETE">Rejetés</option>
       </select>
-        </div>
+    </label>
 
-        <div class="filter-field search-field">
-            <label>Recherche</label>
-            <input type="text" [ngModel]="filters.search" (ngModelChange)="onSearchChange($event)" placeholder="Intervenant, email, lot, zone..." (keyup.enter)="applyFilters()">
-        </div>
+        <label class="field field--search">
+      <span>Recherche</span>
+      <div class="search-box">
+        <i class="ti ti-search"></i>
+        <input
+          type="text"
+          [(ngModel)]="filters.search"
+          (keyup.enter)="applyFilters()"
+          placeholder="Intervenant, domaine ou zone"
+        />
+      </div>
+    </label>
 
         <div class="filter-actions">
-            <button type="button" class="btn primary" (click)="applyFilters()">
-        Filtrer
-      </button>
-
-            <button type="button" class="btn light" (click)="resetFilters()">
+            <button type="button" class="button button--ghost" (click)="resetFilters()">
         Réinitialiser
       </button>
+            <button type="button" class="button button--primary" (click)="applyFilters()">
+        Appliquer
+      </button>
         </div>
+    </section>
 
-    </div>
-
-    <div class="stats-grid">
-
-        <div class="stat-card">
-            <div class="stat-icon blue">
-                <i class="ti ti-users"></i>
-            </div>
-
+    <section class="kpi-grid">
+        <article class="kpi-card" *ngFor="let item of getKpis()">
+            <span class="kpi-icon" [ngClass]="'kpi-icon--' + item.tone">
+        <i [class]="item.icon"></i>
+      </span>
             <div>
-                <strong>{{ stats.totalCandidatures || 0 }}</strong>
-                <span>Intervenants</span>
+                <span>{{ item.label }}</span>
+                <strong>{{ item.value | number:'1.0-1' }}{{ item.suffix || '' }}</strong>
+                <small>{{ item.help }}</small>
             </div>
-        </div>
+        </article>
+    </section>
 
-        <div class="stat-card">
-            <div class="stat-icon navy">
-                <i class="ti ti-layout-grid"></i>
-            </div>
-
-            <div>
-                <strong>{{ stats.totalApplications || 0 }}</strong>
-                <span>Applications / lots</span>
-            </div>
-        </div>
-
-        <div class="stat-card">
-            <div class="stat-icon purple">
-                <i class="ti ti-chart-bar"></i>
-            </div>
-
-            <div>
-                <strong>{{ getAverageScore() | number:'1.0-2' }}%</strong>
-                <span>Note moyenne /100</span>
-            </div>
-        </div>
-
-        <div class="stat-card">
-            <div class="stat-icon orange">
-                <i class="ti ti-trending-down"></i>
-            </div>
-
-            <div>
-                <strong>{{ stats.scoreInferieur100 || 0 }}</strong>
-                <span>Notes &lt; 100</span>
-            </div>
-        </div>
-
-        <div class="stat-card">
-            <div class="stat-icon green">
-                <i class="ti ti-shield-check"></i>
-            </div>
-
-            <div>
-                <strong>{{ getTauxConformite() | number:'1.0-2' }}%</strong>
-                <span>Taux conformité</span>
-            </div>
-        </div>
-
-        <div class="stat-card">
-            <div class="stat-icon red">
-                <i class="ti ti-alert-circle"></i>
-            </div>
-
-            <div>
-                <strong>{{ stats.piecesNonConformes || 0 }}</strong>
-                <span>Non conformes</span>
-            </div>
-        </div>
-
-    </div>
-
-    <div class="overview-grid">
-
-        <div class="card mini-card success">
-            <div>
-                <span>Pièces conformes</span>
-                <strong>{{ stats.piecesConformes || 0 }}</strong>
-            </div>
-            <i class="ti ti-circle-check"></i>
-        </div>
-
-        <div class="card mini-card warning">
-            <div>
-                <span>À corriger</span>
-                <strong>{{ stats.aCorriger || 0 }}</strong>
-            </div>
-            <i class="ti ti-edit-circle"></i>
-        </div>
-
-        <div class="card mini-card info">
-            <div>
-                <span>En cours</span>
-                <strong>{{ stats.enCours || 0 }}</strong>
-            </div>
-            <i class="ti ti-clock"></i>
-        </div>
-
-        <div class="card mini-card danger">
-            <div>
-                <span>Rejetés</span>
-                <strong>{{ stats.rejetes || 0 }}</strong>
-            </div>
-            <i class="ti ti-circle-x"></i>
-        </div>
-
-    </div>
-
-    <div class="dashboard-grid">
-
-        <div class="card chart-card score-chart-card">
-
-            <div class="card-header with-icon">
+    <section class="main-grid">
+        <article class="panel priority-panel">
+            <header class="panel-header">
                 <div>
-                    <h3>Scores par intervenant</h3>
-                    <p>Vue comparative des notes obtenues par lot.</p>
+                    <span class="panel-eyebrow">Priorités</span>
+                    <h2>Actions à traiter</h2>
+                    <p>Uniquement les éléments actifs qui demandent une intervention</p>
                 </div>
+                <span class="counter" [class.counter--active]="alerts.length > 0">
+          {{ alerts.length }}
+        </span>
+            </header>
 
-                <div class="header-icon">
-                    <i class="ti ti-chart-bar"></i>
-                </div>
-            </div>
-
-            <div *ngIf="loading" class="loading-card">
-                Chargement des scores...
-            </div>
-
-            <div *ngIf="!loading && scoreIntervenants.length === 0" class="empty-card">
-                Aucun intervenant trouvé pour ces filtres.
-            </div>
-
-            <div class="bar-chart-wrapper" *ngIf="!loading && scoreIntervenants.length > 0">
-
-                <div class="chart-scale">
-                    <span>100</span>
-                    <span>75</span>
-                    <span>50</span>
-                    <span>25</span>
-                    <span>0</span>
-                </div>
-
-                <div class="bar-chart">
-
-                    <div class="bar-item" *ngFor="let item of scoreIntervenants; trackBy: trackByApplicationId">
-
-                        <div class="bar-value">
-                            {{ getScoreValue(item) | number:'1.0-0' }}
-                        </div>
-
-                        <div class="bar-track">
-                            <div class="bar-fill" [ngClass]="getScoreClass(item.score)" [style.height.%]="getBarHeight(item)">
-                            </div>
-                        </div>
-
-                        <div class="bar-label">
-                            <strong>{{ getShortIntervenantName(item.raisonSociale) }}</strong>
-                            <small>{{ item.lotNom || '-' }}</small>
-                        </div>
-
-                    </div>
-
-                </div>
-
-            </div>
-
-        </div>
-
-        <div class="card chart-card decision-chart-card">
-
-            <div class="card-header">
-                <h3>Répartition des décisions</h3>
-                <p>Statut global des applications analysées.</p>
-            </div>
-
-            <div class="donut-wrapper">
-
-                <div class="donut-chart" [style.background]="getDecisionPieStyle()">
-
-                    <div class="donut-center">
-                        <strong>{{ getDecisionTotal() }}</strong>
-                        <span>Total</span>
-                    </div>
-
-                </div>
-
-            </div>
-
-            <div class="decision-legend">
-
-                <div class="legend-item">
-                    <span class="legend-dot admis"></span>
-                    <span>Admis</span>
-                    <strong>{{ getDecisionCount('ADMIS') }}</strong>
-                    <small>{{ getDecisionPercent('ADMIS') }}%</small>
-                </div>
-
-                <div class="legend-item">
-                    <span class="legend-dot en-cours"></span>
-                    <span>En cours</span>
-                    <strong>{{ getDecisionCount('EN_COURS') }}</strong>
-                    <small>{{ getDecisionPercent('EN_COURS') }}%</small>
-                </div>
-
-                <div class="legend-item">
-                    <span class="legend-dot correction"></span>
-                    <span>À corriger</span>
-                    <strong>{{ getDecisionCount('A_CORRIGER') }}</strong>
-                    <small>{{ getDecisionPercent('A_CORRIGER') }}%</small>
-                </div>
-
-                <div class="legend-item">
-                    <span class="legend-dot rejete"></span>
-                    <span>Rejetés</span>
-                    <strong>{{ getDecisionCount('REJETES') }}</strong>
-                    <small>{{ getDecisionPercent('REJETES') }}%</small>
-                </div>
-
-            </div>
-
-        </div>
-
-        <div class="card conformity-card">
-
-            <div class="card-header">
-                <h3>Conformité des contrôles</h3>
-                <p>Suivi des éléments conformes et non conformes.</p>
-            </div>
-
-            <div class="conformity-main">
+            <div class="empty-state" *ngIf="!loading && alerts.length === 0">
+                <i class="ti ti-circle-check"></i>
                 <div>
-                    <strong>{{ getTauxConformite() | number:'1.0-2' }}%</strong>
-                    <span>de conformité</span>
+                    <strong>Aucune action prioritaire</strong>
+                    <span>Le périmètre actuel ne demande pas de correction.</span>
                 </div>
             </div>
 
-            <div class="progress-track">
-                <div class="progress-fill" [style.width.%]="getConformityWidth()">
+            <div class="priority-list" *ngIf="alerts.length > 0">
+                <div class="priority-item" *ngFor="let item of alerts; trackBy: trackByCode" [ngClass]="'priority-item--' + item.level.toLowerCase()">
+                    <span class="priority-icon">
+            <i [class]="getAlertIcon(item)"></i>
+          </span>
+
+                    <div class="priority-copy">
+                        <div>
+                            <strong>{{ item.title }}</strong>
+                            <span>{{ item.count }}</span>
+                        </div>
+                        <p>{{ item.message }}</p>
+                    </div>
+
+                    <a [routerLink]="item.route" class="priority-link">
+            {{ item.actionLabel || 'Ouvrir' }}
+            <i class="ti ti-arrow-up-right"></i>
+          </a>
+                </div>
+            </div>
+        </article>
+
+        <article class="panel summary-panel">
+            <header class="panel-header">
+                <div>
+                    <span class="panel-eyebrow">{{ profileLabel }}</span>
+                    <h2>{{ sectionTitle }}</h2>
+                    <p>{{ sectionDescription }}</p>
+                </div>
+                <span class="summary-icon">
+<i [class]="summaryIcon"></i>
+        </span>
+            </header>
+
+            <div class="metric-list">
+                <div class="metric-row" *ngFor="let metric of getProfileMetrics()">
+                    <span>{{ metric.label }}</span>
+                    <strong [ngClass]="'metric-value--' + (metric.tone || 'normal')">
+            {{ metric.value | number:'1.0-1' }}{{ metric.suffix || '' }}
+          </strong>
                 </div>
             </div>
 
-            <div class="conformity-list">
-
-                <div class="conformity-item positive">
-                    <span>Conformes</span>
-                    <strong>{{ stats.piecesConformes || 0 }}</strong>
+            <div class="progress-block" *ngIf="profile === 'ACHAT'">
+                <div>
+                    <span>Configuration conforme</span>
+                    <strong>{{ configurationHealth | number:'1.0-0' }}%</strong>
                 </div>
-
-                <div class="conformity-item negative">
-                    <span>Non conformes</span>
-                    <strong>{{ stats.piecesNonConformes || 0 }}</strong>
+                <div class="progress-track">
+                    <span class="progress-fill progress-fill--green" [style.width.%]="configurationHealth"></span>
                 </div>
-
-                <div class="conformity-item neutral">
-                    <span>Total contrôles</span>
-                    <strong>{{ stats.totalControles || 0 }}</strong>
-                </div>
-
             </div>
 
-        </div>
+            <div class="progress-block" *ngIf="profile === 'TECHNIQUE'">
+                <div>
+                    <span>Évaluations terminées</span>
+                    <strong>{{ evaluationProgress | number:'1.0-0' }}%</strong>
+                </div>
+                <div class="progress-track">
+                    <span class="progress-fill" [style.width.%]="evaluationProgress"></span>
+                </div>
+            </div>
+        </article>
+    </section>
 
-        <div class="card notes-card">
+    <section class="department-grid" *ngIf="isAdmin">
+        <article class="department-card">
+            <span class="department-icon department-icon--it">
+        <i class="ti ti-shield-lock"></i>
+      </span>
+            <div>
+                <span>IT</span>
+                <strong>{{ itStats.utilisateursActifs }} utilisateurs actifs</strong>
+                <small>
+          {{ itStats.utilisateursSansRole }} sans rôle ·
+          {{ itStats.rolesSansAcces }} rôle(s) sans accès
+        </small>
+            </div>
+            <a routerLink="/el-emar/utilisateurs">Ouvrir</a>
+        </article>
 
-            <div class="card-header">
-                <h3>Répartition des notes</h3>
-                <p>Lecture rapide des performances /100.</p>
+        <article class="department-card">
+            <span class="department-icon department-icon--achat">
+        <i class="ti ti-settings-check"></i>
+      </span>
+            <div>
+                <span>Achat</span>
+                <strong>{{ configurationStats.criteresActifs }} critères actifs</strong>
+                <small>{{ configurationIssueCount }} correction(s) de configuration</small>
+            </div>
+            <a routerLink="/el-emar/criteres">Ouvrir</a>
+        </article>
+
+        <article class="department-card">
+            <span class="department-icon department-icon--technique">
+        <i class="ti ti-clipboard-check"></i>
+      </span>
+            <div>
+                <span>Technique</span>
+                <strong>{{ evaluationStats.evaluationsEnCours }} évaluation(s) en cours</strong>
+                <small>{{ evaluationStats.criteresAVerifier }} critère(s) à vérifier</small>
+            </div>
+            <a routerLink="/el-emar/evaluations">Ouvrir</a>
+        </article>
+
+        <article class="department-card">
+            <span class="department-icon department-icon--comite">
+        <i class="ti ti-gavel"></i>
+      </span>
+            <div>
+                <span>Comité</span>
+                <strong>{{ committeeStats.decisionsEnAttente }} décision(s) en attente</strong>
+                <small>{{ committeeStats.classementsEnAttente }} classement(s) à compléter</small>
+            </div>
+            <a routerLink="/el-emar/decisions">Ouvrir</a>
+        </article>
+    </section>
+
+    <section class="analysis-grid" *ngIf="profile === 'TECHNIQUE' || profile === 'COMITE' || isAdmin">
+        <article class="panel" *ngIf="profile === 'TECHNIQUE' || isAdmin">
+            <header class="panel-header panel-header--compact">
+                <div>
+                    <span class="panel-eyebrow">Évaluation</span>
+                    <h2>Répartition des notes</h2>
+                </div>
+            </header>
+
+            <div class="bar-list">
+                <div class="bar-row" *ngFor="let band of noteBands; trackBy: trackByCode">
+                    <div>
+                        <span>{{ band.label }}</span>
+                        <strong>{{ band.count }}</strong>
+                    </div>
+                    <div class="bar-track">
+                        <span [style.width.%]="getNoteBandPercent(band.code)"></span>
+                    </div>
+                </div>
             </div>
 
-            <div class="note-band-list">
-
-                <div class="note-band high">
-                    <div class="note-band-top">
-                        <span>≥ 80 / 100</span>
-                        <strong>{{ getNoteBandCount('SUP_80') }}</strong>
-                    </div>
-
-                    <div class="note-progress">
-                        <div [style.width.%]="getNoteBandPercent('SUP_80')"></div>
-                    </div>
-
-                    <small>{{ getNoteBandPercent('SUP_80') }}%</small>
+            <div class="conformity-box">
+                <div>
+                    <span>Critères conformes</span>
+                    <strong>{{ evaluationStats.criteresConformes }}</strong>
                 </div>
-
-                <div class="note-band medium">
-                    <div class="note-band-top">
-                        <span>60 - 79 / 100</span>
-                        <strong>{{ getNoteBandCount('BETWEEN_60_79') }}</strong>
-                    </div>
-
-                    <div class="note-progress">
-                        <div [style.width.%]="getNoteBandPercent('BETWEEN_60_79')"></div>
-                    </div>
-
-                    <small>{{ getNoteBandPercent('BETWEEN_60_79') }}%</small>
+                <div>
+                    <span>Critères non conformes</span>
+                    <strong>{{ evaluationStats.criteresNonConformes }}</strong>
                 </div>
-
-                <div class="note-band low">
-                    <div class="note-band-top">
-                        <span>&lt; 60 / 100</span>
-                        <strong>{{ getNoteBandCount('INF_60') }}</strong>
-                    </div>
-
-                    <div class="note-progress">
-                        <div [style.width.%]="getNoteBandPercent('INF_60')"></div>
-                    </div>
-
-                    <small>{{ getNoteBandPercent('INF_60') }}%</small>
+                <div>
+                    <span>Taux de conformité</span>
+                    <strong>{{ conformityRate | number:'1.0-0' }}%</strong>
                 </div>
-
             </div>
+        </article>
 
-        </div>
+        <article class="panel" *ngIf="profile === 'COMITE' || isAdmin">
+            <header class="panel-header panel-header--compact">
+                <div>
+                    <span class="panel-eyebrow">Comité</span>
+                    <h2>Décisions</h2>
+                </div>
+            </header>
 
-        <div class="card zones-card">
+            <div class="decision-layout">
+                <div class="decision-chart" [style.background]="getDecisionPieStyle()">
+                    <span>
+            <strong>{{ getDecisionTotal() }}</strong>
+            <small>Dossiers</small>
+          </span>
+                </div>
 
-            <div class="card-header">
-                <h3>Intervenants par zone</h3>
-                <p>Répartition selon le classement par zone.</p>
+                <div class="decision-list">
+                    <div *ngFor="let item of decisions; trackBy: trackByCode">
+                        <span class="decision-dot" [attr.data-code]="item.code"></span>
+                        <span>{{ item.label }}</span>
+                        <strong>{{ item.count }}</strong>
+                    </div>
+                </div>
             </div>
+        </article>
 
-            <div *ngIf="zones.length === 0" class="empty-card">
-                Aucune zone disponible.
+        <article class="panel" *ngIf="profile === 'COMITE' || isAdmin">
+            <header class="panel-header panel-header--compact">
+                <div>
+                    <span class="panel-eyebrow">Classement</span>
+                    <h2>Intervenants admis par zone</h2>
+                </div>
+            </header>
+
+            <div class="empty-inline" *ngIf="zones.length === 0">
+                Aucun classement actif pour le périmètre sélectionné.
             </div>
 
             <div class="zone-list" *ngIf="zones.length > 0">
-
                 <div class="zone-row" *ngFor="let zone of zones; trackBy: trackByZone">
-
-                    <div class="zone-row-header">
-                        <span>{{ zone.zoneNom || 'Non classé' }}</span>
+                    <div>
+                        <span>{{ zone.zoneNom }}</span>
                         <strong>{{ zone.count }}</strong>
                     </div>
-
                     <div class="zone-track">
-                        <div class="zone-fill" [style.width.%]="getZoneWidth(zone)">
-                        </div>
+                        <span [style.width.%]="getZoneWidth(zone)"></span>
+                    </div>
+                </div>
+            </div>
+        </article>
+    </section>
+
+    <section class="panel table-panel" *ngIf="showIntervenantTable">
+        <header class="panel-header">
+            <div>
+                <span class="panel-eyebrow">Intervenants</span>
+                <h2>Suivi du périmètre actif</h2>
+                <p>Liste correspondant au périmètre et aux filtres sélectionnés.</p>
+            </div>
+            <span class="table-count">{{ intervenants.length }}</span>
+        </header>
+
+        <div class="empty-state" *ngIf="!loading && visibleIntervenants.length === 0">
+            <i class="ti ti-database-off"></i>
+            <div>
+                <strong>Aucune donnée active</strong>
+                <span>Aucun intervenant ne correspond aux filtres sélectionnés.</span>
+            </div>
+        </div>
+
+        <div class="table-scroll" *ngIf="visibleIntervenants.length > 0">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Intervenant</th>
+                        <th>Type</th>
+                        <th>Domaine</th>
+                        <th>Note</th>
+                        <th>Zone</th>
+                        <th>État</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr *ngFor="let item of visibleIntervenants; trackBy: trackByIntervenant">
+                        <td>
+                            <strong>{{ item.raisonSociale }}</strong>
+                            <small>{{ item.email || '—' }}</small>
+                        </td>
+                        <td>{{ item.typeIntervenantLibelle || '—' }}</td>
+                        <td>{{ item.lotNom || '—' }}</td>
+                        <td>
+                            <span *ngIf="item.applicationCandidatureId; else noScore">
+                {{ item.score | number:'1.0-1' }}/100
+              </span>
+                            <ng-template #noScore>—</ng-template>
+                        </td>
+                        <td>{{ item.zoneNom || '—' }}</td>
+                        <td>
+                            <span class="status-badge" [ngClass]="getIntervenantStatusClass(item)">
+                {{ getIntervenantStatus(item) }}
+              </span>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="panel activity-panel">
+        <header class="panel-header panel-header--compact">
+            <div>
+                <span class="panel-eyebrow">Activité</span>
+                <h2>Dernières actions</h2>
+            </div>
+        </header>
+
+        <div class="empty-inline" *ngIf="activities.length === 0">
+            Aucune activité récente pour le périmètre actif.
+        </div>
+
+        <div class="activity-list" *ngIf="activities.length > 0">
+            <div class="activity-item" *ngFor="let activity of activities; trackBy: trackByActivity">
+                <span class="activity-icon">
+          <i class="ti ti-history"></i>
+        </span>
+                <div>
+                    <strong>{{ activity.action }}</strong>
+                    <p>{{ activity.description }}</p>
+                    <small>
+            {{ activity.utilisateurNom || 'Système' }} ·
+            {{ getActivityDate(activity.dateAction) }}
+          </small>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- =====================================================
+         MODAL — CHANGER LE RESPONSABLE WORKFLOW
+    ====================================================== -->
+
+    <div class="workflow-modal-backdrop" *ngIf="showWorkflowReassignModal" (click)="closeWorkflowReassign()">
+        <section class="workflow-modal-card" (click)="$event.stopPropagation()">
+
+            <header class="workflow-modal-header">
+
+                <div class="workflow-modal-title">
+
+                    <span class="workflow-modal-icon">
+                        <i class="ti ti-user-edit"></i>
+                    </span>
+
+                    <div>
+                        <span class="workflow-modal-eyebrow">
+                            Workflow
+                        </span>
+
+                        <h2>
+                            {{ workflowReassignConfirmStep ? 'Confirmer le changement' : 'Changer le responsable' }}
+                        </h2>
+
+                        <p>
+                            {{ workflowReassignTarget?.libelleEtape || 'Étape' }}
+                        </p>
                     </div>
 
                 </div>
 
-            </div>
+                <button type="button" class="workflow-modal-close" [disabled]="reassigningWorkflow" (click)="closeWorkflowReassign()" aria-label="Fermer">
+                    <i class="ti ti-x"></i>
+                </button>
 
-        </div>
+            </header>
 
-        <div class="card ranking-card">
 
-            <div class="card-header">
-                <h3>Intervenants les mieux notés</h3>
-                <p>Classement rapide selon la note finale.</p>
-            </div>
+            <!-- ÉTAPE 1 : CHOISIR -->
 
-            <div *ngIf="getTopIntervenants().length === 0" class="empty-card">
-                Aucun classement disponible.
-            </div>
+            <div class="workflow-modal-body" *ngIf="!workflowReassignConfirmStep">
 
-            <div class="ranking-list" *ngIf="getTopIntervenants().length > 0">
+                <div class="workflow-current-user">
 
-                <div class="ranking-item" *ngFor="let item of getTopIntervenants(); let i = index">
+                    <span class="workflow-user-avatar">
+                        {{
+                            (
+                                workflowReassignTarget
+                                    ?.utilisateurAffecteNom
+                                || 'U'
+                            )
+                            .charAt(0)
+                            .toUpperCase()
+                        }}
+                    </span>
 
-                    <div class="rank-number">
-                        {{ i + 1 }}
+                    <div class="workflow-user-copy">
+                        <span>Responsable actuel</span>
+
+                        <strong>
+                            {{
+                                workflowReassignTarget
+                                    ?.utilisateurAffecteNom
+                                || 'Non affecté'
+                            }}
+                        </strong>
+
+                        <small>
+                            {{
+                                workflowReassignTarget
+                                    ?.utilisateurAffecteEmail
+                                || '—'
+                            }}
+                        </small>
                     </div>
 
-                    <div class="rank-info">
-                        <strong>{{ item.raisonSociale || 'Intervenant' }}</strong>
+                    <span class="workflow-current-badge">
+                        Actuel
+                    </span>
+
+                </div>
+
+
+                <div class="workflow-selection-heading">
+
+                    <div>
+                        <strong>Nouveau responsable</strong>
+                        <span>Sélectionnez un utilisateur.</span>
+                    </div>
+
+                    <span class="workflow-user-count" *ngIf="!loadingAssignableUsers">
+                        {{ assignableWorkflowUsers.length }}
+                    </span>
+
+                </div>
+
+
+                <div class="workflow-users-loading" *ngIf="loadingAssignableUsers">
+                    <i class="ti ti-loader-2 spin"></i> Chargement des utilisateurs...
+                </div>
+
+
+                <div class="workflow-users-empty" *ngIf="
+                        !loadingAssignableUsers
+                        &&
+                        assignableWorkflowUsers.length === 0
+                    ">
+                    <i class="ti ti-user-off"></i>
+
+                    <div>
+                        <strong>Aucun utilisateur disponible</strong>
                         <span>
-              {{ item.lotNom || '-' }}
-              <ng-container *ngIf="item.zoneNom">
-                • {{ item.zoneNom }}
-              </ng-container>
-            </span>
+                            Aucun utilisateur actif compatible
+                            avec cette étape.
+                        </span>
                     </div>
+                </div>
 
-                    <div class="rank-score" [ngClass]="getScoreClass(item.score)">
-                        {{ getScoreValue(item) | number:'1.0-0' }}
-                    </div>
 
+                <div class="workflow-user-list" *ngIf="
+                        !loadingAssignableUsers
+                        &&
+                        assignableWorkflowUsers.length > 0
+                    ">
+
+                    <button type="button" class="workflow-user-option" *ngFor="
+                            let user of assignableWorkflowUsers;
+                            trackBy: trackByAssignableUser
+                        " [class.workflow-user-option--selected]="
+                            workflowReassignUserId === user.id
+                        " [class.workflow-user-option--current]="
+                            workflowReassignTarget
+                                ?.utilisateurAffecteId === user.id
+                        " [disabled]="
+                            reassigningWorkflow
+                            ||
+                            workflowReassignTarget
+                                ?.utilisateurAffecteId === user.id
+                        " (click)="selectWorkflowUser(user)">
+
+                        <span class="workflow-user-avatar workflow-user-avatar--small">
+                            {{
+                                (user.nom || 'U')
+                                    .charAt(0)
+                                    .toUpperCase()
+                            }}
+                        </span>
+
+                        <span class="workflow-user-option-copy">
+                            <strong>
+                                {{ user.nom || 'Utilisateur' }}
+                            </strong>
+
+                            <small>
+                                {{ user.email || '—' }}
+                            </small>
+                        </span>
+
+                        <span
+                            class="workflow-user-current-label"
+                            *ngIf="
+                                workflowReassignTarget
+                                    ?.utilisateurAffecteId === user.id
+                            "
+                        >
+                            Actuel
+                        </span>
+
+                        <span
+                            class="workflow-radio"
+                            *ngIf="
+                                workflowReassignTarget
+                                    ?.utilisateurAffecteId !== user.id
+                            "
+                            [class.workflow-radio--checked]="
+                                workflowReassignUserId === user.id
+                            "
+                        >
+                            <i
+                                class="ti ti-check"
+                                *ngIf="
+                                    workflowReassignUserId === user.id
+                                "
+                            ></i>
+                        </span>
+
+                    </button>
+
+                </div>
+
+
+                <div class="message message--error workflow-modal-error" *ngIf="workflowActionError">
+                    <i class="ti ti-alert-circle"></i>
+                    <span>{{ workflowActionError }}</span>
                 </div>
 
             </div>
 
-        </div>
 
+            <!-- ÉTAPE 2 : CONFIRMER -->
+
+            <div class="workflow-modal-body" *ngIf="workflowReassignConfirmStep">
+
+                <div class="workflow-confirmation-box">
+
+                    <span class="workflow-confirmation-icon">
+                        <i class="ti ti-arrows-exchange"></i>
+                    </span>
+
+                    <div>
+                        <span>Remplacer</span>
+
+                        <strong>
+                            {{
+                                workflowReassignTarget
+                                    ?.utilisateurAffecteNom
+                                || 'Non affecté'
+                            }}
+                        </strong>
+
+                        <i class="ti ti-arrow-down"></i>
+
+                        <strong class="workflow-new-user">
+                            {{
+                                selectedWorkflowUser?.nom
+                                || 'Utilisateur'
+                            }}
+                        </strong>
+
+                        <small>
+                            {{
+                                selectedWorkflowUser?.email
+                                || '—'
+                            }}
+                        </small>
+                    </div>
+
+                </div>
+
+
+                <div class="workflow-confirmation-warning">
+                    <i class="ti ti-info-circle"></i>
+
+                    <span>
+                        Ce changement concerne uniquement cette étape
+                        de cette candidature. Le workflow global ne change pas.
+                    </span>
+                </div>
+
+
+                <div class="message message--error workflow-modal-error" *ngIf="workflowActionError">
+                    <i class="ti ti-alert-circle"></i>
+                    <span>{{ workflowActionError }}</span>
+                </div>
+
+            </div>
+
+
+            <footer class="workflow-modal-footer">
+
+                <ng-container *ngIf="!workflowReassignConfirmStep">
+
+                    <button type="button" class="button button--secondary" [disabled]="reassigningWorkflow" (click)="closeWorkflowReassign()">
+                        Annuler
+                    </button>
+
+                    <button type="button" class="button button--primary" [disabled]="
+                            loadingAssignableUsers
+                            ||
+                            !workflowReassignUserId
+                            ||
+                            workflowReassignTarget
+                                ?.utilisateurAffecteId
+                                ===
+                                workflowReassignUserId
+                        " (click)="continueWorkflowReassign()">
+                        Continuer
+                        <i class="ti ti-arrow-right"></i>
+                    </button>
+
+                </ng-container>
+
+
+                <ng-container *ngIf="workflowReassignConfirmStep">
+
+                    <button type="button" class="button button--secondary" [disabled]="reassigningWorkflow" (click)="backWorkflowReassign()">
+                        <i class="ti ti-arrow-left"></i>
+                        Retour
+                    </button>
+
+                    <button type="button" class="button button--primary" [disabled]="reassigningWorkflow" (click)="confirmWorkflowReassign()">
+                        <i
+                            [class]="
+                                reassigningWorkflow
+                                    ? 'ti ti-loader-2 spin'
+                                    : 'ti ti-user-check'
+                            "
+                        ></i>
+
+                        {{
+                            reassigningWorkflow
+                                ? 'Modification...'
+                                : 'Confirmer le changement'
+                        }}
+                    </button>
+
+                </ng-container>
+
+            </footer>
+
+        </section>
     </div>
 
+
+    <div class="loading-layer" *ngIf="loading">
+        <span><i class="ti ti-loader-2 spin"></i></span>
+    </div>
 </div>

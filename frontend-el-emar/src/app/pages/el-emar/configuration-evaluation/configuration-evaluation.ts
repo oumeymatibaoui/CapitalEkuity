@@ -1,25 +1,22 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-
 import { forkJoin } from 'rxjs';
+
 import {
-  CategorieEvaluation,
+  CategorieEvaluationResponse,
   CritereEvaluationRequest,
   CritereEvaluationResponse,
   CriterePieceRequest,
-  EvaluationConfigurationService
+  EvaluationConfigurationService,
 } from '../../../core/services/evaluation-configuration.service';
 
 import {
   TypeIntervenant,
-  TypeIntervenantService
+  TypeIntervenantService,
 } from '../../../core/services/type-intervenant.service';
 
-import {
-  Lot,
-  LotService
-} from '../../../core/services/lot.service';
+import { Lot, LotService } from '../../../core/services/lot.service';
 
 type LotView = Lot & {
   id: number;
@@ -29,32 +26,55 @@ type LotView = Lot & {
 
 type DeleteTarget = 'CRITERE' | 'GROUPE';
 
+interface CritereFormState {
+  grilleEvaluationLotId: number | null;
+  lotId: number | null;
+  categorieEvaluationId: number | null;
+
+  codeCritere: string;
+  libelleCritere: string;
+
+  /* Ces champs restent internes mais ne sont plus imposés à l'utilisateur. */
+  labelCandidat: string;
+  aideCandidat: string;
+  raisonDonnee: string;
+  noteCandidat: string;
+  noteEvaluateur: string;
+
+  pointsMax: number;
+  baremeNotation: string;
+  typeNotation: string;
+
+  typeChamp: string;
+  optionsChamp: string;
+  obligatoire: boolean;
+
+  ordreAffichage: number | null;
+  actif: boolean;
+
+  pieces: CriterePieceRequest[];
+}
+
 @Component({
   selector: 'app-configuration-evaluation',
   standalone: true,
   imports: [CommonModule, FormsModule],
   templateUrl: './configuration-evaluation.html',
-  styleUrl: './configuration-evaluation.scss'
+  styleUrl: './configuration-evaluation.scss',
 })
 export class ConfigurationEvaluation implements OnInit {
+  private lotsRequestId = 0;
+  private categoriesRequestId = 0;
+  private evaluationRequestId = 0;
+  private totalsRequestId = 0;
 
   types: TypeIntervenant[] = [];
   lots: LotView[] = [];
 
-  categoryModalOpen = false;
-  savingCategory = false;
-  categoryFormError = '';
-
-  categoryForm = {
-    libelle: '',
-    code: '',
-    description: '',
-    globalForType: true
-  };
   selectedTypeIntervenantId: number | null = null;
   selectedLotId: number | null = null;
 
-  categoriesEvaluation: CategorieEvaluation[] = [];
+  categoriesEvaluation: CategorieEvaluationResponse[] = [];
   selectedCategoryId: number | null = null;
   loadingCategories = false;
 
@@ -76,428 +96,505 @@ export class ConfigurationEvaluation implements OnInit {
   editMode = false;
   editingId: number | null = null;
 
+  categoryModalOpen = false;
+  savingCategory = false;
+  categoryFormError = '';
+
+  categoryForm = {
+    libelle: '',
+    code: '',
+    description: '',
+    globalForType: true,
+  };
+
   deleteModalOpen = false;
   deleting = false;
   deleteTarget: DeleteTarget = 'CRITERE';
   critereToDelete: CritereEvaluationResponse | null = null;
   sectionToDelete = '';
 
-  form: CritereEvaluationRequest = this.getEmptyForm();
+  form: CritereFormState = this.getEmptyForm();
 
   constructor(
     private evaluationService: EvaluationConfigurationService,
     private typeService: TypeIntervenantService,
-    private lotService: LotService
+    private lotService: LotService,
   ) {}
 
   ngOnInit(): void {
     this.loadTypes();
     this.loadPieceNames();
   }
-openCategoryModal(): void {
-  if (!this.selectedTypeIntervenantId) {
-    this.errorMessage = 'Veuillez sélectionner un type d’intervenant.';
-    return;
-  }
 
-  if (!this.selectedLotId) {
-    this.errorMessage = 'Veuillez sélectionner un domaine.';
-    return;
-  }
+  /* =====================================================
+     TYPES / DOMAINES
+  ===================================================== */
 
-  this.categoryForm = {
-    libelle: '',
-    code: '',
-    description: '',
-    globalForType: true
-  };
-
-  this.categoryFormError = '';
-  this.categoryModalOpen = true;
-}
-
-closeCategoryModal(): void {
-  this.categoryModalOpen = false;
-  this.savingCategory = false;
-  this.categoryFormError = '';
-}
-
-saveCategoryFromMiniModal(): void {
-  this.categoryFormError = '';
-
-  const libelle = this.categoryForm.libelle.trim();
-
-  if (!libelle) {
-    this.categoryFormError = 'Le libellé de la catégorie est obligatoire.';
-    return;
-  }
-
-  if (!this.selectedTypeIntervenantId) {
-    this.categoryFormError = 'Le type d’intervenant est obligatoire.';
-    return;
-  }
-
-  const payload = {
-    typeIntervenantId: Number(this.selectedTypeIntervenantId),
-
-    // true = catégorie générale pour ce type
-    // false = catégorie spécifique au lot sélectionné
-    lotId: this.categoryForm.globalForType ? null : this.selectedLotId,
-
-    code: this.categoryForm.code?.trim()
-      ? this.categoryForm.code.trim()
-      : this.generateCategoryCode(libelle),
-
-    libelle: libelle,
-    description: this.categoryForm.description?.trim() || '',
-    actif: true,
-    ordreAffichage: this.categoriesEvaluation.length + 1
-  };
-
-  this.savingCategory = true;
-
-  this.evaluationService.createCategory(payload).subscribe({
-    next: (createdCategory) => {
-      this.savingCategory = false;
-      this.categoryModalOpen = false;
-
-      this.categoriesEvaluation = [
-        ...this.categoriesEvaluation,
-        createdCategory
-      ].sort((a, b) => {
-        const ordreA = Number(a.ordreAffichage || 0);
-        const ordreB = Number(b.ordreAffichage || 0);
-
-        if (ordreA !== ordreB) {
-          return ordreA - ordreB;
-        }
-
-        return a.libelle.localeCompare(b.libelle);
-      });
-
-      this.applyCategoryToForm(createdCategory);
-
-      this.successMessage = 'Catégorie ajoutée avec succès.';
-    },
-    error: (error: any) => {
-      console.error('SAVE CATEGORY ERROR', error);
-      this.savingCategory = false;
-
-      this.categoryFormError =
-        error?.error?.message ||
-        error?.error?.detail ||
-        'Erreur lors de l’ajout de la catégorie.';
-    }
-  });
-}
-
-generateCategoryCode(value: string): string {
-  let code = value
-    .trim()
-    .toUpperCase()
-    .replaceAll('É', 'E')
-    .replaceAll('È', 'E')
-    .replaceAll('Ê', 'E')
-    .replaceAll('À', 'A')
-    .replaceAll('Â', 'A')
-    .replaceAll('Ç', 'C')
-    .replaceAll('Ù', 'U')
-    .replaceAll('Û', 'U')
-    .replaceAll('Î', 'I')
-    .replaceAll('Ï', 'I')
-    .replace(/[^A-Z0-9]+/g, '_')
-    .replace(/^_|_$/g, '');
-
-  if (code.length > 60) {
-    code = code.substring(0, 60);
-  }
-
-  return code || 'CATEGORIE';
-}
   loadTypes(): void {
     this.loadingTypes = true;
     this.errorMessage = '';
 
     this.typeService.getAll(true).subscribe({
       next: (types: TypeIntervenant[]) => {
-        this.types = types || [];
+        this.types = types ?? [];
         this.loadingTypes = false;
 
         if (this.types.length > 0) {
-          this.selectedTypeIntervenantId = this.types[0].id || null;
-          this.loadLotsByType();
+          this.onTypeChange(Number(this.types[0].id));
         }
       },
       error: (error: unknown) => {
         console.error('LOAD TYPES ERROR', error);
         this.loadingTypes = false;
-        this.errorMessage = 'Erreur lors du chargement des types d’intervenants.';
-      }
+        this.errorMessage =
+          "Erreur lors du chargement des types d'intervenants.";
+      },
     });
   }
 
-  onTypeChange(): void {
+  onTypeChange(
+    value: number | string | null = this.selectedTypeIntervenantId,
+  ): void {
+    const typeId = value == null ? null : Number(value);
+
+    this.selectedTypeIntervenantId =
+      typeId !== null && Number.isFinite(typeId) && typeId > 0
+        ? typeId
+        : null;
+
+    this.lotsRequestId++;
+    this.categoriesRequestId++;
+    this.evaluationRequestId++;
+    this.totalsRequestId++;
+
     this.selectedLotId = null;
+    this.lots = [];
     this.categoriesEvaluation = [];
     this.selectedCategoryId = null;
     this.criteres = [];
+    this.form = this.getEmptyForm();
+
     this.totalPoints = 0;
     this.restePoints = 100;
-    this.loadLotsByType();
+    this.errorMessage = '';
+    this.successMessage = '';
+
+    if (this.selectedTypeIntervenantId !== null) {
+      this.loadLotsByType(this.selectedTypeIntervenantId);
+    }
   }
 
-  loadLotsByType(): void {
-    if (!this.selectedTypeIntervenantId) {
-      this.lots = [];
-      this.selectedLotId = null;
-      this.criteres = [];
-      this.categoriesEvaluation = [];
+  loadLotsByType(typeId: number): void {
+    const requestedTypeId = Number(typeId);
+
+    if (!Number.isFinite(requestedTypeId) || requestedTypeId <= 0) {
       return;
     }
 
+    const requestId = ++this.lotsRequestId;
     this.loadingLots = true;
-    this.errorMessage = '';
 
-    this.lotService.getAll(this.selectedTypeIntervenantId).subscribe({
+    this.lotService.getAll(requestedTypeId).subscribe({
       next: (lots: Lot[]) => {
-        this.lots = (lots || [])
-          .filter(lot => this.isActive(lot.actif))
-          .map(lot => ({
+        if (
+          requestId !== this.lotsRequestId ||
+          Number(this.selectedTypeIntervenantId) !== requestedTypeId
+        ) {
+          return;
+        }
+
+        this.loadingLots = false;
+
+        this.lots = (lots ?? [])
+          .filter((lot) => this.isActive(lot.actif))
+          .map((lot) => ({
             ...lot,
             id: Number(lot.id),
             nomLot: lot.nomLot || 'Domaine sans nom',
-            codeLot: lot.codeLot || ''
+            codeLot: lot.codeLot || '',
           }));
-
-        this.loadingLots = false;
 
         if (this.lots.length > 0) {
           this.selectLot(this.lots[0].id);
-        } else {
-          this.selectedLotId = null;
-          this.criteres = [];
-          this.categoriesEvaluation = [];
         }
       },
       error: (error: unknown) => {
-        console.error('LOAD LOTS BY TYPE ERROR', error);
+        if (requestId !== this.lotsRequestId) {
+          return;
+        }
+
+        console.error('LOAD LOTS ERROR', error);
         this.loadingLots = false;
-        this.errorMessage = 'Erreur lors du chargement des domaines de ce type.';
-      }
+        this.lots = [];
+        this.errorMessage = 'Erreur lors du chargement des domaines.';
+      },
     });
   }
 
   selectLot(lotId: number): void {
-    this.selectedLotId = Number(lotId);
-    this.form.lotId = this.selectedLotId;
+    const normalizedLotId = Number(lotId);
 
+    if (!Number.isFinite(normalizedLotId) || normalizedLotId <= 0) {
+      this.errorMessage = 'Identifiant du domaine invalide.';
+      return;
+    }
+
+    const selectedLot = this.lots.find(
+      (lot) => Number(lot.id) === normalizedLotId,
+    );
+
+    if (!selectedLot) {
+      this.errorMessage =
+        "Le domaine ne correspond pas au type d'intervenant sélectionné.";
+      return;
+    }
+
+    this.selectedLotId = normalizedLotId;
+    this.form.lotId = normalizedLotId;
     this.categoriesEvaluation = [];
     this.selectedCategoryId = null;
+    this.errorMessage = '';
+    this.successMessage = '';
 
     this.loadCategoriesForScope();
     this.loadEvaluation();
   }
 
-  loadCategoriesForScope(): void {
-    if (!this.selectedTypeIntervenantId) {
+  /* =====================================================
+     CATÉGORIES
+  ===================================================== */
+
+  loadCategoriesForScope(preferredCategoryId: number | null = null): void {
+    const typeIntervenantId = Number(this.selectedTypeIntervenantId);
+    const lotId = this.selectedLotId == null ? null : Number(this.selectedLotId);
+
+    if (!Number.isFinite(typeIntervenantId) || typeIntervenantId <= 0) {
       this.categoriesEvaluation = [];
       this.selectedCategoryId = null;
       return;
     }
 
+    const requestId = ++this.categoriesRequestId;
     this.loadingCategories = true;
 
-    this.evaluationService.getCategoriesByScope(
-      Number(this.selectedTypeIntervenantId),
-      this.selectedLotId,
-      true
-    ).subscribe({
-      next: (categories: CategorieEvaluation[]) => {
-        this.categoriesEvaluation = categories || [];
-        this.loadingCategories = false;
+    this.evaluationService
+      .getCategoriesByScope(typeIntervenantId, lotId, true)
+      .subscribe({
+        next: (categories: CategorieEvaluationResponse[]) => {
+          if (requestId !== this.categoriesRequestId) {
+            return;
+          }
 
-        if (!this.editMode && this.categoriesEvaluation.length > 0) {
-          this.applyCategoryToForm(this.categoriesEvaluation[0]);
-        }
-      },
-      error: (error: unknown) => {
-        console.error('LOAD CATEGORIES ERROR', error);
-        this.loadingCategories = false;
-        this.categoriesEvaluation = [];
-        this.errorMessage = 'Erreur lors du chargement des catégories.';
-      }
-    });
+          this.loadingCategories = false;
+
+          this.categoriesEvaluation = (categories ?? [])
+            .filter((category) => this.isActive(category.actif))
+            .sort((a, b) => {
+              const ordreA = Number(a.ordreAffichage ?? 0);
+              const ordreB = Number(b.ordreAffichage ?? 0);
+
+              if (ordreA !== ordreB) {
+                return ordreA - ordreB;
+              }
+
+              return String(a.libelle ?? '').localeCompare(
+                String(b.libelle ?? ''),
+                'fr',
+                { sensitivity: 'base' },
+              );
+            });
+
+          if (this.categoriesEvaluation.length === 0) {
+            this.selectedCategoryId = null;
+            this.form.categorieEvaluationId = null;
+            return;
+          }
+
+          const preferred =
+            preferredCategoryId == null
+              ? null
+              : this.categoriesEvaluation.find(
+                  (category) =>
+                    Number(category.id) === Number(preferredCategoryId),
+                );
+
+          this.applyCategoryToForm(
+            preferred ?? this.categoriesEvaluation[0],
+          );
+        },
+        error: (error: any) => {
+          if (requestId !== this.categoriesRequestId) {
+            return;
+          }
+
+          console.error('LOAD CATEGORIES ERROR', error);
+          this.loadingCategories = false;
+          this.categoriesEvaluation = [];
+          this.selectedCategoryId = null;
+          this.errorMessage =
+            error?.error?.message ||
+            error?.error?.detail ||
+            'Erreur lors du chargement des catégories.';
+        },
+      });
   }
 
-  onCategoryChange(categoryId: number | null): void {
-    this.selectedCategoryId = categoryId;
+  onCategoryChange(value: number | string | null): void {
+    const categoryId = value == null ? null : Number(value);
 
-    const category = this.categoriesEvaluation.find(
-      item => Number(item.id) === Number(categoryId)
-    );
+    this.selectedCategoryId =
+      categoryId !== null && Number.isFinite(categoryId) && categoryId > 0
+        ? categoryId
+        : null;
 
-    if (!category) {
-      this.form.categorieEvaluationId = null;
-      this.form.categorieEvaluationCode = null;
-      this.form.categorieEvaluationLibelle = null;
-      this.form.section = '';
+    this.form.categorieEvaluationId = this.selectedCategoryId;
+  }
+
+  private applyCategoryToForm(category: CategorieEvaluationResponse): void {
+    const categoryId = category?.id == null ? null : Number(category.id);
+
+    this.selectedCategoryId =
+      categoryId !== null && Number.isFinite(categoryId) && categoryId > 0
+        ? categoryId
+        : null;
+
+    this.form.categorieEvaluationId = this.selectedCategoryId;
+  }
+
+  openCategoryModal(): void {
+    if (!this.selectedTypeIntervenantId) {
+      this.errorMessage = "Veuillez sélectionner un type d'intervenant.";
       return;
     }
 
-    this.applyCategoryToForm(category);
+    this.categoryForm = {
+      libelle: '',
+      code: '',
+      description: '',
+      globalForType: true,
+    };
+
+    this.categoryFormError = '';
+    this.categoryModalOpen = true;
   }
 
- private applyCategoryToForm(category: CategorieEvaluation): void {
-  this.selectedCategoryId = category.id ?? null;
+  closeCategoryModal(): void {
+    this.categoryModalOpen = false;
+    this.savingCategory = false;
+    this.categoryFormError = '';
+  }
 
-  this.form.categorieEvaluationId = category.id ?? null;
-  this.form.categorieEvaluationCode = category.code ?? null;
-  this.form.categorieEvaluationLibelle = category.libelle ?? null;
-  this.form.section = category.libelle ?? '';
-}
+  saveCategoryFromMiniModal(): void {
+    this.categoryFormError = '';
+
+    const libelle = this.categoryForm.libelle.trim();
+    const typeIntervenantId = Number(this.selectedTypeIntervenantId);
+    const selectedLotId =
+      this.selectedLotId == null ? null : Number(this.selectedLotId);
+
+    if (!libelle) {
+      this.categoryFormError = 'Le libellé de la catégorie est obligatoire.';
+      return;
+    }
+
+    if (!Number.isFinite(typeIntervenantId) || typeIntervenantId <= 0) {
+      this.categoryFormError = "Le type d'intervenant est obligatoire.";
+      return;
+    }
+
+    if (
+      !this.categoryForm.globalForType &&
+      (selectedLotId == null || selectedLotId <= 0)
+    ) {
+      this.categoryFormError =
+        'Le domaine est obligatoire pour une catégorie spécifique.';
+      return;
+    }
+
+    const payload = {
+      typeIntervenantId,
+      lotId: this.categoryForm.globalForType ? null : selectedLotId,
+      code: this.categoryForm.code.trim()
+        ? this.categoryForm.code.trim()
+        : this.generateCategoryCode(libelle),
+      libelle,
+      description: this.categoryForm.description?.trim() || '',
+      actif: true,
+      ordreAffichage:
+        Math.max(
+          0,
+          ...this.categoriesEvaluation.map((category) =>
+            Number(category.ordreAffichage ?? 0),
+          ),
+        ) + 1,
+    };
+
+    this.savingCategory = true;
+
+    this.evaluationService.createCategory(payload).subscribe({
+      next: (createdCategory: CategorieEvaluationResponse) => {
+        this.savingCategory = false;
+        this.categoryModalOpen = false;
+        this.successMessage = 'Catégorie ajoutée avec succès.';
+        this.loadCategoriesForScope(createdCategory.id ?? null);
+      },
+      error: (error: any) => {
+        console.error('SAVE CATEGORY ERROR', error);
+        this.savingCategory = false;
+        this.categoryFormError =
+          error?.error?.message ||
+          error?.error?.detail ||
+          "Erreur lors de l'ajout de la catégorie.";
+      },
+    });
+  }
+
+  /* =====================================================
+     CRITÈRES / TOTAL
+  ===================================================== */
 
   loadPieceNames(): void {
     this.evaluationService.getPieceNames().subscribe({
       next: (names: string[]) => {
-        this.pieceNames = [...(names || [])].sort((a, b) => a.localeCompare(b));
+        this.pieceNames = [...(names ?? [])].sort((a, b) =>
+          a.localeCompare(b, 'fr'),
+        );
       },
       error: () => {
         this.pieceNames = [];
-      }
+      },
     });
   }
 
-loadEvaluation(): void {
-  if (!this.selectedLotId) {
-    this.criteres = [];
-    this.loading = false;
-    return;
-  }
+  loadEvaluation(): void {
+    if (!this.selectedLotId) {
+      this.criteres = [];
+      this.loading = false;
+      return;
+    }
 
-  this.loading = true;
-  this.errorMessage = '';
-  this.successMessage = '';
+    const requestedLotId = Number(this.selectedLotId);
+    const requestId = ++this.evaluationRequestId;
 
-  this.evaluationService
-    .getActiveByLot(this.selectedLotId)
-    .subscribe({
-      next: (
-        criteres: CritereEvaluationResponse[]
-      ) => {
-        console.log(
-          'CRITERES REÇUS =',
-          criteres
-        );
+    this.loading = true;
+    this.errorMessage = '';
 
-        this.criteres = (criteres || [])
-          .map((critere: any) => ({
-            ...critere,
+    this.evaluationService.getActiveByLot(requestedLotId).subscribe({
+      next: (criteres: CritereEvaluationResponse[]) => {
+        if (
+          requestId !== this.evaluationRequestId ||
+          Number(this.selectedLotId) !== requestedLotId
+        ) {
+          return;
+        }
 
-            id: Number(
-              critere.id ??
-              critere.critereEvaluationId
-            )
-          }))
+        this.criteres = (criteres ?? [])
+          .filter((critere) => Number(critere.critereEvaluationId) > 0)
           .sort(
             (a, b) =>
-              Number(a.ordreAffichage || 0) -
-              Number(b.ordreAffichage || 0)
+              Number(a.ordreAffichage ?? 0) -
+              Number(b.ordreAffichage ?? 0),
           );
-
-        console.log(
-          'CRITERES NORMALISÉS =',
-          this.criteres
-        );
-
-        console.log(
-          'ID PREMIER CRITERE =',
-          this.criteres?.[0]?.id
-        );
 
         this.loading = false;
         this.loadTotals();
       },
-
       error: (error: unknown) => {
-        console.error(
-          'LOAD CRITERES ERROR',
-          error
-        );
+        if (requestId !== this.evaluationRequestId) {
+          return;
+        }
 
+        console.error('LOAD CRITERES ERROR', error);
         this.loading = false;
-
         this.errorMessage =
-          'Erreur lors du chargement de la grille d’évaluation.';
-      }
-    });
-}
-  loadTotals(): void {
-    if (!this.selectedLotId) return;
-
-    this.evaluationService.getTotalByLot(this.selectedLotId).subscribe({
-      next: (total: number) => {
-        this.totalPoints = Number(total || 0);
+          "Erreur lors du chargement de la grille d'évaluation.";
       },
-      error: () => {
-        this.totalPoints = 0;
-      }
-    });
-
-    this.evaluationService.getResteByLot(this.selectedLotId).subscribe({
-      next: (reste: number) => {
-        this.restePoints = Number(reste || 0);
-      },
-      error: () => {
-        this.restePoints = 100;
-      }
     });
   }
+
+  loadTotals(): void {
+    if (!this.selectedLotId) {
+      this.totalPoints = 0;
+      this.restePoints = 100;
+      return;
+    }
+
+    const requestedLotId = Number(this.selectedLotId);
+    const requestId = ++this.totalsRequestId;
+
+    forkJoin({
+      total: this.evaluationService.getTotalByLot(requestedLotId),
+      reste: this.evaluationService.getResteByLot(requestedLotId),
+    }).subscribe({
+      next: ({ total, reste }) => {
+        if (
+          requestId !== this.totalsRequestId ||
+          Number(this.selectedLotId) !== requestedLotId
+        ) {
+          return;
+        }
+
+        this.totalPoints = Number(total ?? 0);
+        this.restePoints = Number(reste ?? 0);
+      },
+      error: () => {
+        if (requestId !== this.totalsRequestId) {
+          return;
+        }
+
+        this.totalPoints = this.criteres.reduce(
+          (sum, critere) => sum + Number(critere.pointsMax ?? 0),
+          0,
+        );
+        this.restePoints = Math.max(0, 100 - this.totalPoints);
+      },
+    });
+  }
+
+  /* =====================================================
+     MODAL CRITÈRE — SIMPLIFIÉ
+  ===================================================== */
 
   openCreateModal(): void {
-  if (!this.selectedLotId) {
-    this.errorMessage = 'Veuillez choisir un type puis un domaine.';
-    return;
+    if (!this.selectedLotId) {
+      this.errorMessage = 'Veuillez choisir un type puis un domaine.';
+      return;
+    }
+
+    this.editMode = false;
+    this.editingId = null;
+    this.form = this.getEmptyForm();
+    this.form.lotId = Number(this.selectedLotId);
+    this.form.ordreAffichage = this.criteres.length + 1;
+    this.form.codeCritere = this.generateCodeCritere();
+
+    this.selectedCategoryId = null;
+    this.errorMessage = '';
+    this.successMessage = '';
+    this.modalOpen = true;
+
+    this.loadCategoriesForScope();
   }
-
-  this.editMode = false;
-  this.editingId = null;
-
-  this.form = this.getEmptyForm();
-  this.form.lotId = this.selectedLotId;
-  this.form.ordreAffichage = this.criteres.length + 1;
-  this.form.codeCritere = this.generateCodeCritere();
-
-  if (this.categoriesEvaluation.length > 0) {
-    this.applyCategoryToForm(this.categoriesEvaluation[0]);
-  }
-
-  this.modalOpen = true;
-}
 
   openEditModal(critere: CritereEvaluationResponse): void {
     this.editMode = true;
-    this.editingId = critere.id;
+    this.editingId = Number(critere.critereEvaluationId);
 
     this.form = {
-      grilleEvaluationLotId: critere.grilleEvaluationLotId || null,
-      lotId: critere.lotId,
-
+      grilleEvaluationLotId: critere.grilleEvaluationLotId ?? null,
+      lotId: Number(critere.lotId),
       categorieEvaluationId: critere.categorieEvaluationId ?? null,
-      categorieEvaluationCode: critere.categorieEvaluationCode ?? null,
-      categorieEvaluationLibelle: critere.categorieEvaluationLibelle ?? null,
 
       codeCritere: critere.codeCritere || '',
-      section: critere.categorieEvaluationLibelle || critere.section || '',
       libelleCritere: critere.libelleCritere || '',
 
       labelCandidat: critere.labelCandidat || '',
       aideCandidat: critere.aideCandidat || '',
       raisonDonnee: critere.raisonDonnee || '',
       noteCandidat: critere.noteCandidat || '',
-
       noteEvaluateur: critere.noteEvaluateur || '',
 
-      pointsMax: Number(critere.pointsMax || 0),
+      pointsMax: Number(critere.pointsMax ?? 0),
       baremeNotation: critere.baremeNotation || '',
       typeNotation: critere.typeNotation || 'MANUEL',
 
@@ -505,21 +602,25 @@ loadEvaluation(): void {
       optionsChamp: critere.optionsChamp || '',
       obligatoire: critere.obligatoire ?? true,
 
-      ordreAffichage: critere.ordreAffichage || 1,
+      ordreAffichage: critere.ordreAffichage ?? 1,
       actif: this.isActive(critere.actif),
 
-      pieces: (critere.pieces || []).map(piece => ({
+      pieces: (critere.pieces ?? []).map((piece) => ({
         codePiece: piece.codePiece,
         nomPiece: piece.nomPiece,
+        formatAccepte: piece.formatAccepte ?? 'PDF',
         obligatoire: piece.obligatoire ?? true,
-        ordreAffichage: piece.ordreAffichage || 1,
-        actif: piece.actif ?? true
-      } as any))
+        ordreAffichage: piece.ordreAffichage ?? 1,
+        actif: this.isActive(piece.actif),
+      })),
     };
 
     this.selectedCategoryId = critere.categorieEvaluationId ?? null;
-
+    this.errorMessage = '';
+    this.successMessage = '';
     this.modalOpen = true;
+
+    this.loadCategoriesForScope(critere.categorieEvaluationId ?? null);
   }
 
   closeModal(): void {
@@ -529,9 +630,38 @@ loadEvaluation(): void {
     this.form = this.getEmptyForm();
   }
 
+  onTypeChampChange(value: string): void {
+    const typeChamp = String(value || 'TEXT').toUpperCase();
+    this.form.typeChamp = typeChamp;
+
+    switch (typeChamp) {
+      case 'BOOLEAN':
+        this.form.typeNotation = 'OUI_NON';
+        this.form.optionsChamp = '';
+        break;
+
+      case 'NUMBER':
+        this.form.typeNotation = 'SEUIL_NUMERIQUE';
+        this.form.optionsChamp = '';
+        break;
+
+      case 'SELECT':
+        this.form.typeNotation = 'AUTOMATIQUE';
+        break;
+
+      default:
+        this.form.typeNotation = 'MANUEL';
+        this.form.optionsChamp = '';
+        break;
+    }
+  }
+
   save(): void {
+    this.errorMessage = '';
+    this.successMessage = '';
+
     if (!this.selectedTypeIntervenantId) {
-      this.errorMessage = 'Veuillez sélectionner un type d’intervenant.';
+      this.errorMessage = "Veuillez sélectionner un type d'intervenant.";
       return;
     }
 
@@ -540,10 +670,7 @@ loadEvaluation(): void {
       return;
     }
 
-    this.errorMessage = '';
-    this.successMessage = '';
-
-    if (!this.form.categorieEvaluationId) {
+    if (!this.selectedCategoryId) {
       this.errorMessage = 'Veuillez choisir une catégorie.';
       return;
     }
@@ -553,23 +680,35 @@ loadEvaluation(): void {
       return;
     }
 
-    if (!this.form.pointsMax || Number(this.form.pointsMax) <= 0) {
-      this.errorMessage = 'Veuillez saisir les points max.';
+    const points = Number(this.form.pointsMax ?? 0);
+
+    if (!Number.isFinite(points) || points <= 0) {
+      this.errorMessage = 'Les points maximum doivent être supérieurs à zéro.';
       return;
     }
 
-    if (this.form.typeChamp === 'SELECT' && !this.form.optionsChamp?.trim()) {
+    if (points > this.getAvailablePointsForForm()) {
+      this.errorMessage =
+        `Impossible d'attribuer ${points} points. ` +
+        `Il reste ${this.getAvailablePointsForForm()} point(s) disponibles.`;
+      return;
+    }
+
+    if (
+      this.form.typeChamp === 'SELECT' &&
+      !this.form.optionsChamp?.trim()
+    ) {
       this.errorMessage = 'Veuillez saisir les options de la liste.';
       return;
     }
 
     const request = this.buildRequest();
-
     this.saving = true;
 
-    const action = this.editMode && this.editingId
-      ? this.evaluationService.update(this.editingId, request)
-      : this.evaluationService.create(request);
+    const action =
+      this.editMode && this.editingId
+        ? this.evaluationService.update(this.editingId, request)
+        : this.evaluationService.create(request);
 
     action.subscribe({
       next: () => {
@@ -588,224 +727,207 @@ loadEvaluation(): void {
         this.errorMessage =
           error?.error?.message ||
           error?.error?.detail ||
-          'Erreur lors de l’enregistrement du critère.';
-      }
+          "Erreur lors de l'enregistrement du critère.";
+      },
     });
   }
 
-
   buildRequest(): CritereEvaluationRequest {
     const nomCritere = this.form.libelleCritere?.trim() || '';
-    const categorieLabel =
-      this.form.categorieEvaluationLibelle ||
-      this.form.section ||
-      'Sans catégorie';
 
     return {
       grilleEvaluationLotId: this.form.grilleEvaluationLotId || null,
-      lotId: this.selectedLotId || this.form.lotId,
+      lotId: Number(this.selectedLotId ?? this.form.lotId),
+      categorieEvaluationId: Number(this.selectedCategoryId),
 
-      categorieEvaluationId: this.form.categorieEvaluationId ?? null,
-      categorieEvaluationCode: this.form.categorieEvaluationCode ?? null,
-      categorieEvaluationLibelle: this.form.categorieEvaluationLibelle ?? null,
-
-      codeCritere: this.form.codeCritere?.trim() || this.generateCodeCritere(),
-      section: categorieLabel.trim(),
-
+      /* section n'est plus envoyée : le backend la déduit de la catégorie */
+      codeCritere:
+        this.form.codeCritere?.trim() || this.generateCodeCritere(),
       libelleCritere: nomCritere,
 
       labelCandidat: this.form.labelCandidat?.trim() || nomCritere,
       aideCandidat: this.form.aideCandidat?.trim() || '',
       raisonDonnee: this.form.raisonDonnee?.trim() || '',
       noteCandidat: this.form.noteCandidat?.trim() || '',
+      noteEvaluateur: this.form.noteEvaluateur?.trim() || '',
 
       pointsMax: Number(this.form.pointsMax || 0),
       baremeNotation: this.form.baremeNotation?.trim() || '',
       typeNotation: this.form.typeNotation || 'MANUEL',
-      noteEvaluateur: this.form.noteEvaluateur?.trim() || '',
 
       typeChamp: this.form.typeChamp || 'TEXT',
       optionsChamp: this.form.optionsChamp?.trim() || '',
       obligatoire: this.form.obligatoire ?? true,
 
-      ordreAffichage: Number(this.form.ordreAffichage || this.criteres.length + 1),
+      ordreAffichage: Number(
+        this.form.ordreAffichage || this.criteres.length + 1,
+      ),
       actif: this.form.actif ?? true,
-
-      pieces: this.normalizePieces()
+      pieces: this.normalizePieces(),
     };
   }
 
-  normalizePieces(): CriterePieceRequest[] {
-    const pieces = this.form.pieces || [];
+  getAvailablePointsForForm(): number {
+    if (!this.editMode || !this.editingId) {
+      return Math.max(0, Number(this.restePoints ?? 0));
+    }
 
-    return pieces
-      .map((piece: any, index: number) => {
+    const current = this.criteres.find(
+      (critere) =>
+        Number(critere.critereEvaluationId) === Number(this.editingId),
+    );
+
+    return Math.max(
+      0,
+      Number(this.restePoints ?? 0) + Number(current?.pointsMax ?? 0),
+    );
+  }
+
+  getNotationHelp(): string {
+    switch ((this.form.typeNotation || '').toUpperCase()) {
+      case 'OUI_NON':
+        return 'Exemple : Oui = 10 pts, Non = 0 pt.';
+      case 'SEUIL_NUMERIQUE':
+        return 'Exemple : ≥ 5 = 10 pts ; 3 à 4 = 7 pts ; 1 à 2 = 3 pts.';
+      case 'AUTOMATIQUE':
+        return 'Décrivez la correspondance entre la réponse et les points.';
+      default:
+        return "L'évaluateur attribuera la note dans la limite des points maximum.";
+    }
+  }
+
+  /* =====================================================
+     PIÈCES
+  ===================================================== */
+
+  normalizePieces(): CriterePieceRequest[] {
+    return (this.form.pieces ?? [])
+      .map((piece, index) => {
         const nomPiece = String(piece.nomPiece || '').trim();
 
         return {
           codePiece: piece.codePiece || this.generatePieceCode(nomPiece),
           nomPiece,
+          formatAccepte: piece.formatAccepte || 'PDF',
           obligatoire: piece.obligatoire ?? true,
           ordreAffichage: index + 1,
-          actif: piece.actif ?? true
-        } as any;
+          actif: piece.actif ?? true,
+        } as CriterePieceRequest;
       })
-      .filter(piece => !!piece.nomPiece);
+      .filter((piece) => !!piece.nomPiece);
   }
 
   addPieceToCritere(nomPiece: string = ''): void {
-    if (!this.form.pieces) {
-      this.form.pieces = [];
-    }
-
     this.form.pieces.push({
       codePiece: nomPiece ? this.generatePieceCode(nomPiece) : '',
       nomPiece,
+      formatAccepte: 'PDF',
       obligatoire: true,
       ordreAffichage: this.form.pieces.length + 1,
-      actif: true
-    } as any);
+      actif: true,
+    });
   }
 
   removePieceFromCritere(index: number): void {
-    this.form.pieces?.splice(index, 1);
-
-    this.form.pieces = (this.form.pieces || []).map((piece: any, i: number) => ({
+    this.form.pieces.splice(index, 1);
+    this.form.pieces = this.form.pieces.map((piece, i) => ({
       ...piece,
-      ordreAffichage: i + 1
+      ordreAffichage: i + 1,
     }));
   }
 
-  // generateCodeCritere(): string {
-  //   const lot = this.lots.find(item => item.id === this.selectedLotId);
-  //   const lotCode = lot?.codeLot || lot?.nomLot?.substring(0, 3) || 'LOT';
-  //   const index = this.criteres.length + 1;
-
-  //   return `${lotCode.toUpperCase()}-C${index.toString().padStart(2, '0')}`;
-  // }
-
-  generatePieceCode(nomPiece: string): string {
-    if (!nomPiece) return '';
-
-    let code = nomPiece
-      .trim()
-      .toUpperCase()
-      .replaceAll('É', 'E')
-      .replaceAll('È', 'E')
-      .replaceAll('Ê', 'E')
-      .replaceAll('À', 'A')
-      .replaceAll('Â', 'A')
-      .replaceAll('Ç', 'C')
-      .replaceAll('Ù', 'U')
-      .replaceAll('Û', 'U')
-      .replaceAll('Î', 'I')
-      .replaceAll('Ï', 'I')
-      .replace(/[^A-Z0-9]+/g, '-')
-      .replace(/^-|-$/g, '');
-
-    if (code.length > 30) {
-      code = code.substring(0, 30);
-    }
-
-    return code || 'PIECE';
-  }
-
-  getEmptyForm(): CritereEvaluationRequest {
-    return {
-      grilleEvaluationLotId: null,
-      lotId: this.selectedLotId || 0,
-
-      categorieEvaluationId: null,
-      categorieEvaluationCode: null,
-      categorieEvaluationLibelle: null,
-
-      codeCritere: '',
-      section: '',
-      libelleCritere: '',
-      labelCandidat: '',
-      aideCandidat: '',
-      raisonDonnee: '',
-      noteCandidat: '',
-      noteEvaluateur: '',
-      pointsMax: 0,
-      baremeNotation: '',
-      typeNotation: 'MANUEL',
-      typeChamp: 'TEXT',
-      optionsChamp: '',
-      obligatoire: true,
-      ordreAffichage: this.criteres.length + 1,
-      actif: true,
-      pieces: []
-    };
-  }
+  /* =====================================================
+     AFFICHAGE
+  ===================================================== */
 
   getSections(): string[] {
-    const sections = this.criteres.map(
-      critere =>
-        critere.categorieEvaluationLibelle ||
-        critere.section ||
-        'Sans catégorie'
-    );
-
-    return [...new Set(sections)];
+    return [
+      ...new Set(
+        this.criteres.map(
+          (critere) =>
+            critere.categorieEvaluationLibelle ||
+            critere.section ||
+            'Sans catégorie',
+        ),
+      ),
+    ];
   }
 
   getCriteresBySection(section: string): CritereEvaluationResponse[] {
     return this.criteres
-      .filter(critere => {
+      .filter((critere) => {
         const currentSection =
           critere.categorieEvaluationLibelle ||
           critere.section ||
           'Sans catégorie';
-
         return currentSection === section;
       })
-      .sort((a, b) => (a.ordreAffichage || 0) - (b.ordreAffichage || 0));
+      .sort(
+        (a, b) =>
+          Number(a.ordreAffichage ?? 0) -
+          Number(b.ordreAffichage ?? 0),
+      );
   }
 
   getSectionTotal(section: string): number {
-    return this.getCriteresBySection(section)
-      .reduce((sum, critere) => sum + Number(critere.pointsMax || 0), 0);
+    return this.getCriteresBySection(section).reduce(
+      (sum, critere) => sum + Number(critere.pointsMax ?? 0),
+      0,
+    );
   }
 
-getPiecesText(critere: CritereEvaluationResponse): string[] {
-  return (critere.pieces || [])
-    .map(piece => piece.nomPiece || piece.codePiece || '')
-    .filter((value): value is string => value.trim().length > 0);
-}
+  getPiecesText(critere: CritereEvaluationResponse): string[] {
+    return (critere.pieces ?? [])
+      .map((piece) => piece.nomPiece || piece.codePiece || '')
+      .filter((value) => value.trim().length > 0);
+  }
 
   getSelectedTypeName(): string {
-    const type = this.types.find(t => t.id === Number(this.selectedTypeIntervenantId));
-    return type?.libelle || '';
+    return (
+      this.types.find(
+        (type) => Number(type.id) === Number(this.selectedTypeIntervenantId),
+      )?.libelle || ''
+    );
   }
 
   getSelectedLotName(): string {
-    return this.lots.find(lot => lot.id === this.selectedLotId)?.nomLot || '';
+    return (
+      this.lots.find((lot) => Number(lot.id) === Number(this.selectedLotId))
+        ?.nomLot || ''
+    );
   }
 
-getTypeChampLabel(type?: string | null): string {
-  const value = (type ?? '').toUpperCase();
-
-  switch (value) {
-    case 'TEXT': return 'Texte';
-    case 'TEXTAREA': return 'Texte long';
-    case 'NUMBER': return 'Nombre';
-    case 'DATE': return 'Date';
-    case 'SELECT': return 'Liste';
-    case 'BOOLEAN': return 'Oui / Non';
-    default: return value || '-';
+  getTypeChampLabel(type?: string | null): string {
+    switch ((type ?? '').toUpperCase()) {
+      case 'TEXT':
+        return 'Texte';
+      case 'TEXTAREA':
+        return 'Texte long';
+      case 'NUMBER':
+        return 'Nombre';
+      case 'DATE':
+        return 'Date';
+      case 'SELECT':
+        return 'Liste';
+      case 'BOOLEAN':
+        return 'Oui / Non';
+      default:
+        return type || '-';
+    }
   }
-}
 
-  getTypeNotationLabel(type?: string): string {
-    const value = (type || '').toUpperCase();
-
-    switch (value) {
-      case 'MANUEL': return 'Manuel';
-      case 'AUTOMATIQUE': return 'Automatique';
-      case 'OUI_NON': return 'Oui / Non';
-      case 'SEUIL_NUMERIQUE': return 'Seuil numérique';
-      default: return value || 'Manuel';
+  getTypeNotationLabel(type?: string | null): string {
+    switch ((type ?? '').toUpperCase()) {
+      case 'MANUEL':
+        return 'Évaluation manuelle';
+      case 'AUTOMATIQUE':
+        return 'Selon la réponse';
+      case 'OUI_NON':
+        return 'Oui / Non';
+      case 'SEUIL_NUMERIQUE':
+        return 'Selon la valeur';
+      default:
+        return type || 'Manuel';
     }
   }
 
@@ -813,81 +935,36 @@ getTypeChampLabel(type?: string | null): string {
     return this.pieceNames.slice(0, 10);
   }
 
-  isActive(value: any): boolean {
-    return value === true || value === 'true' || value === 1 || value === '1';
+  /* =====================================================
+     SUPPRESSION / DÉSACTIVATION
+  ===================================================== */
+
+  openDeleteCritereModal(critere: CritereEvaluationResponse): void {
+    if (!critere?.critereEvaluationId) {
+      this.errorMessage = 'Identifiant du critère introuvable.';
+      return;
+    }
+
+    this.deleteTarget = 'CRITERE';
+    this.critereToDelete = critere;
+    this.sectionToDelete = '';
+    this.deleteModalOpen = true;
   }
 
-  trackByLotId(index: number, lot: LotView): number {
-    return lot.id;
-  }
-
-  trackByCritereId(index: number, critere: CritereEvaluationResponse): number {
-    return critere.id;
-  }
-
-  trackByCategoryId(index: number, category: CategorieEvaluation): number {
-    return Number(category.id || index);
-  }
-
-  trackByIndex(index: number): number {
-    return index;
-  }
-  // =====================================================
-  // MODAL SUPPRESSION
-  // =====================================================
-
-openDeleteCritereModal(
-  critere: CritereEvaluationResponse
-): void {
-  console.log(
-    'CRITERE REÇU PAR LE MODAL =',
-    critere
-  );
-
-  if (
-    critere === null ||
-    critere === undefined ||
-    critere.id === null ||
-    critere.id === undefined
-  ) {
-    console.error(
-      'OBJET CRITERE INVALIDE =',
-      critere
-    );
-
-    this.errorMessage =
-      'Identifiant du critère introuvable.';
-    return;
-  }
-
-  this.errorMessage = '';
-  this.successMessage = '';
-
-  this.deleteTarget = 'CRITERE';
-  this.critereToDelete = critere;
-  this.sectionToDelete = '';
-  this.deleteModalOpen = true;
-}
   openDeleteGroupModal(section: string): void {
     if (!this.selectedLotId) {
-      this.errorMessage = 'Veuillez sélectionner un lot.';
+      this.errorMessage = 'Veuillez sélectionner un domaine.';
       return;
     }
 
-    const criteresDuGroupe = this.getCriteresBySection(section)
-      .filter(
-        critere =>
-          Number(critere.lotId) === Number(this.selectedLotId)
-      );
+    const criteresDuGroupe = this.getCriteresBySection(section).filter(
+      (critere) => Number(critere.lotId) === Number(this.selectedLotId),
+    );
 
     if (criteresDuGroupe.length === 0) {
-      this.errorMessage =
-        'Aucun critère à supprimer dans ce groupe.';
+      this.errorMessage = 'Aucun critère à désactiver dans ce groupe.';
       return;
     }
-
-    this.errorMessage = '';
-    this.successMessage = '';
 
     this.deleteTarget = 'GROUPE';
     this.sectionToDelete = section;
@@ -909,168 +986,197 @@ openDeleteCritereModal(
   confirmDeleteModal(): void {
     if (this.deleteTarget === 'GROUPE') {
       this.confirmDeleteGroup();
-      return;
+    } else {
+      this.confirmDeleteCritere();
     }
-
-    this.confirmDeleteCritere();
   }
 
   private confirmDeleteCritere(): void {
-    if (!this.critereToDelete?.id) {
+    const id = Number(this.critereToDelete?.critereEvaluationId ?? 0);
+
+    if (id <= 0) {
       this.errorMessage = 'Critère introuvable.';
       this.closeDeleteModal();
       return;
     }
 
-    const critereId = this.critereToDelete.id;
-    const critereNom =
-      this.critereToDelete.libelleCritere || 'Critère';
-
+    const nom = this.critereToDelete?.libelleCritere || 'Critère';
     this.deleting = true;
-    this.errorMessage = '';
-    this.successMessage = '';
 
-    this.evaluationService.deactivate(critereId).subscribe({
+    this.evaluationService.deactivate(id).subscribe({
       next: () => {
         this.deleting = false;
         this.deleteModalOpen = false;
         this.critereToDelete = null;
-        this.sectionToDelete = '';
-
-        this.successMessage =
-          `Le critère "${critereNom}" a été supprimé de l’affichage.`;
-
+        this.successMessage = `Le critère "${nom}" a été retiré de la grille active.`;
         this.loadEvaluation();
-        this.loadPieceNames();
-        this.loadTotals();
       },
       error: (error: any) => {
         console.error('DEACTIVATE CRITERE ERROR', error);
         this.deleting = false;
-
         this.errorMessage =
           error?.error?.message ||
           error?.error?.detail ||
-          'Erreur lors de la suppression du critère.';
-      }
+          'Erreur lors de la désactivation du critère.';
+      },
     });
   }
 
   private confirmDeleteGroup(): void {
     if (!this.selectedLotId || !this.sectionToDelete) {
-      this.errorMessage = 'Groupe ou lot introuvable.';
+      this.errorMessage = 'Groupe ou domaine introuvable.';
       this.closeDeleteModal();
       return;
     }
 
-    const lotId = Number(this.selectedLotId);
-    const section = this.sectionToDelete;
-
-    const criteresToDeactivate = this.getCriteresBySection(section)
-      .filter(critere => Number(critere.lotId) === lotId);
-
-    if (criteresToDeactivate.length === 0) {
-      this.errorMessage =
-        'Aucun critère à supprimer dans ce groupe.';
-      this.closeDeleteModal();
-      return;
-    }
-
-    const lotName = this.getSelectedLotName();
-
-    this.deleting = true;
-    this.errorMessage = '';
-    this.successMessage = '';
-
-    const requests = criteresToDeactivate.map(
-      critere => this.evaluationService.deactivate(critere.id)
+    const criteres = this.getCriteresBySection(this.sectionToDelete).filter(
+      (critere) => Number(critere.lotId) === Number(this.selectedLotId),
     );
 
-    forkJoin(requests).subscribe({
+    if (criteres.length === 0) {
+      this.closeDeleteModal();
+      return;
+    }
+
+    this.deleting = true;
+
+    forkJoin(
+      criteres.map((critere) =>
+        this.evaluationService.deactivate(critere.critereEvaluationId),
+      ),
+    ).subscribe({
       next: () => {
+        const groupe = this.sectionToDelete;
         this.deleting = false;
         this.deleteModalOpen = false;
         this.sectionToDelete = '';
-        this.critereToDelete = null;
-
-        this.successMessage =
-          `Le groupe "${section}" a été supprimé de l’affichage pour le lot "${lotName}".`;
-
+        this.successMessage = `Le groupe "${groupe}" a été retiré de la grille active.`;
         this.loadEvaluation();
-        this.loadTotals();
       },
       error: (error: any) => {
         console.error('DEACTIVATE GROUP ERROR', error);
         this.deleting = false;
-
         this.errorMessage =
           error?.error?.message ||
           error?.error?.detail ||
-          'Erreur lors de la suppression du groupe.';
-      }
+          'Erreur lors de la désactivation du groupe.';
+      },
     });
   }
 
   getDeleteModalTitle(): string {
     return this.deleteTarget === 'GROUPE'
-      ? 'Supprimer le groupe de critères'
-      : 'Supprimer le critère';
+      ? 'Retirer le groupe de la grille'
+      : 'Retirer le critère de la grille';
   }
 
   getDeleteModalName(): string {
-    if (this.deleteTarget === 'GROUPE') {
-      return this.sectionToDelete;
-    }
-
-    return this.critereToDelete?.libelleCritere || 'Critère';
+    return this.deleteTarget === 'GROUPE'
+      ? this.sectionToDelete
+      : this.critereToDelete?.libelleCritere || 'Critère';
   }
 
   getDeleteModalMessage(): string {
-    if (this.deleteTarget === 'GROUPE') {
-      return (
-        'Tous les critères de ce groupe seront désactivés ' +
-        'uniquement pour le lot sélectionné. Ils resteront ' +
-        'conservés dans la base de données.'
-      );
-    }
-
-    return (
-      'Ce critère sera désactivé et retiré de l’affichage. ' +
-      'Il restera conservé dans la base de données.'
-    );
+    return this.deleteTarget === 'GROUPE'
+      ? 'Tous les critères de ce groupe seront désactivés. Les données restent conservées en base.'
+      : 'Le critère sera désactivé et retiré de la grille active. Les données restent conservées en base.';
   }
 
   getDeleteModalCount(): number {
-    if (
-      this.deleteTarget !== 'GROUPE' ||
-      !this.sectionToDelete ||
-      !this.selectedLotId
-    ) {
+    if (this.deleteTarget !== 'GROUPE' || !this.sectionToDelete) {
       return 1;
     }
 
-    return this.getCriteresBySection(this.sectionToDelete)
-      .filter(
-        critere =>
-          Number(critere.lotId) === Number(this.selectedLotId)
-      )
-      .length;
+    return this.getCriteresBySection(this.sectionToDelete).length;
   }
 
+  /* =====================================================
+     GÉNÉRATEURS / UTILITAIRES
+  ===================================================== */
+
   generateCodeCritere(): string {
-  const existingCodes = this.criteres
-    .map(critere => critere.codeCritere || '')
-    .map(code => code.trim().toUpperCase())
-    .filter(code => /^P\d+$/.test(code));
+    const numbers = this.criteres
+      .map((critere) => String(critere.codeCritere || '').trim().toUpperCase())
+      .filter((code) => /^P\d+$/.test(code))
+      .map((code) => Number(code.replace('P', '')))
+      .filter((value) => Number.isFinite(value));
 
-  const numbers = existingCodes
-    .map(code => Number(code.replace('P', '')))
-    .filter(value => !isNaN(value));
+    const next = numbers.length > 0 ? Math.max(...numbers) + 1 : 1;
+    return `P${String(next).padStart(2, '0')}`;
+  }
 
-  const nextNumber = numbers.length > 0
-    ? Math.max(...numbers) + 1
-    : 1;
+  generateCategoryCode(value: string): string {
+    const code = this.normalizeCode(value, '_');
+    return code.substring(0, 60) || 'CATEGORIE';
+  }
 
-  return `P${nextNumber.toString().padStart(2, '0')}`;
-}
+  generatePieceCode(value: string): string {
+    const code = this.normalizeCode(value, '-');
+    return code.substring(0, 30) || 'PIECE';
+  }
+
+  private normalizeCode(value: string, separator: string): string {
+    return String(value || '')
+      .trim()
+      .toUpperCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^A-Z0-9]+/g, separator)
+      .replace(new RegExp(`^\\${separator}|\\${separator}$`, 'g'), '');
+  }
+
+  getEmptyForm(): CritereFormState {
+    return {
+      grilleEvaluationLotId: null,
+      lotId: this.selectedLotId,
+      categorieEvaluationId: null,
+
+      codeCritere: '',
+      libelleCritere: '',
+
+      labelCandidat: '',
+      aideCandidat: '',
+      raisonDonnee: '',
+      noteCandidat: '',
+      noteEvaluateur: '',
+
+      pointsMax: 0,
+      baremeNotation: '',
+      typeNotation: 'MANUEL',
+
+      typeChamp: 'TEXT',
+      optionsChamp: '',
+      obligatoire: true,
+
+      ordreAffichage: this.criteres.length + 1,
+      actif: true,
+      pieces: [],
+    };
+  }
+
+  isActive(value: any): boolean {
+    return value === true || value === 'true' || value === 1 || value === '1';
+  }
+
+  trackByLotId(index: number, lot: LotView): number {
+    return lot.id;
+  }
+
+  trackByCritereId(
+    index: number,
+    critere: CritereEvaluationResponse,
+  ): number {
+    return critere.critereEvaluationId;
+  }
+
+  trackByCategoryId(
+    index: number,
+    category: CategorieEvaluationResponse,
+  ): number {
+    return Number(category.id ?? index);
+  }
+
+  trackByIndex(index: number): number {
+    return index;
+  }
 }

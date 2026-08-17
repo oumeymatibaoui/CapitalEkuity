@@ -20,8 +20,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.io.IOException;
-import java.nio.file.*;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -35,7 +33,7 @@ public class CandidatCandidatureService {
     private final ApplicationCandidatureRepository applicationCandidatureRepository;
     private final JdbcTemplate jdbcTemplate;
     private final HistoriqueActionService historiqueActionService;
-
+    private final PdfFileSecurityService pdfFileSecurityService;
     // =========================================================
     // GET OR CREATE CANDIDATURE
     // =========================================================
@@ -103,7 +101,7 @@ public class CandidatCandidatureService {
                 ));
 
         Candidature candidature = Candidature.builder()
-                .utilisateur(utilisateur)
+//                .utilisateur(utilisateur)
                 .statut(StatutCandidature.BROUILLON)
                 .accesBloque(false)
                 .rneStatut("NON_DEPOSE")
@@ -212,38 +210,80 @@ public class CandidatCandidatureService {
     // =========================================================
 
     @Transactional
-    public CandidatureResponse uploadRne(Long candidatureId, MultipartFile file) {
+    public CandidatureResponse uploadRne(
+            Long candidatureId,
+            MultipartFile file
+    ) {
+        Candidature candidature =
+                findCandidature(candidatureId);
 
-        Candidature candidature = findCandidature(candidatureId);
-        validateFile(file);
+        String ancienFichier =
+                candidature.getRneNomFichier();
 
-        String ancienFichier = candidature.getRneNomFichier();
+        String ancienChemin =
+                candidature.getRneCheminFichier();
 
-        String chemin = saveFile(candidatureId, "RNE", file);
+        PdfFileSecurityService.StoredPdf storedPdf =
+                pdfFileSecurityService
+                        .validateAndStoreCandidaturePdf(
+                                candidatureId,
+                                "RNE",
+                                file
+                        );
 
-        candidature.setRneNomFichier(file.getOriginalFilename());
-        candidature.setRneCheminFichier(chemin);
-        candidature.setRneTypeContenu(file.getContentType());
-        candidature.setRneTailleFichier(file.getSize());
-        candidature.setRneStatut("DEPOSE");
-        candidature.setUpdatedAt(LocalDateTime.now());
+        try {
+            candidature.setRneNomFichier(
+                    storedPdf.originalFileName()
+            );
+            candidature.setRneCheminFichier(
+                    storedPdf.storedPath()
+            );
+            candidature.setRneTypeContenu(
+                    PdfFileSecurityService.PDF_CONTENT_TYPE
+            );
+            candidature.setRneTailleFichier(
+                    storedPdf.size()
+            );
+            candidature.setRneStatut("DEPOSE");
+            candidature.setUpdatedAt(LocalDateTime.now());
 
-        Candidature saved = candidatureRepository.save(candidature);
+            Candidature saved =
+                    candidatureRepository.save(candidature);
 
-        Long utilisateurId = getUtilisateurIdFromCandidature(saved);
+            Long utilisateurId =
+                    getUtilisateurIdFromCandidature(saved);
 
-        historiqueActionService.enregistrerAction(
-                utilisateurId,
-                saved.getId(),
-                null,
-                "UPLOAD_RNE",
-                "Le candidat a déposé ou modifié le fichier RNE. Ancien fichier: "
-                        + safe(ancienFichier)
-                        + " | Nouveau fichier: "
-                        + safe(file.getOriginalFilename())
-        );
+            historiqueActionService.enregistrerAction(
+                    utilisateurId,
+                    saved.getId(),
+                    null,
+                    "UPLOAD_RNE",
+                    "Le candidat a déposé ou modifié le fichier RNE."
+                            + " Ancien fichier : "
+                            + safe(ancienFichier)
+                            + " | Nouveau fichier : "
+                            + safe(storedPdf.originalFileName())
+            );
 
-        return toResponse(saved);
+            if (ancienChemin != null
+                    && !ancienChemin.equals(
+                    storedPdf.storedPath()
+            )) {
+                pdfFileSecurityService
+                        .deleteStoredFileQuietly(
+                                ancienChemin
+                        );
+            }
+
+            return toResponse(saved);
+
+        } catch (RuntimeException ex) {
+            pdfFileSecurityService
+                    .deleteStoredFileQuietly(
+                            storedPdf.storedPath()
+                    );
+            throw ex;
+        }
     }
 
     // =========================================================
@@ -251,38 +291,80 @@ public class CandidatCandidatureService {
     // =========================================================
 
     @Transactional
-    public CandidatureResponse uploadCnss(Long candidatureId, MultipartFile file) {
+    public CandidatureResponse uploadCnss(
+            Long candidatureId,
+            MultipartFile file
+    ) {
+        Candidature candidature =
+                findCandidature(candidatureId);
 
-        Candidature candidature = findCandidature(candidatureId);
-        validateFile(file);
+        String ancienFichier =
+                candidature.getCnssNomFichier();
 
-        String ancienFichier = candidature.getCnssNomFichier();
+        String ancienChemin =
+                candidature.getCnssCheminFichier();
 
-        String chemin = saveFile(candidatureId, "CNSS", file);
+        PdfFileSecurityService.StoredPdf storedPdf =
+                pdfFileSecurityService
+                        .validateAndStoreCandidaturePdf(
+                                candidatureId,
+                                "CNSS",
+                                file
+                        );
 
-        candidature.setCnssNomFichier(file.getOriginalFilename());
-        candidature.setCnssCheminFichier(chemin);
-        candidature.setCnssTypeContenu(file.getContentType());
-        candidature.setCnssTailleFichier(file.getSize());
-        candidature.setCnssStatut("DEPOSE");
-        candidature.setUpdatedAt(LocalDateTime.now());
+        try {
+            candidature.setCnssNomFichier(
+                    storedPdf.originalFileName()
+            );
+            candidature.setCnssCheminFichier(
+                    storedPdf.storedPath()
+            );
+            candidature.setCnssTypeContenu(
+                    PdfFileSecurityService.PDF_CONTENT_TYPE
+            );
+            candidature.setCnssTailleFichier(
+                    storedPdf.size()
+            );
+            candidature.setCnssStatut("DEPOSE");
+            candidature.setUpdatedAt(LocalDateTime.now());
 
-        Candidature saved = candidatureRepository.save(candidature);
+            Candidature saved =
+                    candidatureRepository.save(candidature);
 
-        Long utilisateurId = getUtilisateurIdFromCandidature(saved);
+            Long utilisateurId =
+                    getUtilisateurIdFromCandidature(saved);
 
-        historiqueActionService.enregistrerAction(
-                utilisateurId,
-                saved.getId(),
-                null,
-                "UPLOAD_CNSS",
-                "Le candidat a déposé ou modifié le fichier CNSS. Ancien fichier: "
-                        + safe(ancienFichier)
-                        + " | Nouveau fichier: "
-                        + safe(file.getOriginalFilename())
-        );
+            historiqueActionService.enregistrerAction(
+                    utilisateurId,
+                    saved.getId(),
+                    null,
+                    "UPLOAD_CNSS",
+                    "Le candidat a déposé ou modifié le fichier CNSS."
+                            + " Ancien fichier : "
+                            + safe(ancienFichier)
+                            + " | Nouveau fichier : "
+                            + safe(storedPdf.originalFileName())
+            );
 
-        return toResponse(saved);
+            if (ancienChemin != null
+                    && !ancienChemin.equals(
+                    storedPdf.storedPath()
+            )) {
+                pdfFileSecurityService
+                        .deleteStoredFileQuietly(
+                                ancienChemin
+                        );
+            }
+
+            return toResponse(saved);
+
+        } catch (RuntimeException ex) {
+            pdfFileSecurityService
+                    .deleteStoredFileQuietly(
+                            storedPdf.storedPath()
+                    );
+            throw ex;
+        }
     }
 
     // =========================================================
@@ -470,59 +552,16 @@ public class CandidatCandidatureService {
                 ));
     }
 
-    private void validateFile(MultipartFile file) {
-        if (file == null || file.isEmpty()) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Le fichier est obligatoire"
-            );
-        }
-    }
-
-    private String saveFile(Long candidatureId, String typePiece, MultipartFile file) {
-        try {
-            String uploadDir = "uploads/candidatures/" + candidatureId + "/phase1/";
-            Path directory = Paths.get(uploadDir);
-
-            if (!Files.exists(directory)) {
-                Files.createDirectories(directory);
-            }
-
-            String originalName = file.getOriginalFilename() == null
-                    ? typePiece + ".pdf"
-                    : file.getOriginalFilename();
-
-            String safeName = typePiece + "_" + System.currentTimeMillis() + "_" +
-                    originalName.replaceAll("[^a-zA-Z0-9.\\-_]", "_");
-
-            Path filePath = directory.resolve(safeName);
-
-            Files.copy(
-                    file.getInputStream(),
-                    filePath,
-                    StandardCopyOption.REPLACE_EXISTING
-            );
-
-            return filePath.toString();
-
-        } catch (IOException e) {
-            throw new ResponseStatusException(
-                    HttpStatus.INTERNAL_SERVER_ERROR,
-                    "Erreur lors de l’enregistrement du fichier"
-            );
-        }
-    }
-
     private Long getUtilisateurIdFromCandidature(Candidature candidature) {
 
         if (candidature == null) {
             return null;
         }
 
-        if (candidature.getUtilisateur() != null
-                && candidature.getUtilisateur().getId() != null) {
-            return candidature.getUtilisateur().getId();
-        }
+//        if (candidature.getUtilisateur() != null
+//                && candidature.getUtilisateur().getId() != null) {
+//            return candidature.getUtilisateur().getId();
+//        }
 
         return getUtilisateurIdFromCandidatureId(candidature.getId());
     }
@@ -553,16 +592,16 @@ public class CandidatCandidatureService {
         return CandidatureResponse.builder()
                 .id(candidature.getId())
 
-                .utilisateurId(
-                        candidature.getUtilisateur() != null
-                                ? candidature.getUtilisateur().getId()
-                                : null
-                )
-                .appelCandidatureId(
-                        candidature.getAppelCandidature() != null
-                                ? candidature.getAppelCandidature().getId()
-                                : null
-                )
+//                .utilisateurId(
+//                        candidature.getUtilisateur() != null
+//                                ? candidature.getUtilisateur().getId()
+//                                : null
+//                )
+//                .appelCandidatureId(
+//                        candidature.getAppelCandidature() != null
+//                                ? candidature.getAppelCandidature().getId()
+//                                : null
+//                )
                 .creeParUtilisateurId(
                         candidature.getCreeParUtilisateur() != null
                                 ? candidature.getCreeParUtilisateur().getId()

@@ -2,30 +2,29 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
+import { environment } from '../../../environments/environment.development';
+
 import {
   HistoriqueActionResponse
 } from './historique-action.service';
 
 export interface CompteUtilisateurResponse {
-  id: number;
-
+  id?: number | null;
   nom?: string | null;
   email?: string | null;
   fonction?: string | null;
-
   typeUtilisateur?: string | null;
   actif?: boolean | null;
-
   createdAt?: string | null;
   updatedAt?: string | null;
 }
 
-export interface CompteUtilisateurUpdateRequest {
+export interface UpdateCompteUtilisateurRequest {
   nom: string;
-  fonction: string;
+  fonction?: string | null;
 }
 
-export interface ChangePasswordRequest {
+export interface ChangePasswordCompteRequest {
   oldPassword: string;
   newPassword: string;
   confirmPassword: string;
@@ -36,45 +35,71 @@ export interface ChangePasswordRequest {
 })
 export class CompteUtilisateurService {
 
-  /*
-   IMPORTANT :
-   Ton backend actuel /api/el-emar/compte lit la table utilisateur.
-   Donc il peut marcher pour EL_EMAR et CND si tu ne bloques pas par type.
-   Plus tard, tu peux renommer backend vers /api/compte.
-  */
-  private readonly apiUrl = 'http://localhost:8089/api/el-emar/compte';
+  private readonly apiUrl =
+    `${environment.apiBaseUrl}/api/el-emar/compte`;
 
-  constructor(private http: HttpClient) {}
+  constructor(
+    private readonly http: HttpClient
+  ) {}
 
-  getCompte(utilisateurId: number): Observable<CompteUtilisateurResponse> {
-    return this.http.get<CompteUtilisateurResponse>(
-      `${this.apiUrl}/${utilisateurId}`
+  // =====================================================
+  // MON COMPTE
+  //
+  // Aucun ID dans l'URL.
+  // Le backend retrouve l'utilisateur via le JWT.
+  // =====================================================
+
+  getCompte():
+    Observable<CompteUtilisateurResponse> {
+
+    return this.http.get<
+      CompteUtilisateurResponse
+    >(
+      `${this.apiUrl}/me`
     );
   }
+
+  // =====================================================
+  // MODIFIER MON COMPTE
+  // =====================================================
 
   updateCompte(
-    utilisateurId: number,
-    request: CompteUtilisateurUpdateRequest
+    request: UpdateCompteUtilisateurRequest
   ): Observable<CompteUtilisateurResponse> {
-    return this.http.put<CompteUtilisateurResponse>(
-      `${this.apiUrl}/${utilisateurId}`,
+
+    return this.http.put<
+      CompteUtilisateurResponse
+    >(
+      `${this.apiUrl}/me`,
       request
     );
   }
+
+  // =====================================================
+  // CHANGER MOT DE PASSE
+  // =====================================================
 
   changePassword(
-    utilisateurId: number,
-    request: ChangePasswordRequest
+    request: ChangePasswordCompteRequest
   ): Observable<void> {
+
     return this.http.put<void>(
-      `${this.apiUrl}/${utilisateurId}/password`,
+      `${this.apiUrl}/me/password`,
       request
     );
   }
 
-  getHistorique(utilisateurId: number): Observable<HistoriqueActionResponse[]> {
-    return this.http.get<HistoriqueActionResponse[]>(
-      `${this.apiUrl}/${utilisateurId}/historique`
+  // =====================================================
+  // MON HISTORIQUE
+  // =====================================================
+
+  getHistorique():
+    Observable<HistoriqueActionResponse[]> {
+
+    return this.http.get<
+      HistoriqueActionResponse[]
+    >(
+      `${this.apiUrl}/me/historique`
     );
   }
 }

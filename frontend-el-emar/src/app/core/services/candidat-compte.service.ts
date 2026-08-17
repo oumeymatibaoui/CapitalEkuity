@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { environment } from '../../../environments/environment.development';
 
 export interface ChangePasswordRequest {
   oldPassword: string;
@@ -12,7 +13,7 @@ export interface ChangePasswordRequest {
 })
 export class CandidatCompteService {
 
-  private readonly baseUrl = 'http://localhost:8089/api/candidat/compte';
+  private readonly baseUrl = `${environment.apiBaseUrl}/api/candidat/compte`;
 
   constructor(private http: HttpClient) {}
 

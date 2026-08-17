@@ -28,21 +28,30 @@ import java.util.List;
 @RequiredArgsConstructor
 public class CritereEvaluationService {
 
+    private static final BigDecimal TOTAL_POINTS_PAR_DEFAUT = BigDecimal.valueOf(100);
+    private static final BigDecimal SEUIL_ADMISSION_PAR_DEFAUT = BigDecimal.valueOf(80);
+
     private final CritereEvaluationRepository critereEvaluationRepository;
     private final CriterePieceRepository criterePieceRepository;
     private final GrilleEvaluationLotRepository grilleEvaluationLotRepository;
     private final LotRepository lotRepository;
     private final CategorieEvaluationRepository categorieEvaluationRepository;
 
+    /* =====================================================
+       CONSULTATION
+    ===================================================== */
+
     @Transactional(readOnly = true)
     public List<CritereEvaluationResponse> getAll() {
         return critereEvaluationRepository.findAll()
                 .stream()
-                .sorted(Comparator.comparing(
-                        critere -> critere.getOrdreAffichage() == null
-                                ? 0
-                                : critere.getOrdreAffichage()
-                ))
+                .sorted(
+                        Comparator.comparing(
+                                critere -> critere.getOrdreAffichage() == null
+                                        ? 0
+                                        : critere.getOrdreAffichage()
+                        )
+                )
                 .map(this::toResponse)
                 .toList();
     }
@@ -59,6 +68,8 @@ public class CritereEvaluationService {
 
     @Transactional(readOnly = true)
     public List<CritereEvaluationResponse> getByLot(Long lotId) {
+        requireLotId(lotId);
+
         return critereEvaluationRepository
                 .findByLot_IdOrderByOrdreAffichageAsc(lotId)
                 .stream()
@@ -68,6 +79,8 @@ public class CritereEvaluationService {
 
     @Transactional(readOnly = true)
     public List<CritereEvaluationResponse> getActiveByLot(Long lotId) {
+        requireLotId(lotId);
+
         return critereEvaluationRepository
                 .findByLot_IdAndActifTrueOrderByOrdreAffichageAsc(lotId)
                 .stream()
@@ -77,6 +90,10 @@ public class CritereEvaluationService {
 
     @Transactional(readOnly = true)
     public BigDecimal getTotalByLot(Long lotId) {
+        if (lotId == null) {
+            return BigDecimal.ZERO;
+        }
+
         return critereEvaluationRepository
                 .findByLot_IdAndActifTrueOrderByOrdreAffichageAsc(lotId)
                 .stream()
@@ -89,35 +106,53 @@ public class CritereEvaluationService {
     public BigDecimal getResteByLot(Long lotId) {
         BigDecimal totalGrille = getTotalGrilleByLot(lotId);
         BigDecimal totalUtilise = getTotalByLot(lotId);
+        BigDecimal reste = totalGrille.subtract(totalUtilise);
 
-        return totalGrille.subtract(totalUtilise);
+        return reste.compareTo(BigDecimal.ZERO) < 0
+                ? BigDecimal.ZERO
+                : reste;
     }
+
+    /* =====================================================
+       CRÉATION
+    ===================================================== */
 
     @Transactional
     public CritereEvaluationResponse create(CritereEvaluationRequest request) {
-        Lot lot = findLot(request.getLotId());
+        validateRequest(request);
 
-        CategorieEvaluation categorie = findCategorieIfPresent(
+        Lot lot = findLot(request.getLotId());
+        CategorieEvaluation categorie = findCategorieRequired(
                 request.getCategorieEvaluationId(),
                 lot
         );
-
-        String sectionFinale = categorie != null
-                ? categorie.getLibelle()
-                : clean(request.getSection());
 
         GrilleEvaluationLot grille = findOrCreateGrille(
                 request.getGrilleEvaluationLotId(),
                 lot
         );
 
+        validateGrilleMatchesLot(grille, lot);
+
         BigDecimal points = safePoints(request.getPointsMax());
+        Boolean actif = request.getActif() != null ? request.getActif() : true;
 
         validateTotalPointsForCreate(
                 lot.getId(),
                 grille,
                 points,
-                request.getActif()
+                actif
+        );
+
+        String libelleCritere = cleanRequired(
+                request.getLibelleCritere(),
+                "Le libellé du critère est obligatoire"
+        );
+
+        String typeChamp = resolveTypeChamp(request.getTypeChamp());
+        String typeNotation = resolveTypeNotation(
+                request.getTypeNotation(),
+                typeChamp
         );
 
         CritereEvaluation critere = CritereEvaluation.builder()
@@ -125,27 +160,41 @@ public class CritereEvaluationService {
                 .lot(lot)
                 .categorieEvaluation(categorie)
 
+                /*
+                 * IMPORTANT : la colonne section est NOT NULL en base.
+                 * L'utilisateur ne la saisit plus : elle est automatiquement
+                 * synchronisée avec la catégorie choisie.
+                 */
+                .section(resolveSection(categorie))
+
                 .codeCritere(cleanUpper(request.getCodeCritere()))
-                .section(sectionFinale)
-                .libelleCritere(clean(request.getLibelleCritere()))
+                .libelleCritere(libelleCritere)
 
-                .labelCandidat(clean(request.getLabelCandidat()))
-                .aideCandidat(clean(request.getAideCandidat()))
-                .raisonDonnee(clean(request.getRaisonDonnee()))
-                .noteCandidat(clean(request.getNoteCandidat()))
-
-                .noteEvaluateur(clean(request.getNoteEvaluateur()))
+                /*
+                 * Si aucun label candidat n'est saisi, le libellé métier
+                 * devient automatiquement le label affiché au candidat.
+                 */
+                .labelCandidat(
+                        hasText(request.getLabelCandidat())
+                                ? request.getLabelCandidat().trim()
+                                : libelleCritere
+                )
+                .aideCandidat(cleanNullable(request.getAideCandidat()))
+                .raisonDonnee(cleanNullable(request.getRaisonDonnee()))
+                .noteCandidat(cleanNullable(request.getNoteCandidat()))
+                .noteEvaluateur(cleanNullable(request.getNoteEvaluateur()))
 
                 .pointsMax(points)
-                .baremeNotation(clean(request.getBaremeNotation()))
-                .typeNotation(defaultValue(request.getTypeNotation(), "MANUEL"))
+                .baremeNotation(cleanNullable(request.getBaremeNotation()))
+                .typeNotation(typeNotation)
 
-                .typeChamp(defaultValue(request.getTypeChamp(), "TEXT"))
-                .optionsChamp(clean(request.getOptionsChamp()))
-                .obligatoire(request.getObligatoire() != null ? request.getObligatoire() : false)
+                .typeChamp(typeChamp)
+                .optionsChamp(cleanNullable(request.getOptionsChamp()))
+                .obligatoire(request.getObligatoire() == null
+                        || Boolean.TRUE.equals(request.getObligatoire()))
 
-                .ordreAffichage(request.getOrdreAffichage() != null ? request.getOrdreAffichage() : 0)
-                .actif(request.getActif() != null ? request.getActif() : true)
+                .ordreAffichage(resolveCreateOrder(lot.getId(), request.getOrdreAffichage()))
+                .actif(actif)
                 .build();
 
         CritereEvaluation saved = critereEvaluationRepository.save(critere);
@@ -155,61 +204,94 @@ public class CritereEvaluationService {
         return toResponse(saved);
     }
 
-    @Transactional
-    public CritereEvaluationResponse update(Long id, CritereEvaluationRequest request) {
-        CritereEvaluation critere = findCritere(id);
+    /* =====================================================
+       MODIFICATION
+    ===================================================== */
 
+    @Transactional
+    public CritereEvaluationResponse update(
+            Long id,
+            CritereEvaluationRequest request
+    ) {
+        validateRequest(request);
+
+        CritereEvaluation critere = findCritere(id);
         Lot lot = findLot(request.getLotId());
 
-        CategorieEvaluation categorie = findCategorieIfPresent(
+        CategorieEvaluation categorie = findCategorieRequired(
                 request.getCategorieEvaluationId(),
                 lot
         );
-
-        String sectionFinale = categorie != null
-                ? categorie.getLibelle()
-                : clean(request.getSection());
 
         GrilleEvaluationLot grille = findOrCreateGrille(
                 request.getGrilleEvaluationLotId(),
                 lot
         );
 
+        validateGrilleMatchesLot(grille, lot);
+
         BigDecimal points = safePoints(request.getPointsMax());
+        Boolean actif = request.getActif() != null
+                ? request.getActif()
+                : Boolean.TRUE.equals(critere.getActif());
 
         validateTotalPointsForUpdate(
                 lot.getId(),
                 grille,
                 points,
-                request.getActif(),
+                actif,
                 id
+        );
+
+        String libelleCritere = cleanRequired(
+                request.getLibelleCritere(),
+                "Le libellé du critère est obligatoire"
+        );
+
+        String typeChamp = resolveTypeChamp(request.getTypeChamp());
+        String typeNotation = resolveTypeNotation(
+                request.getTypeNotation(),
+                typeChamp
         );
 
         critere.setGrilleEvaluationLot(grille);
         critere.setLot(lot);
         critere.setCategorieEvaluation(categorie);
 
+        /* Synchronisation automatique avec la catégorie. */
+        critere.setSection(resolveSection(categorie));
+
         critere.setCodeCritere(cleanUpper(request.getCodeCritere()));
-        critere.setSection(sectionFinale);
-        critere.setLibelleCritere(clean(request.getLibelleCritere()));
+        critere.setLibelleCritere(libelleCritere);
 
-        critere.setLabelCandidat(clean(request.getLabelCandidat()));
-        critere.setAideCandidat(clean(request.getAideCandidat()));
-        critere.setRaisonDonnee(clean(request.getRaisonDonnee()));
-        critere.setNoteCandidat(clean(request.getNoteCandidat()));
-
-        critere.setNoteEvaluateur(clean(request.getNoteEvaluateur()));
+        critere.setLabelCandidat(
+                hasText(request.getLabelCandidat())
+                        ? request.getLabelCandidat().trim()
+                        : libelleCritere
+        );
+        critere.setAideCandidat(cleanNullable(request.getAideCandidat()));
+        critere.setRaisonDonnee(cleanNullable(request.getRaisonDonnee()));
+        critere.setNoteCandidat(cleanNullable(request.getNoteCandidat()));
+        critere.setNoteEvaluateur(cleanNullable(request.getNoteEvaluateur()));
 
         critere.setPointsMax(points);
-        critere.setBaremeNotation(clean(request.getBaremeNotation()));
-        critere.setTypeNotation(defaultValue(request.getTypeNotation(), "MANUEL"));
+        critere.setBaremeNotation(cleanNullable(request.getBaremeNotation()));
+        critere.setTypeNotation(typeNotation);
 
-        critere.setTypeChamp(defaultValue(request.getTypeChamp(), "TEXT"));
-        critere.setOptionsChamp(clean(request.getOptionsChamp()));
-        critere.setObligatoire(request.getObligatoire() != null ? request.getObligatoire() : false);
+        critere.setTypeChamp(typeChamp);
+        critere.setOptionsChamp(cleanNullable(request.getOptionsChamp()));
+        critere.setObligatoire(
+                request.getObligatoire() == null
+                        ? Boolean.TRUE.equals(critere.getObligatoire())
+                        : Boolean.TRUE.equals(request.getObligatoire())
+        );
 
-        critere.setOrdreAffichage(request.getOrdreAffichage() != null ? request.getOrdreAffichage() : 0);
-        critere.setActif(request.getActif() != null ? request.getActif() : true);
+        if (request.getOrdreAffichage() != null
+                && request.getOrdreAffichage() > 0) {
+            critere.setOrdreAffichage(request.getOrdreAffichage());
+        }
+
+        critere.setActif(actif);
 
         CritereEvaluation saved = critereEvaluationRepository.save(critere);
 
@@ -217,6 +299,10 @@ public class CritereEvaluationService {
 
         return toResponse(saved);
     }
+
+    /* =====================================================
+       ACTIVATION / SUPPRESSION
+    ===================================================== */
 
     @Transactional
     public void deactivate(Long id) {
@@ -229,13 +315,20 @@ public class CritereEvaluationService {
     public CritereEvaluationResponse toggleActif(Long id) {
         CritereEvaluation critere = findCritere(id);
 
-        Boolean current = critere.getActif() != null ? critere.getActif() : false;
-        Boolean next = !current;
+        boolean current = Boolean.TRUE.equals(critere.getActif());
+        boolean next = !current;
 
         if (next) {
+            GrilleEvaluationLot grille = critere.getGrilleEvaluationLot();
+
+            if (grille == null) {
+                grille = findOrCreateGrille(null, critere.getLot());
+                critere.setGrilleEvaluationLot(grille);
+            }
+
             validateTotalPointsForUpdate(
                     critere.getLot().getId(),
-                    critere.getGrilleEvaluationLot(),
+                    grille,
                     safePoints(critere.getPointsMax()),
                     true,
                     critere.getId()
@@ -250,32 +343,52 @@ public class CritereEvaluationService {
     @Transactional
     public void delete(Long id) {
         CritereEvaluation critere = findCritere(id);
+
+        List<CriterePiece> pieces = criterePieceRepository
+                .findByCritereEvaluation_IdOrderByOrdreAffichageAsc(id);
+
+        if (!pieces.isEmpty()) {
+            criterePieceRepository.deleteAll(pieces);
+        }
+
         critereEvaluationRepository.delete(critere);
     }
+
+    /* =====================================================
+       PIÈCES
+    ===================================================== */
 
     private void replacePieces(
             CritereEvaluation critere,
             List<CriterePieceRequest> pieces
     ) {
-        List<CriterePiece> oldPieces =
-                criterePieceRepository.findByCritereEvaluation_IdOrderByOrdreAffichageAsc(
+        List<CriterePiece> oldPieces = criterePieceRepository
+                .findByCritereEvaluation_IdOrderByOrdreAffichageAsc(
                         critere.getId()
                 );
 
-        criterePieceRepository.deleteAll(oldPieces);
+        if (!oldPieces.isEmpty()) {
+            criterePieceRepository.deleteAll(oldPieces);
+        }
 
         if (pieces == null || pieces.isEmpty()) {
             return;
         }
 
-        int ordre = 1;
+        int ordreParDefaut = 1;
 
         for (CriterePieceRequest request : pieces) {
+            if (request == null) {
+                continue;
+            }
+
             String nomPiece = clean(request.getNomPiece());
 
             if (nomPiece.isBlank()) {
                 continue;
             }
+
+            String format = clean(request.getFormatAccepte());
 
             CriterePiece piece = CriterePiece.builder()
                     .critereEvaluation(critere)
@@ -285,45 +398,61 @@ public class CritereEvaluationService {
                                     : generatePieceCode(nomPiece)
                     )
                     .nomPiece(nomPiece)
-                    .raisonPiece(clean(request.getRaisonPiece()))
-                    .noteCandidat(clean(request.getNoteCandidat()))
-                    .noteEvaluateur(clean(request.getNoteEvaluateur()))
-                    .formatAccepte(
-                            clean(request.getFormatAccepte()).isBlank()
-                                    ? "PDF"
-                                    : clean(request.getFormatAccepte())
+                    .raisonPiece(cleanNullable(request.getRaisonPiece()))
+                    .noteCandidat(cleanNullable(request.getNoteCandidat()))
+                    .noteEvaluateur(cleanNullable(request.getNoteEvaluateur()))
+                    .formatAccepte(format.isBlank() ? "PDF" : format)
+                    .obligatoire(
+                            request.getObligatoire() != null
+                                    ? request.getObligatoire()
+                                    : true
                     )
-                    .obligatoire(request.getObligatoire() != null ? request.getObligatoire() : true)
-                    .conditionReponse(clean(request.getConditionReponse()))
-                    .ordreAffichage(request.getOrdreAffichage() != null ? request.getOrdreAffichage() : ordre)
-                    .actif(request.getActif() != null ? request.getActif() : true)
+                    .conditionReponse(cleanNullable(request.getConditionReponse()))
+                    .ordreAffichage(
+                            request.getOrdreAffichage() != null
+                                    ? request.getOrdreAffichage()
+                                    : ordreParDefaut
+                    )
+                    .actif(
+                            request.getActif() != null
+                                    ? request.getActif()
+                                    : true
+                    )
                     .build();
 
             criterePieceRepository.save(piece);
-            ordre++;
+            ordreParDefaut++;
         }
     }
 
+    /* =====================================================
+       MAPPING RESPONSE
+    ===================================================== */
+
     private CritereEvaluationResponse toResponse(CritereEvaluation critere) {
-        List<CriterePieceResponse> pieces =
-                criterePieceRepository.findByCritereEvaluation_IdOrderByOrdreAffichageAsc(
-                                critere.getId()
-                        )
-                        .stream()
-                        .map(this::toPieceResponse)
-                        .toList();
+        List<CriterePieceResponse> pieces = criterePieceRepository
+                .findByCritereEvaluation_IdOrderByOrdreAffichageAsc(
+                        critere.getId()
+                )
+                .stream()
+                .map(this::toPieceResponse)
+                .toList();
 
         CategorieEvaluation categorie = critere.getCategorieEvaluation();
 
+        String section = hasText(critere.getSection())
+                ? critere.getSection().trim()
+                : categorie != null
+                ? cleanNullable(categorie.getLibelle())
+                : null;
+
         return CritereEvaluationResponse.builder()
                 .critereEvaluationId(critere.getId())
-
                 .grilleEvaluationLotId(
                         critere.getGrilleEvaluationLot() != null
                                 ? critere.getGrilleEvaluationLot().getId()
                                 : null
                 )
-
                 .lotId(
                         critere.getLot() != null
                                 ? critere.getLot().getId()
@@ -334,45 +463,31 @@ public class CritereEvaluationService {
                                 ? critere.getLot().getNomLot()
                                 : null
                 )
-
                 .categorieEvaluationId(
-                        categorie != null
-                                ? categorie.getId()
-                                : null
+                        categorie != null ? categorie.getId() : null
                 )
                 .categorieEvaluationCode(
-                        categorie != null
-                                ? categorie.getCode()
-                                : null
+                        categorie != null ? categorie.getCode() : null
                 )
                 .categorieEvaluationLibelle(
-                        categorie != null
-                                ? categorie.getLibelle()
-                                : null
+                        categorie != null ? categorie.getLibelle() : null
                 )
-
                 .codeCritere(critere.getCodeCritere())
-                .section(critere.getSection())
+                .section(section)
                 .libelleCritere(critere.getLibelleCritere())
-
                 .labelCandidat(critere.getLabelCandidat())
                 .aideCandidat(critere.getAideCandidat())
                 .raisonDonnee(critere.getRaisonDonnee())
                 .noteCandidat(critere.getNoteCandidat())
-
                 .noteEvaluateur(critere.getNoteEvaluateur())
-
                 .pointsMax(critere.getPointsMax())
                 .baremeNotation(critere.getBaremeNotation())
                 .typeNotation(critere.getTypeNotation())
-
                 .typeChamp(critere.getTypeChamp())
                 .optionsChamp(critere.getOptionsChamp())
                 .obligatoire(critere.getObligatoire())
-
                 .ordreAffichage(critere.getOrdreAffichage())
                 .actif(critere.getActif())
-
                 .pieces(pieces)
                 .build();
     }
@@ -398,7 +513,18 @@ public class CritereEvaluationService {
                 .build();
     }
 
+    /* =====================================================
+       RECHERCHE ET VALIDATION
+    ===================================================== */
+
     private CritereEvaluation findCritere(Long id) {
+        if (id == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "L'identifiant du critère est obligatoire"
+            );
+        }
+
         return critereEvaluationRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND,
@@ -407,12 +533,7 @@ public class CritereEvaluationService {
     }
 
     private Lot findLot(Long lotId) {
-        if (lotId == null) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Le lot est obligatoire pour un critère d'évaluation"
-            );
-        }
+        requireLotId(lotId);
 
         return lotRepository.findById(lotId)
                 .orElseThrow(() -> new ResponseStatusException(
@@ -421,66 +542,163 @@ public class CritereEvaluationService {
                 ));
     }
 
-    private CategorieEvaluation findCategorieIfPresent(
+    private void requireLotId(Long lotId) {
+        if (lotId == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Le lot est obligatoire"
+            );
+        }
+    }
+
+    private CategorieEvaluation findCategorieRequired(
             Long categorieId,
             Lot lot
     ) {
         if (categorieId == null) {
-            return null;
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "La catégorie d'évaluation est obligatoire"
+            );
         }
 
-        CategorieEvaluation categorie = categorieEvaluationRepository.findById(categorieId)
+        CategorieEvaluation categorie = categorieEvaluationRepository
+                .findById(categorieId)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND,
-                        "Catégorie d’évaluation introuvable"
+                        "Catégorie d'évaluation introuvable"
                 ));
 
-        if (
-                categorie.getTypeIntervenant() != null
-                        && lot.getTypeIntervenant() != null
-                        && !categorie.getTypeIntervenant().getId()
-                        .equals(lot.getTypeIntervenant().getId())
-        ) {
+        validateCategorieForLot(categorie, lot);
+        return categorie;
+    }
+
+    private void validateCategorieForLot(
+            CategorieEvaluation categorie,
+            Lot lot
+    ) {
+        if (!Boolean.TRUE.equals(categorie.getActif())) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "La catégorie sélectionnée est désactivée"
+            );
+        }
+
+        if (categorie.getTypeIntervenant() == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "La catégorie ne possède pas de type d'intervenant"
+            );
+        }
+
+        if (lot.getTypeIntervenant() == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Le lot ne possède pas de type d'intervenant"
+            );
+        }
+
+        if (!categorie.getTypeIntervenant().getId()
+                .equals(lot.getTypeIntervenant().getId())) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "La catégorie ne correspond pas au type du lot"
             );
         }
 
-        if (
-                categorie.getLot() != null
-                        && !categorie.getLot().getId().equals(lot.getId())
-        ) {
+        if (categorie.getLot() != null
+                && !categorie.getLot().getId().equals(lot.getId())) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "La catégorie ne correspond pas au lot sélectionné"
             );
         }
-
-        return categorie;
     }
+
+    private void validateRequest(CritereEvaluationRequest request) {
+        if (request == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Les informations du critère sont obligatoires"
+            );
+        }
+
+        if (request.getLotId() == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Le lot est obligatoire"
+            );
+        }
+
+        if (request.getCategorieEvaluationId() == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "La catégorie est obligatoire"
+            );
+        }
+
+        if (!hasText(request.getLibelleCritere())) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Le libellé du critère est obligatoire"
+            );
+        }
+
+        if (request.getPointsMax() == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Le nombre de points est obligatoire"
+            );
+        }
+
+        if (request.getPointsMax().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Le nombre de points doit être supérieur à zéro"
+            );
+        }
+
+        String typeChamp = resolveTypeChamp(request.getTypeChamp());
+
+        if ("SELECT".equals(typeChamp)
+                && !hasText(request.getOptionsChamp())) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Les options sont obligatoires pour un champ de type liste"
+            );
+        }
+    }
+
+    /* =====================================================
+       GRILLE ET TOTAL DES POINTS
+    ===================================================== */
 
     private GrilleEvaluationLot findOrCreateGrille(
             Long grilleId,
             Lot lot
     ) {
         if (grilleId != null) {
-            return grilleEvaluationLotRepository.findById(grilleId)
+            return grilleEvaluationLotRepository
+                    .findById(grilleId)
                     .orElseThrow(() -> new ResponseStatusException(
                             HttpStatus.NOT_FOUND,
                             "Grille d'évaluation introuvable"
                     ));
         }
 
-        return grilleEvaluationLotRepository.findFirstByLot_IdAndActifTrue(lot.getId())
+        return grilleEvaluationLotRepository
+                .findFirstByLot_IdAndActifTrue(lot.getId())
                 .orElseGet(() -> {
                     GrilleEvaluationLot grille = GrilleEvaluationLot.builder()
                             .lot(lot)
                             .codeGrille("GRILLE-" + cleanUpper(lot.getNomLot()))
                             .nomGrille("Grille d'évaluation - " + lot.getNomLot())
-                            .description("Grille générée automatiquement pour le lot " + lot.getNomLot())
-                            .totalPoints(BigDecimal.valueOf(100))
-                            .seuilAdmission(BigDecimal.valueOf(80))
+                            .description(
+                                    "Grille générée automatiquement pour le lot "
+                                            + lot.getNomLot()
+                            )
+                            .totalPoints(TOTAL_POINTS_PAR_DEFAUT)
+                            .seuilAdmission(SEUIL_ADMISSION_PAR_DEFAUT)
                             .actif(true)
                             .build();
 
@@ -488,10 +706,30 @@ public class CritereEvaluationService {
                 });
     }
 
+    private void validateGrilleMatchesLot(
+            GrilleEvaluationLot grille,
+            Lot lot
+    ) {
+        if (grille == null
+                || grille.getLot() == null
+                || !grille.getLot().getId().equals(lot.getId())) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "La grille ne correspond pas au lot sélectionné"
+            );
+        }
+    }
+
     private BigDecimal getTotalGrilleByLot(Long lotId) {
-        return grilleEvaluationLotRepository.findFirstByLot_IdAndActifTrue(lotId)
+        if (lotId == null) {
+            return TOTAL_POINTS_PAR_DEFAUT;
+        }
+
+        return grilleEvaluationLotRepository
+                .findFirstByLot_IdAndActifTrue(lotId)
                 .map(GrilleEvaluationLot::getTotalPoints)
-                .orElse(BigDecimal.valueOf(100));
+                .filter(points -> points != null)
+                .orElse(TOTAL_POINTS_PAR_DEFAUT);
     }
 
     private void validateTotalPointsForCreate(
@@ -506,19 +744,17 @@ public class CritereEvaluationService {
 
         BigDecimal currentTotal = getTotalByLot(lotId);
         BigDecimal newTotal = currentTotal.add(newPoints);
-        BigDecimal max = grille.getTotalPoints() != null
+        BigDecimal maximum = grille.getTotalPoints() != null
                 ? grille.getTotalPoints()
-                : BigDecimal.valueOf(100);
+                : TOTAL_POINTS_PAR_DEFAUT;
 
-        if (newTotal.compareTo(max) > 0) {
+        if (newTotal.compareTo(maximum) > 0) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "Total des points du lot dépassé. Total actuel : "
-                            + currentTotal
-                            + ", nouveau total : "
-                            + newTotal
-                            + ", maximum : "
-                            + max
+                    "Total des points du lot dépassé. "
+                            + "Total actuel : " + currentTotal
+                            + ", nouveau total : " + newTotal
+                            + ", maximum : " + maximum
             );
         }
     }
@@ -534,38 +770,89 @@ public class CritereEvaluationService {
             return;
         }
 
-        BigDecimal currentTotalWithoutThis =
-                critereEvaluationRepository.findByLot_IdAndActifTrueOrderByOrdreAffichageAsc(lotId)
-                        .stream()
-                        .filter(critere -> !critere.getId().equals(currentCritereId))
-                        .map(CritereEvaluation::getPointsMax)
-                        .filter(points -> points != null)
-                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalSansCritere = critereEvaluationRepository
+                .findByLot_IdAndActifTrueOrderByOrdreAffichageAsc(lotId)
+                .stream()
+                .filter(critere -> !critere.getId().equals(currentCritereId))
+                .map(CritereEvaluation::getPointsMax)
+                .filter(points -> points != null)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        BigDecimal newTotal = currentTotalWithoutThis.add(newPoints);
-        BigDecimal max = grille.getTotalPoints() != null
+        BigDecimal newTotal = totalSansCritere.add(newPoints);
+        BigDecimal maximum = grille.getTotalPoints() != null
                 ? grille.getTotalPoints()
-                : BigDecimal.valueOf(100);
+                : TOTAL_POINTS_PAR_DEFAUT;
 
-        if (newTotal.compareTo(max) > 0) {
+        if (newTotal.compareTo(maximum) > 0) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "Total des points du lot dépassé. Total sans ce critère : "
-                            + currentTotalWithoutThis
-                            + ", nouveau total : "
-                            + newTotal
-                            + ", maximum : "
-                            + max
+                    "Total des points du lot dépassé. "
+                            + "Total sans ce critère : " + totalSansCritere
+                            + ", nouveau total : " + newTotal
+                            + ", maximum : " + maximum
             );
         }
     }
+
+    /* =====================================================
+       AUTOMATISATION / SIMPLIFICATION DU FORMULAIRE
+    ===================================================== */
+
+    private String resolveSection(CategorieEvaluation categorie) {
+        if (categorie == null || !hasText(categorie.getLibelle())) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "La catégorie sélectionnée ne possède pas de libellé"
+            );
+        }
+
+        return categorie.getLibelle().trim();
+    }
+
+    private String resolveTypeChamp(String typeChamp) {
+        String value = cleanUpper(typeChamp);
+        return value.isBlank() ? "TEXT" : value;
+    }
+
+    private String resolveTypeNotation(
+            String requestedTypeNotation,
+            String typeChamp
+    ) {
+        if (hasText(requestedTypeNotation)) {
+            return cleanUpper(requestedTypeNotation);
+        }
+
+        return switch (resolveTypeChamp(typeChamp)) {
+            case "BOOLEAN" -> "OUI_NON";
+            case "NUMBER" -> "SEUIL_NUMERIQUE";
+            case "SELECT" -> "AUTOMATIQUE";
+            default -> "MANUEL";
+        };
+    }
+
+    private Integer resolveCreateOrder(
+            Long lotId,
+            Integer requestedOrder
+    ) {
+        if (requestedOrder != null && requestedOrder > 0) {
+            return requestedOrder;
+        }
+
+        return critereEvaluationRepository
+                .findByLot_IdOrderByOrdreAffichageAsc(lotId)
+                .size() + 1;
+    }
+
+    /* =====================================================
+       UTILITAIRES
+    ===================================================== */
 
     private String generatePieceCode(String nomPiece) {
         if (!hasText(nomPiece)) {
             return "PIECE";
         }
 
-        String cleaned = nomPiece
+        String generated = nomPiece
                 .trim()
                 .toUpperCase()
                 .replace("É", "E")
@@ -581,11 +868,11 @@ public class CritereEvaluationService {
                 .replaceAll("[^A-Z0-9]+", "-")
                 .replaceAll("^-|-$", "");
 
-        if (cleaned.length() > 25) {
-            cleaned = cleaned.substring(0, 25);
+        if (generated.length() > 25) {
+            generated = generated.substring(0, 25);
         }
 
-        return cleaned.isBlank() ? "PIECE" : cleaned;
+        return generated.isBlank() ? "PIECE" : generated;
     }
 
     private BigDecimal safePoints(BigDecimal value) {
@@ -596,13 +883,25 @@ public class CritereEvaluationService {
         return value == null ? "" : value.trim();
     }
 
-    private String cleanUpper(String value) {
-        return clean(value).toUpperCase();
+    private String cleanNullable(String value) {
+        if (!hasText(value)) {
+            return null;
+        }
+        return value.trim();
     }
 
-    private String defaultValue(String value, String defaultValue) {
-        String cleaned = clean(value);
-        return cleaned.isBlank() ? defaultValue : cleaned;
+    private String cleanRequired(String value, String message) {
+        if (!hasText(value)) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    message
+            );
+        }
+        return value.trim();
+    }
+
+    private String cleanUpper(String value) {
+        return clean(value).toUpperCase();
     }
 
     private boolean hasText(String value) {
